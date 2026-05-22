@@ -95,8 +95,12 @@ async def _npm_extract(identifier: str, metric: str) -> Any:
             v = data.get("versions", {}).get(latest, {}).get("license", "Unknown")
         return v
     if metric == "downloads":
+        # npm download stats live on a separate api.npmjs.org subdomain;
+        # registry.npmjs.org/-/downloads/* returns 404 for all packages
+        # (verified 2026-05-20). Scoped paths (@scope/name) work unencoded
+        # on the api host.
         dl = await fetch_json(
-            f"https://registry.npmjs.org/-/downloads/point/last-week/{identifier}",
+            f"https://api.npmjs.org/downloads/point/last-week/{identifier}",
             provider="npm",
         )
         return dl.get("downloads", 0)

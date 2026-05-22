@@ -60,19 +60,38 @@
   <animate attributeName="x2" values="0.4;1.8;0.4"  dur="18s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
 </linearGradient>
 
+{# v0.3.9 Bug H: bevel filter restores the specular-lighting composite when
+   the genome declares ``material.filter_chain: "specular-bevel"`` (chrome).
+   Reference implementation: templates/frames/icon/chrome-defs.j2 — same
+   chain (feDropShadow + feSpecularLighting + feComposite arithmetic) so
+   chart bevels match the icon's material discipline. Genomes that
+   declare "none" (brutalist, automata) get the plain drop-shadow path. #}
 <filter id="{{ uid }}-bevel" x="-2%" y="-3%" width="104%" height="108%">
   <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000000" flood-opacity="{{ bevel_shadow_opacity | default('0.5') }}"/>
+  {% if material_filter_chain == "specular-bevel" %}
+  <feSpecularLighting in="SourceAlpha" surfaceScale="1.6" specularConstant="0.55"
+    specularExponent="16" lighting-color="{{ specular_light }}" result="spec">
+    <feDistantLight azimuth="225" elevation="45"/>
+  </feSpecularLighting>
+  <feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn"/>
+  <feComposite in="SourceGraphic" in2="specIn" operator="arithmetic"
+    k1="0" k2="1" k3="0.2" k4="0"/>
+  {% endif %}
 </filter>
 
-{# Data line glow — outer white halo + inner genome-highlight halo.
+{# v0.3.9 Bug H: lineglow opacity hierarchy inverted so the line stroke
+   reads as the BRIGHTEST element (was: specular halo at 0.95 outshone the
+   line at full-opacity; user reported "line should be brighter than the
+   glow bloom around it"). Outer white at 0.35, inner specular at 0.55 —
+   line renders on top via SourceGraphic merge and dominates visually.
    feFlood flood-color accepts hex only (not var()), so we substitute the
    genome's specular_light if provided and fall back to chrome cyan. #}
 <filter id="{{ uid }}-lineglow" x="-15%" y="-50%" width="130%" height="200%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="blur1"/>
-  <feFlood flood-color="#FFFFFF" flood-opacity="0.55"/>
+  <feFlood flood-color="#FFFFFF" flood-opacity="0.35"/>
   <feComposite in2="blur1" operator="in" result="glow1"/>
   <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur2"/>
-  <feFlood flood-color="{{ specular_light }}" flood-opacity="0.95"/>
+  <feFlood flood-color="{{ specular_light }}" flood-opacity="0.55"/>
   <feComposite in2="blur2" operator="in" result="glow2"/>
   <feMerge>
     <feMergeNode in="glow1"/>
@@ -105,8 +124,8 @@
 <style>
   {{ font_faces | safe }}
   text { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); shape-rendering: geometricPrecision; }
-  .{{ uid }}-label       { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; fill: var(--dna-signal); }
-  .{{ uid }}-identity    { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; fill: var(--dna-ink-primary); }
+  .{{ uid }}-label       { font-family: var(--dna-font-display, 'Orbitron', sans-serif); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--dna-signal); }
+  .{{ uid }}-identity    { font-family: '{{ identity_font_family | default("Orbitron") }}', sans-serif; font-size: {{ identity_font_size | default(11) }}px; font-weight: {{ identity_font_weight | default(700) }}; letter-spacing: {{ identity_letter_spacing_em | default(0.1) }}em; fill: var(--dna-signal); }
   .{{ uid }}-title       { font-family: var(--dna-font-display, 'Orbitron', sans-serif); font-size: 44px; font-weight: 900; letter-spacing: 0.04em; fill: url(#{{ uid }}-ct-title); }
   .{{ uid }}-hero        { font-family: var(--dna-font-display, 'Orbitron', sans-serif); font-size: 48px; font-weight: 900; letter-spacing: -0.01em; fill: url(#{{ uid }}-ct-hero); }
   .{{ uid }}-subtitle    { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 9px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; fill: var(--dna-ink-muted); opacity: 0.9; }
@@ -123,11 +142,11 @@
   .hw-chart-line         { stroke: var(--dna-signal); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; filter: url(#{{ uid }}-lineglow); }
   .hw-chart-area         { fill: none; }
   .hw-chart-area-smooth  { fill: none; }
-  [data-hw-zone="markers"] > rect { fill: var(--dna-ink-primary); stroke: var(--dna-surface-deep); stroke-width: 0.7; }
+  [data-hw-zone="markers"] > rect { fill: var(--hw-core, var(--dna-signal)); stroke: var(--dna-surface-deep); stroke-width: 0.7; }
   .hw-chart-endpoint     { animation: {{ uid }}-breathe 2.618s ease-in-out infinite; will-change: opacity; }
   .hw-chart-milestone-line  { stroke: var(--dna-signal); stroke-width: 0.5; opacity: 0.35; }
   .hw-chart-milestone-label { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em; fill: var(--dna-ink-primary); }
-  [data-hw-status="active"], [data-hw-status="passing"] { --hw-core: var(--dna-status-passing-core, #22C55E); }
+  [data-hw-status="active"], [data-hw-status="passing"] { --hw-core: var(--dna-signal); }
   [data-hw-status="warning"] { --hw-core: var(--dna-status-warning-core, #F59E0B); }
   [data-hw-status="critical"], [data-hw-status="failing"] { --hw-core: var(--dna-status-failing-core, #EF4444); }
   @keyframes {{ uid }}-breathe       { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }

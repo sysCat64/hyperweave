@@ -179,9 +179,9 @@ def test_brutalist_marquee_uses_rect_separators() -> None:
         )
     ).svg
     # Two items between three labels → at least 2 separator rects per Set; 4 total.
-    # Round 7 wraps separator_color in var(--dna-signal, ...) so chrome variants
-    # cascade naturally; brutalist's accent (#10B981) matches its separator hex
-    # so the fallback case still equals the original color.
+    # separator_color wraps in var(--dna-signal, ...) so chrome variants
+    # cascade naturally; brutalist's accent (#10B981) matches its separator
+    # hex so the fallback case still equals the original color.
     rect_seps = re.findall(
         r'<rect [^>]*width="6" height="6"[^>]*fill="var\(--dna-signal, #10B981\)"[^>]*shape-rendering="crispEdges"',
         svg,
@@ -330,11 +330,13 @@ def test_chrome_icon_square_uses_bevel_filter_not_simple_shadow() -> None:
 
 
 def test_chrome_icon_circle_omits_bevel_filter_application() -> None:
-    """Round 6 removed feSpecularLighting from the circle envelope STROKE because
-    the 5-unit annular geometry is too narrow for the kernel — highlight pixelated
-    as visible grain at 64px display. The filter primitive is still defined (square
-    consumes it), but the circle's envelope no longer applies it; the linearGradient
-    on the stroke carries the metallic sweep cleanly without kernel artifacts."""
+    """Circle envelope stroke omits feSpecularLighting.
+
+    The 5-unit annular geometry is too narrow for the kernel, which makes the
+    highlight pixelate as visible grain at 64px display. The filter primitive
+    is still defined for square icons, but the circle envelope relies on the
+    stroke gradient for a clean metallic sweep.
+    """
     svg = compose(ComposeSpec(type="icon", genome_id="chrome", glyph="github", shape="circle")).svg
     # The envelope <circle> with stroke-width="5" must not reference the bevel filter.
     # Search for the specific pattern to avoid false positives from other elements.

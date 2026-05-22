@@ -1,7 +1,7 @@
-{# HyperWeave Strip Frame — Paradigm-dispatched (Principle 26, Session 2A+2B).
+{# HyperWeave Strip Frame — Paradigm-dispatched by abstract paradigm name.
 
-   Session 2A+2B migration: templates dispatch by abstract paradigm name
-   declared in `genome.paradigms.strip`, not by data-presence or genome identity.
+   Templates dispatch by `genome.paradigms.strip`, not by data-presence or
+   genome identity.
 
    Built-in paradigms:
      "default" → brutalist partial (flat plate, class-based separators)
@@ -30,40 +30,18 @@
 {% set _show_icon_box = show_icon_box | default(false) %}
 {% set _icon_box_size = icon_box_size | default(28) %}
 {% set _icon_box_pad = icon_box_pad | default(8) %}
-{# Icon box geometry: paradigm opts in (cellular). When a glyph is present the
-   box renders at flank_end+pad with the glyph centered inside; identity text
-   sits at box_right+8. When no glyph is present the entire glyph zone
-   collapses — no box, no reserved padding — and identity text sits flush at
-   accent_w + _icon_box_pad. This removes the empty 28×28 pocket that
-   previously appeared on glyphless strips (border-motion proofs, agent
-   prompts that omit `glyph=`). Other paradigms (brutalist/chrome) leave the
-   glyph floating bare in either case. #}
-{% if _show_icon_box and glyph_path %}
-  {% set _icon_box_x = _gz_offset + accent_w + _icon_box_pad %}
-  {% set _icon_box_y = (strip_h - _icon_box_size) // 2 %}
-  {% set glyph_size = _icon_box_size - 10 %}
-  {% set glyph_cx = _icon_box_x + _icon_box_size // 2 %}
-  {% set glyph_cy = _icon_box_y + _icon_box_size // 2 %}
-  {% set identity_x = _icon_box_x + _icon_box_size + 8 %}
-{% elif _show_icon_box %}
-  {# Glyph absent: collapse the entire glyph zone. Identity sits flush after
-     the accent bar + standard pad, no box-shaped void. #}
-  {% set _icon_box_x = 0 %}
-  {% set _icon_box_y = 0 %}
-  {% set glyph_size = 0 %}
-  {% set glyph_cx = 0 %}
-  {% set glyph_cy = 0 %}
-  {% set identity_x = _gz_offset + accent_w + _icon_box_pad %}
-{% else %}
-  {% set glyph_size = 24 %}
-  {% set glyph_cx = _gz_offset + accent_w + 12 + (glyph_size // 2) %}
-  {% set glyph_cy = strip_h // 2 %}
-  {% set identity_x = (glyph_cx + (glyph_size // 2) + 9) if glyph_path else (_gz_offset + accent_w + 14) %}
-{% endif %}
+{# Identity-zone coordinates come from compute_strip_zones; the template only
+   renders those resolved positions. #}
+{% set _icon_box_x = icon_box_x | default(0) %}
+{% set _icon_box_y = icon_box_y | default(0) %}
+{% set glyph_size = strip_glyph_render_size | default(0) %}
+{% set glyph_cx = strip_glyph_cx | default(0) %}
+{% set glyph_cy = strip_glyph_cy | default(0) %}
+{% set identity_x = identity_x | default(0) %}
 {% set metric_pitch = metric_pitch | default(106) %}
 {% set indicator_size = 14 %}
-{% set div_y1 = 8 %}
-{% set div_y2 = strip_h - 8 %}
+{% set div_y1 = strip_divider_y1 | default(8) %}
+{% set div_y2 = strip_divider_y2 | default(44) %}
 {% set paradigm_strip = paradigm | default("default") %}
 
 {# === Frame structure (paradigm-dispatched via include — polymorphism, not a branch) === #}
@@ -90,7 +68,7 @@
    unchanged, so the identity text still sits at the same x-position; the
    box-shaped pocket between flank and identity simply renders as void. #}
 {% if _show_icon_box and glyph_path %}
-<rect x="{{ _icon_box_x }}" y="{{ _icon_box_y }}" width="{{ _icon_box_size }}" height="{{ _icon_box_size }}" fill="{{ icon_box_fill | default('#0a0e14') }}"/>
+<rect x="{{ _icon_box_x }}" y="{{ _icon_box_y }}" width="{{ _icon_box_size }}" height="{{ _icon_box_size }}" fill="{{ icon_box_fill | default('var(--dna-surface-deep)') }}"/>
 <rect x="{{ _icon_box_x }}" y="{{ _icon_box_y }}" width="{{ _icon_box_size }}" height="{{ _icon_box_size }}" fill="none" stroke="{{ icon_box_stroke | default('var(--dna-signal)') }}" stroke-width="0.5" opacity="0.4"/>
 {% endif %}
 
@@ -112,16 +90,18 @@
 {% set first_div_x = first_divider_x | default(143) %}
 <defs>
   <clipPath id="{{ uid }}-id-clip">
-    <rect x="{{ accent_w + _gz_offset }}" y="0" width="{{ first_div_x - accent_w - _gz_offset }}" height="{{ strip_h }}"/>
+    <rect x="{{ identity_clip_x | default(0) }}" y="0" width="{{ identity_clip_width | default(0) }}" height="{{ strip_h }}"/>
   </clipPath>
 </defs>
 <g clip-path="url(#{{ uid }}-id-clip)">
-  {% if show_subtitle | default(false) %}
-    {# Two-line stack: identity top, subtitle bottom, centered vertically. #}
-    <text data-hw-zone="identity" x="{{ identity_x }}" y="{{ (strip_h // 2) - 4 }}" class="{{ uid }}-identity">{{ identity | upper }}</text>
-    <text data-hw-zone="subtitle" x="{{ identity_x }}" y="{{ (strip_h // 2) + 9 }}" font-family="'{{ subtitle_font_family }}',monospace" font-size="{{ subtitle_font_size }}" fill="{{ ink_sub | default('#7e93a6') }}" letter-spacing="{{ subtitle_letter_spacing_em }}em">{{ subtitle_text | default('') }}</text>
+  {% if show_subtitle | default(false) and subtitle_text %}
+    {# Two-line stack: identity top, subtitle bottom, centered vertically.
+       The subtitle gate also checks subtitle_text non-empty so suppressed
+       duplicate subtitles do not emit empty text elements. #}
+    <text data-hw-zone="identity" x="{{ identity_x }}" y="{{ identity_stack_y | default(0) }}" class="{{ uid }}-identity">{{ identity | upper }}</text>
+    <text data-hw-zone="subtitle" x="{{ identity_x }}" y="{{ subtitle_y | default(0) }}" font-family="'{{ subtitle_font_family }}',monospace" font-size="{{ subtitle_font_size }}" fill="{{ ink_sub | default('var(--dna-ink-sub)') }}" letter-spacing="{{ subtitle_letter_spacing_em }}em">{{ subtitle_text }}</text>
   {% else %}
-    <text data-hw-zone="identity" x="{{ identity_x }}" y="{{ (strip_h // 2) + 4 }}" class="{{ uid }}-identity">{{ identity | upper }}</text>
+    <text data-hw-zone="identity" x="{{ identity_x }}" y="{{ identity_single_y | default(0) }}" class="{{ uid }}-identity">{{ identity | upper }}</text>
   {% endif %}
 </g>
 
@@ -133,7 +113,7 @@
    divider while "1.2k" sat at 12. cell_widths[i] is the full seam-to-seam
    distance (resolver: content + 20 pad). #}
 {% set first_div_x = first_divider_x | default(143) %}
-{% set cell_start = first_div_x %}
+{% set _seams = seam_positions | default([]) %}
 {# First divider — stroke sourced from resolver-injected context:
    divider_render_mode = "gradient" → chrome-defs url(#...-sep) gradient
    divider_render_mode = "class"    → profile-declared flat color.
@@ -160,14 +140,14 @@
    No template-side arithmetic; no paradigm-specific branching. Adding a
    new paradigm with a different alignment is a YAML edit only. #}
 {% set _layouts = cell_layouts | default([]) %}
-{% set _ns = namespace(cx=cell_start) %}
 {% for metric in metrics %}
 {% set _layout = _layouts[loop.index0] %}
-{% set _cell_w = _layout.cell_w %}
 {% set _lx = _layout.label_x %}
 {% set _vx = _layout.value_x %}
 {% set _mta = _layout.text_anchor %}
-<g data-hw-zone="metric-{{ loop.index0 }}" transform="translate({{ _ns.cx }},0)">
+{% set _cell_x = _seams[loop.index0] %}
+{% set _trailing_x = _seams[loop.index] %}
+<g data-hw-zone="metric-{{ loop.index0 }}" transform="translate({{ _cell_x }},0)">
   <text x="{{ _lx }}" y="{{ strip_metric_label_y | default(18) }}" text-anchor="{{ _mta }}"
         class="{{ uid }}-metric-label">{{ metric.label | upper }}</text>
   {# Metric value — skew applied only when strip_metric_value_skew != 0
@@ -190,15 +170,14 @@
 {% endif %}
 </g>
 {# Trailing divider after each metric — anchored to this cell's right edge
-   via running cumulative offset (per-cell, not multiplicative). #}
-{% set _ns.cx = _ns.cx + _cell_w %}
+   via resolver-computed seam positions (per-cell, not multiplicative). #}
 {% if divider_render_mode == "gradient" %}
-<line x1="{{ _ns.cx }}" y1="{{ div_y1 }}"
-      x2="{{ _ns.cx }}" y2="{{ div_y2 }}"
+<line x1="{{ _trailing_x }}" y1="{{ div_y1 }}"
+      x2="{{ _trailing_x }}" y2="{{ div_y2 }}"
       stroke="url(#{{ uid }}-sep)" stroke-width="1"/>
 {% else %}
-<line x1="{{ _ns.cx }}" y1="{{ div_y1 }}"
-      x2="{{ _ns.cx }}" y2="{{ div_y2 }}"
+<line x1="{{ _trailing_x }}" y1="{{ div_y1 }}"
+      x2="{{ _trailing_x }}" y2="{{ div_y2 }}"
       stroke="{{ strip_divider_color | default('var(--dna-border)') }}"
       stroke-width="1"
       opacity="{{ strip_divider_opacity | default(1.0) }}"/>
@@ -206,22 +185,15 @@
 {% endfor %}
 
 {# === Status indicator (paradigm-dispatched) ===
-   Prefers the resolver-supplied status_x (flank-aware for cellular strips);
-   falls back to the legacy (last_seam + width) / 2 derivation for genomes
-   whose resolvers don't populate status_x. status_cy stays at the vertical
-   midpoint so the indicator lines up with the metric band. #}
+   The resolver supplies flank-aware status coordinates so the template
+   renders without local position derivation. #}
 {# v0.2.25: gate the status group on show_status_indicator (mode-driven).
    Stateless strips (STARS | FORKS | VERSION) get NO indicator element at
    all — same architectural posture as stateless badges. #}
 {% if show_status_indicator %}
-{% if status_x is defined and status_x is number and status_x > 0 %}
-{% set _status_x = status_x %}
-{% else %}
-{% set _last_seam_x = (first_divider_x | default(143)) + 12 + (metrics | length | default(1)) * metric_pitch %}
-{% set _status_x = (_last_seam_x + width) // 2 %}
-{% endif %}
+{% set _status_x = status_x | default(0) %}
 {% set status_x = _status_x %}
-{% set status_cy = strip_h // 2 %}
+{% set status_cy = status_cy | default(0) %}
 <g data-hw-zone="status" transform="translate({{ status_x }},{{ status_cy }})"
    {% if status_shape_rendering != "geometricPrecision" %}shape-rendering="{{ status_shape_rendering }}"{% endif %}>
 {% include "frames/strip/" ~ paradigm_strip ~ "-status.j2" %}

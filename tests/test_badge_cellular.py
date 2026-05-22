@@ -1,6 +1,6 @@
 """Automata cellular badge — Phase 4 rendering validation.
 
-Covers the 8-case matrix: {blue, purple} x {default, compact} x {version, state}.
+Covers automata's cellular badge structure across version and state modes.
 Assertions verify structural elements and family-specific colors, not byte
 equality — dynamic width from measure_text and UID suffix variance make
 golden-file comparison fragile.
@@ -53,23 +53,24 @@ def test_version_badge_purple_default() -> None:
     # color + CSS var routing are separate cleanup items for v1.1.
 
 
-def test_version_badge_compact_is_smaller() -> None:
+def test_version_badge_default_uses_compact_geometry() -> None:
     default_spec = ComposeSpec(
         type="badge", genome_id="automata", title="PYPI", value="v0.2.5", variant="teal", glyph="python"
     )
-    compact_spec = ComposeSpec(
+    large_spec = ComposeSpec(
         type="badge",
         genome_id="automata",
         title="PYPI",
         value="v0.2.5",
         variant="teal",
-        size="compact",
+        size="large",
         glyph="python",
     )
-    d = compose(default_spec)
-    c = compose(compact_spec)
-    assert c.height < d.height  # 20 vs 32
-    assert c.width < d.width
+    default_result = compose(default_spec)
+    large_result = compose(large_spec)
+    assert default_result.height == 20
+    assert large_result.height == 32
+    assert default_result.width < large_result.width
 
 
 def test_compact_badge_viewbox_is_20_tall() -> None:

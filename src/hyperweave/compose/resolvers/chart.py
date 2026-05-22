@@ -47,12 +47,20 @@ def resolve_chart(
         line_animate = bool(cc.line_animate)
         cellular_cell_size = int(cc.cell_size) if cc.cell_size > 0 else 40
         chart_header_band_height = int(cc.header_band_height)
+        identity_font_family = cc.identity_font_family
+        identity_font_size = cc.identity_font_size
+        identity_font_weight = cc.identity_font_weight
+        identity_letter_spacing_em = cc.identity_letter_spacing_em
     else:
         width, height = 900, 500
         vp = Viewport(x=80, y=150, w=760, h=245)
         line_animate = False
         cellular_cell_size = 40
         chart_header_band_height = 0
+        identity_font_family = "JetBrains Mono"
+        identity_font_size = 12.0
+        identity_font_weight = 700
+        identity_letter_spacing_em = 0.06
 
     # Three-state machine. "fresh" preserved (not renamed to "live") for
     # backward compat with the existing data-hw-status contract; "empty" is
@@ -170,7 +178,7 @@ def resolve_chart(
         "chart_date_range": date_range,
         "data_hw_status": status,
         "chart_line_animate": line_animate,
-        # Cellular paradigm v2 area-fill substrate (Round 6 / Issue G).
+        # Cellular paradigm area-fill substrate.
         # cellular_area_cells: list of {x, y, w, h, fill, anim_class} dicts
         # rendered as <rect> children inside the clipPath group. Empty list
         # for non-cellular paradigms (brutalist/chrome charts skip the
@@ -184,6 +192,10 @@ def resolve_chart(
         "chart_header_band_fill": chart_header_band,
         "chart_info_accent": chart_info_accent,
         "chart_mid_accent": chart_mid_accent,
+        "identity_font_family": identity_font_family,
+        "identity_font_size": identity_font_size,
+        "identity_font_weight": identity_font_weight,
+        "identity_letter_spacing_em": identity_letter_spacing_em,
     }
     # Surface non-fresh states via the document-level data-hw-status attribute.
     # "fresh" stays implicit (live data is the default, no status marker needed).

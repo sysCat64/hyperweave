@@ -49,7 +49,7 @@ def test_cellular_frame_variant_defaults() -> None:
     """v0.3.0 grammar refactor: every frame defaults to teal (the canonical
     solo flagship). Pairing is opt-in via ``?variant=teal&pair=violet`` —
     pre-grammar, the default was the paired ``violet-teal`` slug, but pairing
-    is no longer a baked variant entry. The 12 solo tones each compose with
+    is no longer a baked variant entry. The 16 solo tones each compose with
     any other solo tone via the URL grammar modifier."""
     cellular = get_paradigms()["cellular"]
     assert cellular.frame_variant_defaults.get("badge") == "teal"
@@ -75,6 +75,7 @@ def test_cellular_badge_config_exposes_indicator_flag() -> None:
     assert cellular.badge.show_indicator is True
     assert cellular.badge.value_font_family == "Chakra Petch"
     assert cellular.badge.label_font_family == "Orbitron"
+    assert cellular.badge.label_letter_spacing_em == 0.1
 
 
 def test_automata_satisfies_cellular_requirements() -> None:

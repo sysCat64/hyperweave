@@ -1,9 +1,10 @@
 id: cellular
 name: Cellular
 description: >
-  Compositional chromatic paradigm used by the `automata` genome. Twelve
+  Compositional chromatic paradigm used by the `automata` genome. Sixteen
   tone primitives (violet, teal, bone, steel, amber, jade, magenta, cobalt,
-  toxic, solar, abyssal, crimson) ship as solo variants. Pairing happens at
+  toxic, solar, abyssal, crimson, sulfur, indigo, burgundy, copper) ship as
+  solo variants. Pairing happens at
   request time via the URL grammar modifier ?variant=primary&pair=secondary
   — any solo tone composes with any other solo tone. Templates consume a
   structured cellular_palette dict (primary, secondary, bridge, is_paired)
@@ -45,18 +46,23 @@ frame_variant_defaults:
   chart: teal
 
 badge:
+  default_size: compact
   label_font_family: Orbitron
   value_font_family: Chakra Petch
   label_font_size: 9
   value_font_size: 12
   value_font_weight: 700
+  label_letter_spacing_em: 0.1
   show_indicator: true
   frame_height: 32
   frame_height_compact: 20
   glyph_offset_left: 18
   glyph_offset_left_compact: 12
   glyph_size: 12
-  glyph_size_compact: 8
+  glyph_size_compact: 12
+  glyph_size_ratio: 0.6
+  glyph_size_compact_ratio: 0.6
+  glyph_size_max: 12
   text_y_factor: 0.656
   # Cellular paints a 1px gradient seam at lp_w (template lines 60-61),
   # not the brutalist 2px separator. Override sep_w so the resolver's
@@ -68,6 +74,13 @@ badge:
   # value_zone_right lands 2px past the slab edge and the centered
   # value text drifts 1px right.
   right_canvas_inset: 2
+  # v0.3.9 equal-spacing rule (compute_badge_zones): single pad between every
+  # PRESENT zone. 8px matches cellular's measured visual rhythm (label_font
+  # at 9px, value_font at 12px share an 8px breathing band).
+  pad: 8
+  # Glyph y aligns to the label visual center in compose/layout.py; no
+  # template-side or per-size vertical compensation is needed.
+  glyph_y_offset: 0.0
 
 strip:
   # Specimen cellular-automata-strip-v10.svg is 48px tall (not 52px default).
@@ -203,6 +216,38 @@ stats:
   heatmap_cell_size: 11.080
   heatmap_cell_gap: 1.2
   heatmap_zone_height: 84.76
+  # Username header layout. v0.3.9 Bug #1 follow-up: bio_x is the ADAPTIVE
+  # CEILING (only fires when identity is so long it would push bio off the
+  # card). Post-Bug-A the HYPERWEAVE branding moved from the header right
+  # zone (was at sw-20 y=22) to the footer (y=221), so the header right is
+  # now entirely free. Bio slides right with the username's natural
+  # measured ink end + breathing_margin, only hitting the ceiling for
+  # pathologically long names. The pre-Bug-A constraint where bio had to
+  # leave room for HYPERWEAVE is gone for cellular.
+  #
+  # 410 chosen so VLLM-PROJECT (~130px natural at Orbitron 13/700/0.16em)
+  # never clamps: 20 + 130 + 4 = 154, well under 410. Only usernames
+  # exceeding ~386px natural ink hit the ceiling — none realistic.
+  identity_x: 20
+  bio_x: 410
+  identity_padding: 2
+  # Adaptive bio_x: bio sits at identity_x + identity_ink_width +
+  # identity_breathing_margin. For ELI64S (short, ~52px ink): bio at x=76.
+  # For VLLM-PROJECT (~130px ink): bio at x=154 (no clamp, no squish).
+  identity_breathing_margin: 4
+  # Bug A folded HYPERWEAVE into the footer, eliminating the header-row
+  # collision that bio_collision_clamp was defending against. With
+  # HYPERWEAVE at y=221 there's no right-side header element to collide
+  # with — bio can extend naturally up to the card edge.
+  bio_collision_clamp: false
+  # Identity measurement matches cellular-defs.j2 CSS exactly. Orbitron
+  # 13/700/0.16em produces ~110px natural for 8-char names vs Inter 13/700/0's
+  # 53px, so resolver measurement must use the rendered font.
+  identity_font_family: Orbitron
+  identity_font_size: 13
+  identity_font_weight: 700
+  identity_letter_spacing_em: 0.16
+  identity_text_transform: uppercase
   # Genome-independent paradigm constants. Routed to template context as
   # named template variables (not raw hex) so the variant-blind hex gate
   # stays effective across all 6 cellular tones.

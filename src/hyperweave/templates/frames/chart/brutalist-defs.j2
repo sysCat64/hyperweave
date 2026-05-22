@@ -72,7 +72,7 @@
     --dna-chart-main: var(--dna-bg);
     --dna-chart-highlight: var(--dna-seam-color);
     --dna-chart-axis-text: var(--dna-bg);
-    --dna-chart-glyph: var(--dna-seam-color);
+    --dna-chart-glyph: var(--dna-glyph-inner, var(--dna-seam-color));
     {# Title zone bg uses the per-variant chart_title_bg hex captured from
        the v0.3.2 brutalist light chart prototype (pulse #ECDBC0,
        archive #E8D8C0, depth #DFE3EB, signal #DAE0D4, afterimage #D4CEE4,
@@ -94,7 +94,7 @@
     --dna-chart-main: var(--dna-signal);
     --dna-chart-highlight: var(--dna-signal-dim, var(--dna-signal));
     --dna-chart-axis-text: var(--dna-ink-muted);
-    --dna-chart-glyph: var(--dna-ink-primary);
+    --dna-chart-glyph: var(--dna-glyph-inner, var(--dna-signal));
     --dna-chart-title-bg: var(--dna-surface-deep);
     {# Milestone marker palette (consumed by chart-milestone-brutalist.svg.j2).
        Dark mono: variant accent (signal) outer, canvas (surface_0) mid, cream

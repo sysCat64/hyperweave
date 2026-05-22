@@ -394,6 +394,11 @@ def _base_context(
             resolved,
             spec.glyph_mode,
             resolved.frame_context.get("glyph_fill", "var(--dna-signal)"),
+            # Paradigm-declared glyph_size flows to the inline SVG. Chrome=11
+            # matches _spatial_study.svg prototype; brutalist default=14
+            # preserves the v16 prototype. Previously the inline template
+            # hardcoded 14 and ignored paradigm config.
+            int(resolved.frame_context.get("glyph_render_size") or resolved.frame_context.get("glyph_size") or 14),
         ),
         # Metadata / accessibility
         "title_text": _aria_title(spec),
@@ -445,6 +450,12 @@ def _base_context(
         # Material depth — from genome.material.depth nested dict (e.g.
         # "flat", "deep"). Empty falls back to template default.
         "material_depth": (resolved.genome.get("material") or {}).get("depth", ""),
+        # Material filter chain — from genome.material.filter_chain (e.g.
+        # "specular-bevel", "none"). Templates conditionally emit
+        # feSpecularLighting + feComposite when set to "specular-bevel"
+        # (chrome v0.3.9 Bug H — restores the specular pass on chart bevels
+        # that the chart template had silently dropped to a plain feDropShadow).
+        "material_filter_chain": (resolved.genome.get("material") or {}).get("filter_chain", "none"),
         # Form language — from genome.structural.data_layout (e.g.
         # "brutalist", "geometric"). Indicates the artifact's compositional
         # grammar for metadata consumers.
@@ -648,10 +659,10 @@ def _ctx_chart(spec: ComposeSpec, resolved: ResolvedArtifact, css: dict[str, str
     ctx["chart_milestones"] = []
     ctx["chart_empty_state"] = None
     ctx["data_hw_status"] = "fresh"
-    # Cellular automata chart substrate (Round 13). Three layers: dormant
-    # softens void→data clip boundary, active cells under polyline, markers
-    # progress through chart_levels. Empty defaults so StrictUndefined never
-    # fires on non-cellular paradigms.
+    # Cellular automata chart substrate. Three layers: dormant cells soften
+    # the void→data clip boundary, active cells sit under the polyline, and
+    # markers progress through chart_levels. Empty defaults prevent
+    # StrictUndefined on non-cellular paradigms.
     ctx["cellular_area_cells"] = []
     ctx["cellular_area_clip_d"] = ""
     ctx["cellular_marker_colors"] = []
@@ -701,9 +712,18 @@ def _inject_motion(ctx: dict[str, Any], spec: ComposeSpec, resolved: ResolvedArt
         from hyperweave.render.motion import build_border_overlay
 
         uid = ctx["uid"]
-        w = ctx["width"]
         h = ctx["height"]
         rx = ctx.get("badge_corner", ctx.get("strip_corner", 3.33))
+
+        # Border motions trace the visible envelope, not the SVG viewBox.
+        # For chrome strips with strip_min_width clamping the canvas wider
+        # than content, content_width < width.
+        # The motion path must follow content_width so the animated border
+        # doesn't extend into the transparent trailing zone. Brutalist's
+        # owns_strip path sets content_width == width so it's unchanged.
+        # Badges have no canvas/content split — content_width unset → fall
+        # back to width.
+        w = int(ctx.get("content_width") or ctx["width"])
 
         # Panel geometry for rimrun seam-tracing
         seam_positions: list[int] = []
@@ -740,6 +760,7 @@ def _build_glyph_svg(
     resolved: ResolvedArtifact,
     glyph_mode: str = "fill",
     glyph_fill_color: str = "var(--dna-signal)",
+    glyph_size: int = 14,
 ) -> str:
     if not resolved.glyph_path:
         return ""
@@ -753,6 +774,7 @@ def _build_glyph_svg(
             "glyph_path": resolved.glyph_path,
             "glyph_mode": glyph_mode,
             "glyph_fill_color": glyph_fill_color,
+            "glyph_size": glyph_size,
         },
     )
 

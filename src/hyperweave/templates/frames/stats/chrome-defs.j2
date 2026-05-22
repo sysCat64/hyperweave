@@ -74,7 +74,7 @@
 <style>
   {{ font_faces | safe }}
   text { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); shape-rendering: geometricPrecision; }
-  .{{ uid }}-identity   { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; fill: var(--dna-ink-primary); }
+  .{{ uid }}-identity   { font-family: '{{ identity_font_family | default("Orbitron") }}', sans-serif; font-size: {{ identity_font_size | default(8.5) }}px; font-weight: {{ identity_font_weight | default(700) }}; letter-spacing: {{ identity_letter_spacing_em | default(0.1) }}em; fill: var(--dna-signal); }
   .{{ uid }}-hero       { font-family: var(--dna-font-display, 'Orbitron', sans-serif); font-size: 44px; font-weight: 900; letter-spacing: -0.01em; fill: url(#{{ uid }}-ct-hero); }
   .{{ uid }}-hero-label { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 7.5px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; fill: var(--dna-ink-muted); opacity: 0.9; }
   .{{ uid }}-mval       { font-family: var(--dna-font-display, 'Orbitron', sans-serif); font-size: 20px; font-weight: 900; letter-spacing: 0.01em; fill: var(--dna-ink-primary); }
@@ -82,7 +82,7 @@
   .{{ uid }}-act-label  { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 7.5px; font-weight: 700; letter-spacing: 0.20em; text-transform: uppercase; fill: var(--dna-ink-muted); opacity: 0.95; }
   .{{ uid }}-foot       { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 7px; font-weight: 600; letter-spacing: 0.14em; fill: var(--dna-ink-muted); opacity: 0.8; }
   .{{ uid }}-brand      { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 7px; font-weight: 700; letter-spacing: 0.28em; fill: var(--dna-ink-muted); opacity: 0.65; }
-  [data-hw-status="active"], [data-hw-status="passing"] { --hw-core: var(--dna-status-passing-core, #22C55E); }
+  [data-hw-status="active"], [data-hw-status="passing"] { --hw-core: var(--dna-signal); }
   [data-hw-status="warning"] { --hw-core: var(--dna-status-warning-core, #F59E0B); }
   [data-hw-status="critical"], [data-hw-status="failing"] { --hw-core: var(--dna-status-failing-core, #EF4444); }
   @keyframes {{ uid }}-breathe       { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }

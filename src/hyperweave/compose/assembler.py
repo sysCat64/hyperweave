@@ -13,6 +13,11 @@ if TYPE_CHECKING:
 # Frame types that use badge/strip state machine + status indicator animations
 _STATEFUL_FRAMES: frozenset[str] = frozenset({FrameType.BADGE, FrameType.STRIP})
 
+# Frame types that render provider/identity glyphs and need glyph-specific
+# chromatic roles. These roles are not state-machine roles: stats and charts
+# also consume them in their header identity slots.
+_GLYPH_FRAMES: frozenset[str] = frozenset({FrameType.BADGE, FrameType.STRIP, FrameType.STATS, FrameType.CHART})
+
 # Frame types that use bridge hw-* class mappings
 _BRIDGE_FRAMES: frozenset[str] = frozenset({FrameType.BADGE, FrameType.STRIP, FrameType.ICON})
 
@@ -135,7 +140,6 @@ _STATEFUL_CSS_MAPPING: list[tuple[str, str]] = [
     ("density", "--dna-density"),
     ("metric_text", "--dna-metric-text"),
     ("label_text", "--dna-label-text"),
-    ("glyph_inner", "--dna-glyph-inner"),
     ("seam_gap", "--dna-seam-gap"),
     ("badge_value_text", "--dna-badge-value-text"),
     ("badge_pass_sep", "--dna-badge-pass-sep"),
@@ -143,6 +147,10 @@ _STATEFUL_CSS_MAPPING: list[tuple[str, str]] = [
     ("badge_warn_color", "--dna-badge-warn-color"),
     ("material_specular", "--dna-material-specular"),
     ("material_roughness", "--dna-material-roughness"),
+]
+
+_GLYPH_CSS_MAPPING: list[tuple[str, str]] = [
+    ("glyph_inner", "--dna-glyph-inner"),
 ]
 
 _MARQUEE_CSS_MAPPING: list[tuple[str, str]] = [
@@ -202,6 +210,7 @@ _ALL_CSS_MAPPING: dict[str, list[str]] = {}
 for _mapping in (
     _CORE_CSS_MAPPING,
     _STATEFUL_CSS_MAPPING,
+    _GLYPH_CSS_MAPPING,
     _MARQUEE_CSS_MAPPING,
     _TELEMETRY_CSS_MAPPING,
     _FONT_CSS_MAPPING,
@@ -314,6 +323,8 @@ def genome_to_css(genome: dict[str, Any], frame_type: str = "") -> str:
     # any genome declaring tool_* fields gets the tool-class + status-color +
     # extended-ink mappings regardless of frame.
     mapping: list[tuple[str, str]] = list(_CORE_CSS_MAPPING)
+    if frame_type in _GLYPH_FRAMES:
+        mapping.extend(_GLYPH_CSS_MAPPING)
     if frame_type in _STATEFUL_FRAMES:
         mapping.extend(_STATEFUL_CSS_MAPPING)
     elif frame_type in _MARQUEE_FRAMES:

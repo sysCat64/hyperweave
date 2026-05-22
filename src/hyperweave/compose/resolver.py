@@ -157,6 +157,12 @@ def resolve(spec: ComposeSpec) -> ResolvedArtifact:
             genome = {**genome, **_vo}
 
     inline_style_overrides = compute_variant_inline_style(genome, resolved_variant)
+    if spec.type == FrameType.BADGE and resolved_variant and genome.get("highlight_color"):
+        _safe_specular = str(genome["highlight_color"]).replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        _specular_decl = f"--dna-specular:{_safe_specular};"
+        inline_style_overrides = (
+            f"{inline_style_overrides} {_specular_decl}".strip() if inline_style_overrides else _specular_decl
+        )
     cellular_palette = resolve_cellular_palette(genome, resolved_variant, pair=spec.pair)
 
     # Cellular paradigm: append --hw-state-tone + --hw-state-value-tone CSS
@@ -292,12 +298,15 @@ def resolve_badge(
     """
     from hyperweave.core.text import measure_text
 
-    # Height + size class: paradigm-driven default or compact variant.
-    # Cellular badges render at 32px default / 20px compact; brutalist/chrome
-    # stay at 20px. ``compact`` flows into text-measurement scaling and
-    # template pattern-cell geometry.
-    compact = spec.size == "compact"
     badge_cfg_for_height = paradigm_spec.badge if paradigm_spec else None
+    # Height + size class: paradigm-driven default or compact variant.
+    # Cellular can make its default request resolve through the compact
+    # geometry by declaring badge.default_size=compact. Explicit non-default
+    # size values still use frame_height, which keeps the larger artifact
+    # reachable without a paradigm-specific branch.
+    compact = spec.size == "compact" or (
+        spec.size == "default" and badge_cfg_for_height is not None and badge_cfg_for_height.default_size == "compact"
+    )
     if badge_cfg_for_height is not None:
         height = badge_cfg_for_height.frame_height_compact if compact else badge_cfg_for_height.frame_height
     else:
@@ -311,13 +320,25 @@ def resolve_badge(
     # Glyph-size: paradigm-driven, compact variant may override.
     badge_cfg_for_glyph_size = paradigm_spec.badge if paradigm_spec else None
     if badge_cfg_for_glyph_size is not None:
-        if compact and badge_cfg_for_glyph_size.glyph_size_compact > 0:
+        from hyperweave.compose.layout import compute_badge_glyph_size
+
+        glyph_ratio = (
+            badge_cfg_for_glyph_size.glyph_size_compact_ratio
+            if compact and badge_cfg_for_glyph_size.glyph_size_compact_ratio > 0
+            else badge_cfg_for_glyph_size.glyph_size_ratio
+        )
+        if glyph_ratio > 0:
+            glyph_size = compute_badge_glyph_size(
+                height,
+                glyph_ratio,
+                badge_cfg_for_glyph_size.glyph_size_max,
+            )
+        elif compact and badge_cfg_for_glyph_size.glyph_size_compact > 0:
             glyph_size = badge_cfg_for_glyph_size.glyph_size_compact
         else:
             glyph_size = badge_cfg_for_glyph_size.glyph_size
     else:
         glyph_size = 14
-    glyph_gap = 4
 
     # Paradigm may override profile-level seam structure. Cellular declares
     # sep_w=1 because its template paints a 1px gradient seam where
@@ -343,11 +364,6 @@ def resolve_badge(
         badge_cfg_for_indicator.indicator_size
         if badge_cfg_for_indicator and badge_cfg_for_indicator.indicator_size > 0
         else profile.get("badge_indicator_size", 8)
-    )
-    ind_pad_r = (
-        badge_cfg_for_indicator.indicator_pad_r
-        if badge_cfg_for_indicator and badge_cfg_for_indicator.indicator_pad_r > 0
-        else profile.get("badge_indicator_pad_r", 8)
     )
     indicator_stroke_width = (
         badge_cfg_for_indicator.indicator_stroke_width
@@ -441,7 +457,7 @@ def resolve_badge(
     # Replaces the prior is_state_badge ad-hoc value-mirrors-state inference
     # with a title-allowlist + explicit-state precedence chain.
     from hyperweave.compose.layout import (
-        compute_badge_layout,
+        compute_badge_zones,
         data_hw_statemode_for,
         resolve_badge_mode,
     )
@@ -454,44 +470,88 @@ def resolve_badge(
     # Paradigm-specific right-canvas-inset (cellular: 2px, brutalist/chrome: 0).
     right_canvas_inset = badge_cfg_for_seam.right_canvas_inset if badge_cfg_for_seam else 0
 
-    # All badge geometry now lives in compose/layout.py — single source of
-    # truth, unit-tested independently. The v0.2.25 centering fix is in there
-    # (value_x = zone_center, not midpoint of unrelated bounds).
-    # Uniform-rhythm gap: when the paradigm declares a positive
-    # ``rhythm_gap`` (brutalist v0.3.3 sets 8), every interior gap of the
-    # badge composition (accent→glyph or accent→label, glyph→label,
-    # label→seam, seam→value, value→indicator, indicator→right border)
-    # collapses to that single value. Paradigms that don't declare it
-    # (chrome / cellular / default) receive 0 and keep their legacy layout
-    # constants. When rhythm_gap > 0, ``ind_pad_r`` is also forced to the
-    # same value so the value→indicator and indicator→right-border gaps
-    # match the rest of the rhythm.
-    rhythm_gap = paradigm_spec.badge.rhythm_gap if paradigm_spec else 0
-    layout = compute_badge_layout(
+    # Unified additive badge layout: single cursor walk across all paradigms.
+    # Paradigm-specific structural differences flow through ParadigmBadgeConfig
+    # (pad, text_anchor, seam_render_w, seam_specular_offset). Half-gap rule
+    # for etched seam (chrome) when seam_render_w > 0; structural separator
+    # (sep_w + seam_w) for paradigms with seam_render_w == 0.
+    pad = paradigm_spec.badge.pad if paradigm_spec else 8
+    badge_cfg = paradigm_spec.badge if paradigm_spec else None
+    text_anchor = badge_cfg.text_anchor if badge_cfg else "middle"
+    seam_render_w = badge_cfg.seam_render_w if badge_cfg else 0.0
+    seam_specular_offset = badge_cfg.seam_specular_offset if badge_cfg else 0.0
+    # Algorithmic bearing correction. For paradigms
+    # with text_anchor=start (chrome), the seam needs to sit at the visible
+    # ink end + pad/2, not at the advance-width end + pad/2. The difference
+    # is the LAST glyph's right side-bearing (RSB) — a per-glyph value
+    # that varies (Orbitron K ≠ S ≠ I). measure_text_trailing_bearing reads
+    # the RSB directly from the font LUT (extracted via fonttools BoundsPen
+    # in scripts/extract_font_metrics.py). No paradigm tuning — the font
+    # itself supplies the correction. Centered text (text_anchor=middle in
+    # brutalist/cellular) balances bearing across both edges so corrections
+    # stay at 0.
+    from hyperweave.core.text import measure_text_trailing_bearing
+
+    if text_anchor == "start":
+        label_end_bearing = (
+            measure_text_trailing_bearing(
+                label_display,
+                font_family=_label_family,
+                font_size=_label_size,
+                font_weight=400 if use_mono else 700,
+            )
+            if label_display
+            else 0.0
+        )
+        value_end_bearing = (
+            measure_text_trailing_bearing(
+                value_raw,
+                font_family=_value_family,
+                font_size=_value_size,
+                font_weight=_value_weight,
+            )
+            if value_raw
+            else 0.0
+        )
+    else:
+        label_end_bearing = 0.0
+        value_end_bearing = 0.0
+    # Compact variant uses glyph_y_offset_compact when declared. The
+    # text-visual-vs-frame-center delta scales with font size: cellular's
+    # +2px at h=32/9px font becomes near zero at h=20/compact font.
+    if compact and badge_cfg:
+        glyph_y_offset = badge_cfg.glyph_y_offset_compact
+    else:
+        glyph_y_offset = badge_cfg.glyph_y_offset if badge_cfg else 0.0
+    # Paradigm-aware min badge width. Zero defers to the layout engine's
+    # default (60); chrome declares 40 for content-driven shrinkage.
+    min_total_w = badge_cfg.min_total_width if badge_cfg and badge_cfg.min_total_width > 0 else 60
+    zones = compute_badge_zones(
         height=height,
+        pad=pad,
         measured_label_w=lw,
         measured_value_w=vw,
         has_glyph=has_glyph,
-        show_indicator=effective_show_indicator,
-        use_mono=use_mono,
-        label_uppercase=label_uppercase,
-        value_raw_len=len(value_raw),
+        has_state_indicator=effective_show_indicator,
         accent_w=accent_w,
-        inset=inset,
         glyph_size=glyph_size,
-        glyph_gap=glyph_gap,
         glyph_left_offset=glyph_left_offset,
         sep_w=sep_w,
         seam_w=seam_w,
         indicator_size=indicator_size,
-        ind_pad_r=ind_pad_r,
-        val_pad_l=3,
-        val_min_gap=3,
         right_canvas_inset=right_canvas_inset,
+        min_total_w=min_total_w,
         text_y_factor=text_y_factor,
+        label_font_size=_label_size,
         value_font_size=_value_size,
         inner_bit_ratio=indicator_inner_bit_ratio,
-        rhythm_gap=rhythm_gap,
+        text_anchor=text_anchor,
+        seam_render_w=seam_render_w,
+        seam_specular_offset=seam_specular_offset,
+        label_end_bearing=label_end_bearing,
+        value_end_bearing=value_end_bearing,
+        glyph_y_offset=glyph_y_offset,
+        text_visual_center_offset_em=badge_cfg.text_visual_center_offset_em if badge_cfg else 0.3,
     )
 
     # Variant resolution and profile visual context (envelope, well, specular,
@@ -500,36 +560,42 @@ def resolve_badge(
     # per-resolver call needed. The dispatcher's setdefault populates
     # frame_context["variant"] before ResolvedArtifact construction.
     return {
-        "width": layout.width,
-        "height": layout.height,
+        "width": zones.width,
+        "height": zones.height,
         "template": "frames/badge.svg.j2",
         "context": {
             "label": label_raw,
             "label_display": label_display,
             "value": value_raw,
-            "left_panel_width": layout.left_panel_w,
-            "right_panel_x": layout.right_panel_x,
-            "right_panel_w": layout.right_panel_w,
-            "text_y": layout.text_y,
-            "glyph_x": layout.glyph_x,
-            "glyph_y": layout.glyph_y,
+            "left_panel_width": zones.left_panel_w,
+            "right_panel_x": zones.right_panel_x,
+            "right_panel_w": zones.right_panel_w,
+            "text_y": zones.text_y,
+            "glyph_x": zones.glyph_x,
+            "glyph_y": zones.glyph_y,
             "glyph_render_size": glyph_size,
-            "label_x": layout.label_x,
-            "value_x": layout.value_x,
-            "value_zone_left": layout.value_zone_left,
-            "value_zone_right": layout.value_zone_right,
-            "value_zone_width": layout.value_zone_width,
-            "indicator_x": layout.indicator_x,
-            "indicator_y": layout.indicator_y,
+            "label_x": zones.label_x,
+            "value_x": zones.value_x,
+            "label_text_length": zones.label_text_length,
+            "value_text_length": zones.value_text_length,
+            # Chrome etched-seam coordinates.
+            "seam_left_x": zones.seam_left_x,
+            "seam_specular_x": zones.seam_specular_x,
+            "text_anchor": zones.text_anchor,
+            "value_zone_left": zones.value_zone_left,
+            "value_zone_right": zones.value_zone_right,
+            "value_zone_width": zones.value_zone_width,
+            "indicator_x": zones.indicator_x,
+            "indicator_y": zones.indicator_y,
             "sep_width": sep_w,
             "seam_width": seam_w,
-            "indicator_size": layout.indicator_size,
-            "inner_bit_w": layout.inner_bit_w,
-            "inner_bit_offset": layout.inner_bit_offset,
+            "indicator_size": zones.indicator_size,
+            "inner_bit_w": zones.inner_bit_w,
+            "inner_bit_offset": zones.inner_bit_offset,
             "indicator_stroke_width": indicator_stroke_width,
             "accent_bar_width": accent_w,
             "has_glyph": has_glyph,
-            "show_indicator": layout.show_indicator,
+            "show_indicator": zones.show_indicator,
             "use_mono": use_mono,
             "label_uppercase": label_uppercase,
             "inset": inset,
@@ -539,7 +605,7 @@ def resolve_badge(
             # (cellular-content.j2:104). Will be removed once cellular template
             # is updated to read badge_mode directly.
             "is_state_badge": badge_mode != "stateless",
-            "compact": spec.size == "compact",
+            "compact": compact,
         },
     }
 
@@ -574,6 +640,13 @@ def resolve_strip(
     strip_cfg = paradigm_spec.strip if paradigm_spec else None
     height = strip_cfg.strip_height if strip_cfg else 52
 
+    # Algorithmic strip glyph sizing. The identity glyph derives from
+    # ``strip_height * strip_glyph_ratio`` so paradigms scale uniformly
+    # instead of carrying hand-synced magic numbers.
+    from hyperweave.compose.layout import compute_strip_glyph_size
+
+    strip_glyph_size = compute_strip_glyph_size(height, strip_cfg.strip_glyph_ratio) if strip_cfg else 18
+
     metrics = _parse_metrics(spec)
     # min_metric_pitch is the brutalist-era aesthetic floor (106px) that
     # prevents cells from collapsing when metrics are short. When a paradigm
@@ -592,7 +665,6 @@ def resolve_strip(
     # — that bug shifted cell-0's text 24px past seam[0] while cells 1+ had
     # only 12px, producing visibly more black space on the left of the first
     # metric than the rest.
-    cell_offset = 0
 
     # Glyph zone layout:
     #   paradigm opts into icon box (cellular):
@@ -609,22 +681,10 @@ def resolve_strip(
     # profile (brutalist) would be phantom reserved width that shifts every
     # downstream coordinate by 6px without rendering anything.
     accent_w = 0 if show_icon_box else profile.get("strip_accent_width", 0)
-    if show_icon_box and has_glyph:
-        # Icon box renders: pad + box + 8px post-box gap. Mirrors the
-        # template's coordinate flow at strip.svg.j2:38-43, so the divider
-        # x sits a consistent 14px past identity-text-end regardless of
-        # whether the resolver or the template was the source of truth.
-        glyph_zone = icon_box_pad + icon_box_size + 8
-    elif show_icon_box:
-        # No glyph: collapse the entire icon-box reservation; identity sits
-        # flush at accent_w + icon_box_pad. Removes the empty 28x28 pocket
-        # that used to render on glyphless cellular strips.
-        glyph_zone = icon_box_pad
-    elif has_glyph:
-        glyph_zone = 36  # legacy brutalist/chrome: 12 pad + 24 glyph + gap
-    else:
-        glyph_zone = 0
-    identity_x = accent_w + glyph_zone + (0 if show_icon_box else 14)
+
+    # Glyph zone width, glyph render coordinates, identity_x, identity zone
+    # width, and first_divider_x all flow from compute_strip_zones below.
+    # The inline arithmetic that used to live here is now centralized.
 
     # Compute identity zone width from actual text content. measure_text
     # absorbs letter-spacing via its ``letter_spacing_em`` kwarg using the
@@ -646,14 +706,27 @@ def resolve_strip(
     )
 
     # Subtitle (paradigm opts in): measured to potentially push identity
-    # zone wider if subtitle is longer than identity.
+    # zone wider if subtitle is longer than identity. Fallback chain:
+    # explicit subtitle (connector_data.repo_slug / spec.subtitle) > spec.title
+    # uppercased (the project name the user already provided) > genome.name
+    # uppercased (last resort). Suppress subtitle entirely when it would
+    # duplicate the identity text.
     show_subtitle = strip_cfg.show_subtitle if strip_cfg else False
     subtitle_raw = ""
     subtitle_w = 0.0
     if show_subtitle and strip_cfg is not None:
-        # Subtitle comes from connector_data.repo_slug / spec.value fallback.
         conn = spec.connector_data or {}
         subtitle_raw = str(conn.get("repo_slug") or conn.get("repo") or "")
+        if not subtitle_raw and spec.title:
+            subtitle_raw = str(spec.title).upper()
+        if not subtitle_raw:
+            subtitle_raw = str(genome.get("name") or genome.get("id") or "").upper()
+        # Suppress duplicate subtitle: when derived subtitle equals the identity
+        # text the strip would render two copies of the same string stacked
+        # vertically. Empty subtitle_raw → template's {% else %} branch renders
+        # single-line identity centered (no stack).
+        if subtitle_raw and spec.title and subtitle_raw.upper() == spec.title.upper():
+            subtitle_raw = ""
         if subtitle_raw:
             _sub_size = strip_cfg.subtitle_font_size
             subtitle_w = measure_text(
@@ -663,9 +736,6 @@ def resolve_strip(
                 font_weight=400,
                 letter_spacing_em=strip_cfg.subtitle_letter_spacing_em,
             )
-
-    identity_zone_w = max(id_text_w, subtitle_w)
-    first_divider_x = max(int(identity_x + identity_zone_w + 14), 80)  # 14px right padding, min 80
 
     # ── Per-cell adaptive widths via core/cell_layout.py ──
     # Single source of truth: every parameter that affects rendered cell
@@ -766,15 +836,6 @@ def resolve_strip(
     # spec strip v10: last_seam=400 → frame_x=416) + 14 indicator + 4 post-gap.
     paradigm_show_status_indicator = strip_cfg.show_status_indicator if strip_cfg else True
     show_status_indicator = paradigm_show_status_indicator and strip_mode != "stateless"
-    _indicator_size = 14
-    _indicator_pre_gap = 16
-    # Post-indicator breathing. Paradigms with icon-boxes (cellular) now
-    # mirror the pre-gap so the 14px indicator sits centered inside its
-    # 46px status_zone — a consequence of dropping the ACTIVE text subtitle,
-    # which previously required 29px of clearance for its 21px-wide glyphs.
-    # Brutalist/chrome bare-diamond strips keep the tight 4px trailing gap.
-    _indicator_post_gap = 16 if show_icon_box else 4
-    status_zone = (_indicator_pre_gap + _indicator_size + _indicator_post_gap) if show_status_indicator else 0
 
     # Bifamily flank zones: paradigm declares flank_width > 0 when chromatic
     # flanking cells render at left/right edges (automata strips: 36px of
@@ -782,48 +843,58 @@ def resolve_strip(
     flank_width = strip_cfg.flank_width if strip_cfg else 0
     flank_cell_size = strip_cfg.flank_cell_size if strip_cfg else 12
     has_flanks = flank_width > 0
-    n = max(len(metrics), 1)
-    # If flanks are present, metric zones shift right by flank_width on each side
-    # (flanks live OUTSIDE the content panel; width grows accordingly).
-    flank_total = 2 * flank_width if has_flanks else 0
-    metrics_zone_w = sum(cell_widths) if cell_widths else n * metric_pitch
-    width = first_divider_x + cell_offset + metrics_zone_w + status_zone + flank_total
 
-    # Seam positions: cumulative cell-edge x-coordinates for rimrun multi-seam tracing
-    # AND for the per-cell trailing-divider lines emitted in strip.svg.j2. With
-    # per-cell widths, seams are NOT evenly spaced; iterate cumulative widths.
-    seam_offset = flank_width if has_flanks else 0
-    seams = [first_divider_x + seam_offset]
-    cell_start = first_divider_x + cell_offset + seam_offset
-    _running = 0
-    for cw in cell_widths:
-        _running += cw
-        seams.append(cell_start + _running)
-    # Pad seams when cell_widths is empty (zero-metric strips) to preserve the
-    # legacy single-divider seam list and avoid IndexError downstream.
-    if not cell_widths:
-        seams.append(cell_start + metric_pitch)
+    # v0.3.9: ALL strip geometry centralized in compute_strip_zones.
+    # Replaces inline arithmetic for glyph zone, identity zone, first divider,
+    # cell positions, seams, status indicator, bookend, flank shifts, and
+    # strip_min_width clamp. Templates consume zone fields verbatim.
+    from hyperweave.compose.layout import compute_strip_zones
 
-    # Status-indicator x-position: spec cellular-automata-strip-v10 places
-    # the hw-state-frame at last_seam + 16 (NOT centered between last_seam
-    # and content_right — that would leave a wide black gap in the flanked
-    # layout). For genomes without flanks, last_seam + 16 still reads as
-    # anchored-to-right-edge-of-metrics. content_right stays in context for
-    # templates that want flank-boundary awareness for other uses.
-    last_seam_x = seams[-1] if seams else first_divider_x
-    content_right = width - (flank_width if has_flanks else 0)
-    status_x = last_seam_x + 16 if show_status_indicator else 0
-
-    # Glyph-zone x-offset: when bifamily flanks are present, the glyph must
-    # be pushed past the left flank so it doesn't overlap pattern cells.
-    # brutalist/chrome strips have flank_width=0 → no offset → unchanged.
-    glyph_zone_x_offset = flank_width if has_flanks else 0
+    paradigm_owns_strip = bool(strip_cfg and strip_cfg.owns_strip)
+    _post_indicator_gap = 16 if show_icon_box else 4
+    zones = compute_strip_zones(
+        height=height,
+        owns_strip=paradigm_owns_strip,
+        accent_w=accent_w,
+        show_icon_box=show_icon_box,
+        icon_box_size=icon_box_size,
+        icon_box_pad=icon_box_pad,
+        has_identity_glyph=has_glyph,
+        strip_glyph_size=strip_glyph_size,
+        brand_panel_x=strip_cfg.brand_panel_x if strip_cfg else 0,
+        brand_panel_width=strip_cfg.brand_panel_width if strip_cfg else 0,
+        identity_text_x=strip_cfg.identity_text_x if strip_cfg else 0,
+        brand_divider_x=strip_cfg.brand_divider_x if strip_cfg else 0,
+        triple_divider_bar_width=strip_cfg.triple_divider_bar_width if strip_cfg else 3,
+        triple_divider_void_width=strip_cfg.triple_divider_void_width if strip_cfg else 2,
+        bookend_x_fallback=strip_cfg.bookend_x if strip_cfg else 0,
+        identity_w=id_text_w,
+        subtitle_w=subtitle_w,
+        subtitle_text=subtitle_raw,
+        cell_widths=cell_widths,
+        cell_layouts_records=cell_layouts_records,
+        metric_pitch_fallback=metric_pitch,
+        has_status_indicator=show_status_indicator,
+        status_indicator_post_gap=_post_indicator_gap,
+        flank_width=flank_width,
+        strip_min_width=strip_cfg.strip_min_width if strip_cfg else 0,
+    )
+    width = zones.width
+    content_width = zones.content_width
+    content_right = zones.content_right
+    first_divider_x = zones.first_divider_x
+    seams = zones.seam_positions
+    status_x = zones.status_x
+    glyph_zone_x_offset = zones.glyph_zone_x_offset
+    identity_clip_x = accent_w + glyph_zone_x_offset
+    identity_clip_width = max(0.0, first_divider_x - identity_clip_x)
 
     ctx: dict[str, Any] = {
         "identity": identity,
         "identity_font_family": _id_family,
         "identity_font_size": _id_size,
         "identity_letter_spacing_em": _id_ls_em,
+        "identity_text_length": zones.identity_text_length,
         "subtitle_text": subtitle_raw,
         "show_subtitle": show_subtitle,
         "subtitle_font_family": strip_cfg.subtitle_font_family if strip_cfg else "JetBrains Mono",
@@ -832,6 +903,14 @@ def resolve_strip(
         "show_icon_box": show_icon_box,
         "icon_box_size": icon_box_size,
         "icon_box_pad": icon_box_pad,
+        # v0.3.9 algorithmic strip glyph sizing — derived from
+        # ``strip_height * strip_glyph_ratio`` rather than per-paradigm magic
+        # numbers. Both ``paradigm_strip_glyph_size`` (consumed by the parent
+        # strip.svg.j2 dispatcher) and ``strip_glyph_size`` (consumed by
+        # owns_strip paradigm content templates) carry the same computed
+        # value so chrome/cellular shared-pipeline and brutalist owns_strip
+        # paths render glyphs at the same proportional size.
+        "paradigm_strip_glyph_size": strip_glyph_size,
         "metrics": metrics,
         "metric_pitch": metric_pitch,
         # Per-cell adaptive widths — sized to each metric's own content
@@ -840,42 +919,55 @@ def resolve_strip(
         # sit flush-left against their content rather than padded inside
         # a uniform widest-cell pitch. See resolver.py per-cell-widths
         # section for rationale.
-        "cell_widths": cell_widths,
-        # Resolved per-cell layout records (one dict per metric, keyed by
-        # CellLayout fields: cell_w, label_x, value_x, text_anchor, label_w,
-        # value_w, content_w). The template renders these coordinates
-        # verbatim — no template-side ``cell_w // 2`` arithmetic, no
-        # paradigm-specific text-x branching. Adding a new paradigm with a
-        # different text alignment is YAML-only.
-        "cell_layouts": cell_layouts_records,
-        # Shift into flank-shifted space so templates that render identity,
-        # dividers, and metric cells all operate in the same coordinate system.
-        # Seams already include the offset; first_divider_x previously didn't,
-        # which caused the first divider to slice through the identity text
-        # in bifamily strips (identity rendered at _gz_offset + accent + ...
-        # in the template, but first_divider_x stayed flank-less). Adding
-        # seam_offset reconciles both returns to the same frame-of-reference.
-        "first_divider_x": first_divider_x + seam_offset,
+        # cell_widths + cell_layouts come from compute_strip_zones so strip
+        # min-width stretching updates per-cell widths and re-centers
+        # middle-anchored text. Local cell_widths / cell_layouts_records are
+        # only the inputs to the zone engine.
+        "cell_widths": zones.cell_widths,
+        "cell_layouts": zones.cell_layouts_records,
+        # first_divider_x is already shifted into the flank-aware coordinate
+        # frame by compute_strip_zones. Identity, dividers, and metric cells
+        # all operate in the same reference frame.
+        "first_divider_x": first_divider_x,
         "seam_positions": seams,
         "status_x": status_x,
+        "status_cy": height / 2,
         "content_right": content_right,
         "glyph_zone_x_offset": glyph_zone_x_offset,
+        "icon_box_x": zones.icon_box_x,
+        "icon_box_y": zones.icon_box_y,
+        "strip_glyph_cx": zones.glyph_cx,
+        "strip_glyph_cy": zones.glyph_cy,
+        "strip_glyph_render_size": zones.glyph_size,
+        "identity_x": zones.identity_x,
+        "identity_clip_x": identity_clip_x,
+        "identity_clip_width": identity_clip_width,
+        "identity_single_y": height / 2 + 4,
+        "identity_stack_y": height / 2 - 4,
+        "subtitle_y": height / 2 + 9,
+        "strip_divider_y1": 8,
+        "strip_divider_y2": height - 8,
         "show_status_indicator": show_status_indicator,
         "strip_mode": strip_mode,
         "data_hw_statemode": data_hw_statemode_for(strip_mode),
+        # content_width is where visible strip content ends. When strip_min_width
+        # clamps the SVG viewBox, content_width < width; chrome envelope/well/
+        # rail render at content_width so trailing pixels past content stay
+        # transparent with no internal dead space.
+        "content_width": content_width,
         "has_flanks": has_flanks,
         "flank_width": flank_width,
         "flank_cell_size": flank_cell_size,
         "strip_corner": profile.get("strip_corner", 5),
         # accent_width/accent_bar_width/has_accent reflect the same rule as
         # the local accent_w above: paradigms with show_icon_box zero out
-        # the accent bar so downstream template math (identity_x, icon_box_x)
-        # stays aligned with the specimen.
+        # the accent bar so downstream computed coordinates stay aligned with
+        # the specimen.
         "accent_width": accent_w,
         "accent_bar_width": accent_w,
         "divider_mode": profile.get("strip_divider_mode", "full"),
         "has_accent": accent_w > 0,
-        "strip_glyph_size": profile.get("strip_glyph_size", 20),
+        "strip_glyph_size": strip_glyph_size,
         "strip_glyph_fill": profile.get("strip_glyph_fill", "var(--dna-signal)"),
         "strip_identity_weight": profile.get("strip_identity_weight", 900),
         "strip_identity_fill": profile.get("strip_identity_fill", "var(--dna-brand-text)"),
@@ -924,38 +1016,38 @@ def resolve_strip(
     # itself. The geometry fields below feed that partial. Unconditional
     # assignment guarantees StrictUndefined never trips on chrome / cellular /
     # default paradigms (which leave owns_strip at the schema default of False).
-    paradigm_owns_strip = bool(strip_cfg and strip_cfg.owns_strip)
     ctx["paradigm_owns_strip"] = paradigm_owns_strip
     if paradigm_owns_strip and strip_cfg is not None:
-        ctx["brand_panel_x"] = strip_cfg.brand_panel_x
-        ctx["brand_panel_w"] = strip_cfg.brand_panel_width
-        ctx["triple_divider_x"] = strip_cfg.triple_divider_x
+        # brand_panel_x/w, triple_divider_x, brand_divider_x all come from
+        # compute_strip_zones (content-driven, brand_panel_width
+        # treated as MAX ceiling). YAML values pass into zone computation; zone
+        # outputs flow into context. Short identities (N8N) render with a
+        # shrunken panel; long identities (AUTOGPT) shrink-to-fit via textLength
+        # while panel stays at MAX.
+        ctx["brand_panel_x"] = zones.brand_panel_x
+        ctx["brand_panel_w"] = zones.brand_panel_w
+        ctx["triple_divider_x"] = zones.triple_divider_x
         ctx["triple_divider_bar_w"] = strip_cfg.triple_divider_bar_width
         ctx["triple_divider_void_w"] = strip_cfg.triple_divider_void_width
         ctx["ornament_x"] = strip_cfg.ornament_x
         ctx["ornament_y"] = strip_cfg.ornament_y
         ctx["ornament_size"] = strip_cfg.ornament_size
         ctx["ornament_inner_inset"] = strip_cfg.ornament_inner_inset
-        ctx["bookend_x"] = strip_cfg.bookend_x
+        # v0.3.9 algorithmic strip glyph: the LEFT identity glyph is sized
+        # via ``strip_glyph_size`` (derived from strip_height * ratio),
+        # distinct from the right-edge bookend square sized by ornament_size.
+        # Both sizes are now derived rather than carrying independent magic
+        # numbers — previous identity_glyph_size field has been removed.
+        ctx["bookend_x"] = zones.bookend_x
         ctx["identity_text_x"] = strip_cfg.identity_text_x
         ctx["identity_text_y"] = strip_cfg.identity_text_y
+        ctx["identity_text_length"] = zones.identity_text_length
         ctx["metric_label_y"] = strip_cfg.metric_label_y
         ctx["metric_value_y"] = strip_cfg.metric_value_y
-        # Strip width override: 560x52 fixed canvas per prototype.
-        # Overrides the adaptive (first_divider + cells + status) sum so the
-        # bookend ornament at x=520 always has consistent space.
-        strip_canvas_w = strip_cfg.strip_width
-        if strip_canvas_w > 0:
-            width = strip_canvas_w
         # Brand panel fill (dark variants) / panel gradient stops (light variants)
         # already merged onto the genome dict by the resolver; expose directly
         # so the content partials can paint the panel without re-reading genome.
         ctx["brand_panel_fill"] = genome.get("brand_panel_fill", "")
-        # Brand divider override — brutalist strip grammar uses fixed 170px
-        # regardless of identity text width (brand panel + triple divider is
-        # the seam).
-        if strip_cfg.brand_divider_x > 0:
-            ctx["first_divider_x"] = strip_cfg.brand_divider_x
 
     return {
         "width": width,

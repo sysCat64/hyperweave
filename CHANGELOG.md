@@ -5,6 +5,32 @@ All notable changes to HyperWeave are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-05-22
+
+Badge, strip, stat card, and star chart frames now measure rendered content before placing text, glyphs, seams, and markers. Chrome, brutalist, and automata outputs share more consistent typography, spacing, and variant colors across frame types.
+
+### Fixed
+
+- **Badges** &mdash; Missing glyph/status zones collapse, provider glyphs align to text, and long chrome status labels keep even padding.
+- **Chrome frames** &mdash; Badge, strip, stat card, and chart identity slots share Orbitron typography and variant glyph color.
+- **Font metrics** &mdash; Chakra Petch and Barlow Condensed now use real per-weight advance widths instead of scalar bold expansion.
+- **Stats cards** &mdash; Header identity, bio text, metric slots, and language footer placement measure content before positioning.
+- **Star charts** &mdash; Date labels use even calendar spacing, milestone labels avoid collisions, and chrome markers use variant color instead of fixed green.
+- **Strips** &mdash; Metric cells and identity zones adapt to measured labels, values, subtitles, and glyph presence.
+- **Connectors** &mdash; npm download metrics use the public stats endpoint.
+
+### Added
+
+- **Font metrics** &mdash; Per-weight measurements and visible text bounds for Orbitron, JetBrains Mono, Chakra Petch, and Barlow Condensed.
+- **Render checks** &mdash; Direct, HTTP, and MCP outputs are compared across the release matrix.
+
+### Changed
+
+- **Automata help text** &mdash; MCP help now lists all 16 automata tones.
+- **Automata badges** &mdash; Default badge output now uses the compact 20px form; explicit larger requests still use the 32px form.
+- **Strip rendering** &mdash; Identity glyph, icon box, divider, and status coordinates now flow from resolver context.
+- **Release tooling** &mdash; `just tag` accepts versions with or without the leading `v` and refreshes package version metadata after tagging.
+
 ## [0.3.8] - 2026-05-19
 
 Every artifact request now emits one greppable `HW_REQUEST` access-log line to stdout, so Fly.io's log stream reveals which GitHub repos embed HyperWeave SVGs via Camo's referer header. Health and metrics probes stay silent so 30-second checks don't drown the signal.

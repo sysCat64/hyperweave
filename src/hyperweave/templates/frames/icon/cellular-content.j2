@@ -20,7 +20,7 @@
    concentration, swap to a hash-based dispatch later. The simple modulo
    gives a balanced grid acceptable as the initial render. #}
 
-{% set _surface = surface_0 | default('#0A0800') %}
+{% set _surface = surface_0 | default('var(--dna-surface)') %}
 {% set _cw = width | default(48) %}
 {% set _ch = height | default(48) %}
 {% set _cols = icon_grid_cols | default(5) %}

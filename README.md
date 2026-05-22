@@ -23,6 +23,10 @@
 </p>
 
 <!--
+AI agents need to explain what they did, what they found, and what changed — HyperWeave gives them a visual language that works anywhere.
+
+---
+
 A brand agent for repos.
 Generate a cohesive visual identity layer for README, profile, status, and releases — automatically.
 
@@ -696,7 +700,7 @@ Every artifact ships with:
 | Glyphs | 99 (93 Simple Icons + 6 geometric) |
 | Divider variants | 8 &mdash; 3 genome-themed (`band` chrome, `seam` brutalist, `dissolve` automata) + 5 genome-agnostic (`block`, `current`, `takeoff`, `void`, `zeropoint`) at <code>/a/inneraura/dividers/</code> |
 | Metadata tiers | 5 (Tier 0 silent &rarr; Tier 4 reasoning) |
-| Bundled fonts | 3 (JetBrains Mono, Orbitron, Chakra Petch — base64-embedded) |
+| Bundled fonts | 4 families / 5 weights (JetBrains Mono, Orbitron, Chakra Petch, Barlow Condensed 700/900 — base64-embedded) |
 
 Stack: Pydantic, FastAPI, FastMCP v3, Jinja2, Typer.
 

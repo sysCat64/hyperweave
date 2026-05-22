@@ -50,13 +50,13 @@
 <style>
 {{ font_faces | safe }}
 .{{ uid }}-identity {
-  font-family: var(--dna-font-mono, 'JetBrains Mono', monospace);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
-  fill: {{ glyph_fill }};
+  font-family: var(--dna-font-display, 'Orbitron', 'Space Grotesk', sans-serif);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  fill: var(--dna-signal);
 }
 .{{ uid }}-metric-label {
-  font-family: var(--dna-font-mono, 'JetBrains Mono', monospace);
-  font-size: 9px; font-weight: 600; letter-spacing: 0.12em;
+  font-family: var(--dna-font-display, 'Orbitron', 'Space Grotesk', sans-serif);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
   fill: var(--dna-signal);
 }
 .{{ uid }}-metric-value {

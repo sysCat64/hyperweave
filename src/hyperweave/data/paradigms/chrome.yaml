@@ -15,42 +15,109 @@ requires_genome_fields:
   - highlight_color
 
 badge:
-  label_font_family: JetBrains Mono
+  # Unified additive layout. Chrome shares the same algorithm as
+  # brutalist/cellular; structural differences (text anchor, etched-seam
+  # slot, half-gap rule) flow through paradigm config. Frame grows/shrinks
+  # with content — no fixed target width. Typography matches the chrome
+  # spatial study (tier2/genomes/chrome/_spatial_study.svg): Orbitron 8.5/700
+  # for label, Orbitron 10/800 for value, proportional glyph, 4px accent rail.
+  label_font_family: Orbitron
   value_font_family: Orbitron
-  label_font_size: 11
-  value_font_size: 11
-  value_font_weight: 900
-  # Glyph dimensions: 12 matches cellular paradigm's declaration so chrome and
-  # cellular badges render the same glyph proportion. Chrome paradigm declares
-  # no compact geometry; glyph_size_compact=0 keeps _paradigm_supports_compact
-  # at scripts/generate_proofset.py gating compact rendering off.
+  label_font_size: 8.5
+  value_font_size: 10
+  value_font_weight: 800
   glyph_size: 12
   glyph_size_compact: 0
+  glyph_size_ratio: 0.6
+  glyph_size_max: 12
+  text_y_factor: 0.525
+  text_visual_center_offset_em: 0.0
+  # Equal-spacing pad. Chrome 7 produces ~110px for PYPI/v0.3.0 (close to
+  # the prototype's 113×20 baseline; user accepted natural width).
+  pad: 7
+  # text_anchor=start with first-character x positions. Chrome's Orbitron
+  # at small sizes with letter-spacing drifts visually when centered, so
+  # the paradigm uses start-anchored placement matching the spatial study.
+  text_anchor: start
+  # Etched seam between label and value. 1px slot rendered as two hairlines
+  # (dark cut + specular catch). The half-gap rule reserves pad/2 on each
+  # side of the seam (3.5px at pad=7) instead of a full pad each side.
+  seam_render_w: 1.0
+  seam_specular_offset: 0.6
+  # Smaller aesthetic floor for chrome — its identity is content-driven shrinkage.
+  # Single-character X/1 chrome badges render as tight chips (40px) rather than
+  # 60px blocks with visible dead space.
+  min_total_width: 40
+  # Bearing correction is computed DIRECTLY from per-glyph LSB/RSB extracted
+  # from the Orbitron font via fonttools (see scripts/extract_font_metrics.py
+  # and data/font-metrics/orbitron.json `bearings` map). The resolver calls
+  # measure_text_ink_width and subtracts the visible-ink end from the
+  # advance end to derive the per-text trailing bearing — no paradigm knob.
+  # Replaces the interim average scalar that over- or under-corrected
+  # depending on the LAST GLYPH of each label/value (Orbitron S ≠ K ≠ I
+  # trailing bearings).
+  label_letter_spacing_em: 0.1
+  value_letter_spacing_em: 0.03
 
 strip:
   value_font_size: 17
   value_font_family: Orbitron
+  # Chrome strip label typography matches chrome badge label (Orbitron
+  # 9/700/0.1em with --dna-signal fill). This keeps badge and strip
+  # typography visually cohesive.
   label_font_size: 9
-  label_font_family: JetBrains Mono
+  label_font_family: Orbitron
   divider_render_mode: gradient
   status_shape_rendering: geometricPrecision
   # Cell-layout measurement params — must mirror chrome-defs.j2:57-66.
-  label_font_weight: 600
-  label_letter_spacing_em: 0.12
+  label_font_weight: 700
+  label_letter_spacing_em: 0.1
   value_font_weight: 900
   value_letter_spacing_em: 0.02
+  # Identity typography matches chrome badge label (Orbitron 11/700/0.1em).
+  # Resolver measures with these exact values so first_divider_x matches
+  # rendered identity text width.
+  identity_font_family: Orbitron
+  identity_font_size: 11
+  identity_font_weight: 700
+  identity_letter_spacing_em: 0.1
+  # Strip glyph size is computed from strip_height * strip_glyph_ratio
+  # (default ratio 0.346 → 18px at strip_height=52). v0.3.9 deletes the
+  # hand-synced ``glyph_size: 22`` field that had to stay in proportional
+  # agreement with brutalist's ``identity_glyph_size: 18``. Both paradigms
+  # now derive their identity glyph from the same ratio, so changing the
+  # design intent updates both uniformly. See ParadigmStripConfig.strip_glyph_ratio.
   cell_pad: 20
   cell_min_width: 106
+  # Pinned strip height (v0.3.9 additive layout). Canvas WIDTH adapts to
+  # content; height stays at 52 regardless of metric count.
+  strip_height: 52
+  # v0.3.9 minimum strip width: prevents 1-metric chrome strips from
+  # aspect-warping in README columns (a 213-wide strip in a 1000-wide column
+  # scales 4.7× → visually appears 2.5× taller than a 4-metric strip in the
+  # same column). 320 is wide enough that 1-metric and 4-metric strips render
+  # within the same display-height band.
+  strip_min_width: 320
 
 chart:
   viewport_x: 80
   viewport_y: 160
   viewport_w: 750
   viewport_h: 250
+  identity_font_family: Orbitron
+  identity_font_size: 11
+  identity_font_weight: 700
+  identity_letter_spacing_em: 0.1
 
 stats:
   card_height: 260
   embeds_chart: true
+  # Identity typography matches the chrome badge label slot. The resolver
+  # measures with these values and chrome-defs.j2 consumes them directly.
+  identity_font_family: Orbitron
+  identity_font_size: 8.5
+  identity_font_weight: 700
+  identity_letter_spacing_em: 0.1
   embed_viewport_x: 240
   embed_viewport_y: 170
   embed_viewport_w: 220

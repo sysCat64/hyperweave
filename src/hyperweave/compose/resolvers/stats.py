@@ -263,6 +263,15 @@ def resolve_stats(
         "heatmap_zone_height": heatmap_zone_height,
         "language_layout": language_layout,
     }
+    if paradigm_spec is not None:
+        stats_context.update(
+            {
+                "identity_font_family": paradigm_spec.stats.identity_font_family,
+                "identity_font_size": paradigm_spec.stats.identity_font_size,
+                "identity_font_weight": paradigm_spec.stats.identity_font_weight,
+                "identity_letter_spacing_em": paradigm_spec.stats.identity_letter_spacing_em,
+            }
+        )
 
     if stale:
         stats_context["data_hw_status"] = "stale"
@@ -300,9 +309,224 @@ def resolve_stats(
             font_weight=700,
         )
         stats_context[f"{key}_text_length"] = _COLUMN_BUDGET if natural > _COLUMN_BUDGET else 0
-    # Username identity (13px, bold) — same overflow guard for the header. Always Inter.
-    identity_natural = measure_text(username, font_family="Inter", font_size=13, font_weight=700)
-    stats_context["identity_text_length"] = 260 if identity_natural > 260 else 0
+    # Username identity — content-driven shrink-to-fit. Measurement reads
+    # the paradigm's actual identity CSS font (family,
+    # size, weight, letter-spacing). Previously hardcoded Inter 13/700/0 which
+    # under-measured Orbitron-with-letter-spacing renders by ~50%+ and missed
+    # overflow on usernames like KARPATHY (Orbitron 13/0.16em ≈ 110px natural
+    # vs Inter 13/0 = 53px). When natural > identity_zone_width, emit
+    # identity_text_length so the template applies SVG textLength + lengthAdjust.
+    #
+    # v0.3.9 algorithmic upgrade: identity_zone_width is DERIVED from the
+    # neighboring layout constants (``bio_x - identity_x - identity_padding``)
+    # instead of carrying a magic number that has to be re-synced every time
+    # bio_x shifts. Single computation site so regression tests can pin the
+    # derivation.
+    if paradigm_spec is not None:
+        _stats = paradigm_spec.stats
+        identity_measure_text = username.upper() if _stats.identity_text_transform == "uppercase" else username
+        identity_natural = measure_text(
+            identity_measure_text,
+            font_family=_stats.identity_font_family,
+            font_size=_stats.identity_font_size,
+            font_weight=_stats.identity_font_weight,
+            letter_spacing_em=_stats.identity_letter_spacing_em,
+        )
+        identity_zone_w = max(0, _stats.bio_x - _stats.identity_x - _stats.identity_padding)
+    else:
+        identity_natural = measure_text(username, font_family="Inter", font_size=13, font_weight=700)
+        identity_zone_w = 0
+    stats_context["identity_text_length"] = (
+        identity_zone_w if identity_zone_w > 0 and identity_natural > identity_zone_w else 0
+    )
+
+    # Plumb x positions so templates consume computed coordinates instead of
+    # hardcoded literals (per feedback_compose_owns_geometry_template_renders.md).
+    #
+    # v0.3.9 adaptive bio_x — bio snaps close to the username's visible-ink
+    # end for short names and reproduces the v0.3.8 fixed bio_x for clamped
+    # long names. Formula:
+    #
+    #     adaptive_bio_x = identity_x + identity_rendered_ink_w + breathing_margin
+    #
+    # ``identity_rendered_ink_w`` is:
+    #   * the username's visible-ink width (measure_text_ink_width) when the
+    #     natural advance fits within identity_zone_w (no clamp), OR
+    #   * identity_zone_w when the clamp fires (textLength forces this width)
+    #
+    # The static ``bio_x`` paradigm value remains the CEILING — when the
+    # adaptive computation would exceed it, bio sits at the static value.
+    # Substituting identity_zone_w into the adaptive formula gives:
+    #     identity_x + (bio_x_static - identity_x - padding) + breathing
+    #     = bio_x_static - padding + breathing
+    # For brutalist (padding=20, breathing=8): bio_x = 134-12 = 122, the
+    # v0.3.8 visual exactly. For ELI64S (~52px ink): bio = 44+52+8 = 104,
+    # much tighter than the v0.3.9 static 134.
+    from hyperweave.core.text import measure_text_ink_width
+
+    if paradigm_spec is not None:
+        _stats = paradigm_spec.stats
+        stats_context["identity_x"] = _stats.identity_x
+        identity_measure_text = username.upper() if _stats.identity_text_transform == "uppercase" else username
+        identity_ink_w = measure_text_ink_width(
+            identity_measure_text,
+            font_family=_stats.identity_font_family,
+            font_size=_stats.identity_font_size,
+            font_weight=_stats.identity_font_weight,
+            letter_spacing_em=_stats.identity_letter_spacing_em,
+        )
+        if identity_zone_w > 0 and identity_natural > identity_zone_w:
+            # Clamp fires: rendered width is the zone width (textLength forces it).
+            identity_rendered_ink_w = float(identity_zone_w)
+        else:
+            identity_rendered_ink_w = identity_ink_w
+        adaptive_bio_x = _stats.identity_x + identity_rendered_ink_w + _stats.identity_breathing_margin
+        # Cap at the static paradigm bio_x (the ceiling).
+        bio_x_static = _stats.bio_x
+        stats_context["bio_x"] = round(min(adaptive_bio_x, bio_x_static)) if bio_x_static > 0 else round(adaptive_bio_x)
+    else:
+        stats_context["identity_x"] = 0
+        stats_context["bio_x"] = 0
+
+    # v0.3.9 bio collision clamp — when bio + HYPERWEAVE branding share the
+    # header band row (cellular paradigm), measure the available width
+    # between bio_x and the branding's visible left edge, and emit
+    # bio_text_length so the template applies SVG textLength shrink-to-fit
+    # when a long bio would visually collide with the branding text.
+    # Brutalist places branding in the footer row (y=275 vs header y=22-24)
+    # so bio_collision_clamp stays False there and no measurement runs.
+    bio_text_length = 0.0
+    if paradigm_spec is not None and paradigm_spec.stats.bio_collision_clamp:
+        repo_label_str = f"{top_language} / {repo_count} repos" if top_language else ""
+        bio_str = bio or ""
+        bio_full = f"{repo_label_str} · {bio_str}" if repo_label_str and bio_str else repo_label_str or bio_str
+        if bio_full:
+            card_width_px = paradigm_spec.stats.card_width or 530
+            # HYPERWEAVE branding renders right-anchored at x=card_width-20.
+            # Cellular CSS uses JBM 6.5/700/0.14em (cellular-defs.j2:36) and
+            # bio uses JBM 8.5/400/0.03em (cellular-defs.j2:35). These font
+            # constants are paradigm-specific; v0.3.10 promotes them to
+            # ParadigmStatsConfig fields alongside ink-width measurement.
+            branding_w = measure_text(
+                "HYPERWEAVE",
+                font_family="JetBrains Mono",
+                font_size=6.5,
+                font_weight=700,
+                letter_spacing_em=0.14,
+            )
+            branding_left = card_width_px - 20 - branding_w
+            bio_margin = 10
+            bio_max_width = branding_left - paradigm_spec.stats.bio_x - bio_margin
+            bio_natural = measure_text(
+                bio_full,
+                font_family="JetBrains Mono",
+                font_size=8.5,
+                font_weight=400,
+                letter_spacing_em=0.03,
+            )
+            if bio_max_width > 0 and bio_natural > bio_max_width:
+                bio_text_length = round(bio_max_width, 1)
+    stats_context["bio_text_length"] = bio_text_length
+
+    # v0.3.9 Bug B: algorithmic metric slot allocation (cellular only — the
+    # other paradigms use structurally different layouts). Each of the 5
+    # cellular metrics (STARS hero, COMMITS medium, PRS small, CONTRIB small,
+    # STREAK green) renders as a value+label pair. Pre-v0.3.9 the template
+    # hardcoded all 10 x positions (e.g., STREAK value at x=459, STREAK label
+    # at x=479 with only 20px gap), so a "1000d" streak value overflowed
+    # into the STREAK label. Now: resolver measures each value at its CSS
+    # font (.mvh/.mvm/.mvs/.mvg) and each label at .mlb, packs the four
+    # left-side metrics from x=20 with inter-slot gap, and right-anchors
+    # STREAK so the value floats left to make room for arbitrary widths.
+    # Cellular paradigm uniquely declares a heatmap (rows > 0); brutalist
+    # and chrome stats omit it. This is a structural marker (no string
+    # comparison on paradigm name — Invariant 12) that identifies cellular
+    # for paradigm-specific layout decisions like the metric slot strip.
+    cellular_paradigm = paradigm_spec is not None and int(paradigm_spec.stats.heatmap_rows) > 0
+    if cellular_paradigm:
+        _CARD_W = paradigm_spec.stats.card_width or 530
+        _METRIC_Y = 72.8
+        _LEFT_X = 20
+        _RIGHT_MARGIN = 20
+        _VALUE_LABEL_GAP = 4
+        _INTER_SLOT_GAP = 12
+        _LABEL_FONT_FAMILY = "JetBrains Mono"
+        _LABEL_FONT_SIZE = 6.5
+        _LABEL_FONT_WEIGHT = 500
+        _LABEL_LETTER_SPACING_EM = 0.22
+        # (css_class, value_font_size, value_font_weight, value_letter_spacing_em,
+        #  value_display, label_text)
+        _value_font_family = "Chakra Petch"
+        _left_metrics = [
+            ("mvh", 26, 700, -0.02, stats_context["stars_display"], "STARS"),
+            ("mvm", 20, 700, -0.02, stats_context["commits_display"], "COMMITS"),
+            ("mvs", 15, 600, 0.0, stats_context["prs_display"], "PRS"),
+            ("mvs", 15, 600, 0.0, stats_context["contrib_display"], "CONTRIB"),
+        ]
+        _streak_slot = ("mvg", 15, 600, 0.0, stats_context["streak_display"], "STREAK")
+
+        def _measure_label(label_text: str) -> float:
+            return measure_text(
+                label_text,
+                font_family=_LABEL_FONT_FAMILY,
+                font_size=_LABEL_FONT_SIZE,
+                font_weight=_LABEL_FONT_WEIGHT,
+                letter_spacing_em=_LABEL_LETTER_SPACING_EM,
+            )
+
+        metric_layouts: list[dict[str, Any]] = []
+        cursor = float(_LEFT_X)
+        for css_value, val_size, val_weight, val_ls, value_display, label_text in _left_metrics:
+            value_w = measure_text(
+                str(value_display),
+                font_family=_value_font_family,
+                font_size=val_size,
+                font_weight=val_weight,
+                letter_spacing_em=val_ls,
+            )
+            label_w = _measure_label(label_text)
+            value_x = cursor
+            label_x = cursor + value_w + _VALUE_LABEL_GAP
+            metric_layouts.append(
+                {
+                    "value_x": round(value_x, 1),
+                    "label_x": round(label_x, 1),
+                    "css_value": css_value,
+                    "value_display": value_display,
+                    "label_text": label_text,
+                }
+            )
+            cursor = label_x + label_w + _INTER_SLOT_GAP
+
+        # STREAK right-aligned: compute its slot width and place from the
+        # right edge backward. Supports arbitrary streak widths (1d, 21d,
+        # 1000d, 100000d) without overlapping the STREAK label.
+        css_value, val_size, val_weight, val_ls, value_display, label_text = _streak_slot
+        value_w = measure_text(
+            str(value_display),
+            font_family=_value_font_family,
+            font_size=val_size,
+            font_weight=val_weight,
+            letter_spacing_em=val_ls,
+        )
+        label_w = _measure_label(label_text)
+        slot_w = value_w + _VALUE_LABEL_GAP + label_w
+        value_x = _CARD_W - _RIGHT_MARGIN - slot_w
+        label_x = value_x + value_w + _VALUE_LABEL_GAP
+        metric_layouts.append(
+            {
+                "value_x": round(value_x, 1),
+                "label_x": round(label_x, 1),
+                "css_value": css_value,
+                "value_display": value_display,
+                "label_text": label_text,
+            }
+        )
+        stats_context["metric_layouts"] = metric_layouts
+        stats_context["metric_y"] = _METRIC_Y
+    else:
+        stats_context["metric_layouts"] = []
+        stats_context["metric_y"] = 0.0
 
     # Embedded compact chart — enablement flag + viewport sourced from
     # paradigm YAML. Chrome paradigm embeds; brutalist does not. Zero

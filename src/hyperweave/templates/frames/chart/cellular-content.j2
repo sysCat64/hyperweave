@@ -7,11 +7,10 @@
    as a separate visual zone, lifting header text out of the cell substrate
    instead of overlaying it.
 
-   Cell substrate (cells under the bezier polygon + dormant cells across the
-   full viewport) is unchanged structurally — Round 6 already established the
-   two-layer approach. v0.3.0 refresh tunes cell stride from 40 to 19 (cell
-   width 18, 1px gap) yielding a denser 30-col × 13-row grid in the chart
-   area. Animation classes consolidate to b1/b2/b3/b4.
+   Cell substrate uses cells under the bezier polygon plus dormant cells
+   across the full viewport. Cell stride is 19 (cell width 18, 1px gap),
+   yielding a denser 30-col × 13-row grid in the chart area. Animation
+   classes consolidate to b1/b2/b3/b4.
 
    Polyline drops to 3px white with double-glow drop-shadow (info_accent
    outer halo + tight white inner glow). Axis lines render at info_accent
@@ -27,7 +26,7 @@
 {% set vy = chart_viewport_y | default(80) %}
 {% set vw = chart_viewport_w | default(580) %}
 {% set vh = chart_viewport_h | default(246) %}
-{% set _surface = surface_0 | default('#04060A') %}
+{% set _surface = surface_0 | default('var(--dna-surface)') %}
 {% set _band_h = chart_header_band_height | default(64) %}
 {% set _accent = chart_info_accent %}
 {% set chart_levels = cellular_palette.primary.chart_levels %}
@@ -80,10 +79,10 @@
   <text x="{{ cw - 22 }}" y="54" class="{{ uid }}-hero-label" text-anchor="end">CURRENT STARS</text>
 </g>
 
-{# CHART zone — same layered render order as Round 6: dormant (full viewport,
-   no anim) → active cells (clipped to bezier polygon, animated) → gridlines
-   → polyline → markers → milestones → axes. The dormant layer renders FIRST
-   so the active layer's clipped overrides it inside the polyline area. #}
+{# CHART zone — layered render order: dormant (full viewport, no anim) →
+   active cells (clipped to bezier polygon, animated) → gridlines → polyline
+   → markers → milestones → axes. The dormant layer renders first so the
+   active layer's clipped cells override it inside the polyline area. #}
 <g data-hw-zone="chart">
   {%- if cellular_dormant_cells %}
   <g data-hw-zone="cellular-dormant">

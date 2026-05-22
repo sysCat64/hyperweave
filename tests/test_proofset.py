@@ -114,9 +114,10 @@ def test_variant_matrix_full_artifact_coverage(static_proofset: object) -> None:
         supports_compact = badge_paradigm is not None and badge_paradigm.badge.glyph_size_compact > 0
 
         for variant in cfg.variants:
-            # Chrome supports binary-opposition icons (circle + square);
-            # other genomes are monoshape.
-            if genome == GenomeId.CHROME:
+            # Chrome and brutalist both declare ``icon.supported_shapes:
+            # [circle, square]`` in their paradigm yaml — emit both shape
+            # files per variant. Automata is square-only.
+            if genome in (GenomeId.CHROME, GenomeId.BRUTALIST):
                 icon_files = [
                     f"icon_github_{variant}_circle.svg",
                     f"icon_github_{variant}_square.svg",
@@ -156,36 +157,52 @@ def test_variant_matrix_full_artifact_coverage(static_proofset: object) -> None:
 
 
 def test_generate_readme_includes_new_sections(static_proofset: object) -> None:
-    """README embeds stats + chart inline under each genome section.
-    Depends on ``static_proofset`` so the variant matrix + freestyle pairings
-    artifacts exist on disk before README emission — the README writer's
-    `if path.exists()` guards skip references when files are missing, which
-    on a fresh CI checkout (``outputs/`` is gitignored) means image refs
-    silently disappear without the variant proofset run."""
-    static_proofset._generate_data_cards()  # type: ignore[attr-defined]
-    static_proofset.generate_readme(100, 0)  # type: ignore[attr-defined]
+    """Main README links out to genome-specific READMEs + telemetry README.
 
+    v0.3.9 round 2 slim restructure: the main README no longer inlines
+    Variant Matrix / State Machine / Profile Card / Star History Chart
+    sections per genome — those live in the genome-specific README files
+    (README_BRUTALIST.md, README_CHROME.md, README_AUTOMATA.md). Telemetry
+    moved to README_TELEMETRY.md. The main README retains Base Frames,
+    Policy Lanes, Border Motions, InnerAura dividers, telemetry cross-link,
+    and the parity summary.
+
+    Save/restore guard: ``generate_readme`` writes the slim base README; the
+    full proofset run appends an Edge Cases section + parity summary to that
+    file in a second pass. This test only exercises the base writer, so we
+    capture the pre-test README content (if any) and restore it on exit. Keeps
+    pytest from clobbering the visual-review surface devs build with
+    ``python scripts/generate_proofset.py``.
+    """
     out_dir = static_proofset.OUT  # type: ignore[attr-defined]
-    readme = (out_dir / "README.md").read_text()
-    assert "### Profile Card (stats)" in readme
-    assert "### Star History Chart" in readme
-    assert "data-cards/stats.svg" in readme
-    assert "data-cards/chart_stars_full.svg" in readme
+    readme_path = out_dir / "README.md"
+    pre_test_content = readme_path.read_text() if readme_path.exists() else None
+    try:
+        static_proofset._generate_data_cards()  # type: ignore[attr-defined]
+        static_proofset.generate_readme(100, 0)  # type: ignore[attr-defined]
+
+        readme = readme_path.read_text()
+        # Sections that remain in the slim main README.
+        assert "### Base Frames" in readme
+        assert "### Policy Lanes" in readme
+        assert "### Border Motions" in readme
+        assert "## `/a/inneraura/dividers/`" in readme
+        assert "## Telemetry" in readme
+        # Cross-links to genome READMEs + telemetry README.
+        assert "[README_BRUTALIST.md](README_BRUTALIST.md)" in readme
+        assert "[README_CHROME.md](README_CHROME.md)" in readme
+        assert "[README_AUTOMATA.md](README_AUTOMATA.md)" in readme
+        assert "[README_TELEMETRY.md](README_TELEMETRY.md)" in readme
+        # Sections that moved to genome-specific READMEs (and should NOT be in main).
+        assert "### Profile Card (stats)" not in readme
+        assert "### Star History Chart" not in readme
+        assert "### Variant Matrix" not in readme
+    finally:
+        if pre_test_content is not None:
+            readme_path.write_text(pre_test_content)
+    assert "### State Machine" not in readme
     # Timeline section removed in v0.2.14.
     assert "### Timeline / Roadmap" not in readme
-    assert "timeline.svg" not in readme
-    # v0.3.0 variant matrix sections (one per genome with variants[]).
-    # Chrome ships 5 variants inline; automata ships 16 solo tones in a
-    # sibling README_AUTOMATA.md (the 16-tone matrix would otherwise dominate
-    # the main README). The main README links to that sibling and inlines a
-    # spot-check of representative tones for flavor.
-    assert "### Variant Matrix (5 variants)" in readme  # chrome
-    assert "### Variant Matrix (16 variants)" in readme  # automata stub heading
-    assert "[README_AUTOMATA.md](README_AUTOMATA.md)" in readme  # link to full matrix
-    # Chrome variants — full inline matrix
-    for v in ("horizon", "abyssal", "lightning", "graphite", "moth"):
-        assert f"variants/badge_pypi_{v}_default.svg" in readme
-        assert f"variants/strip_{v}.svg" in readme
 
     # Automata's full 16-tone matrix lives in README_AUTOMATA.md.
     automata_readme = (out_dir / "README_AUTOMATA.md").read_text()

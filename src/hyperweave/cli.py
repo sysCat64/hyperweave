@@ -39,7 +39,7 @@ def version() -> None:
     """Print the HyperWeave version."""
     from hyperweave import __version__
 
-    typer.echo(f"hyperweave {__version__}")
+    typer.echo(f"hyperweave v{__version__}")
 
 
 @app.command()

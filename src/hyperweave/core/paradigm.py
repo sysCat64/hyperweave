@@ -55,6 +55,15 @@ class ParadigmChartConfig(FrozenModel):
     top of the chart (paradigm-specific). Zero disables the band entirely.
     Cellular v0.3.0 refresh: 64 (band houses repo identifier, title, and
     hero metric inside a tone-specific dark mid-band fill)."""
+    identity_font_family: str = "JetBrains Mono"
+    """Font family for the chart header identity slot. Chrome uses the same
+    Orbitron identity typography as its badge label."""
+    identity_font_size: float = 12
+    """Font size for the chart header identity slot."""
+    identity_font_weight: int = 700
+    """Font weight for the chart header identity slot."""
+    identity_letter_spacing_em: float = 0.06
+    """CSS letter-spacing for the chart header identity slot."""
 
 
 class ParadigmStatsConfig(FrozenModel):
@@ -104,6 +113,62 @@ class ParadigmStatsConfig(FrozenModel):
     """Header band height in pixels at the top of the stats card. Zero
     disables. Cellular v0.3.0: 39 (band houses username + bio + brand stamp
     against a dark gradient fill)."""
+    identity_x: int = 0
+    """Left edge (px) of the username/identity text in the stat card header.
+    The resolver derives ``identity_zone_width`` from neighboring layout —
+    ``bio_x - identity_x - identity_padding`` — instead of carrying a magic
+    number that has to be re-tuned every time ``bio_x`` shifts. Cellular: 20.
+    Brutalist: 44. Chrome: 0 (chrome has no competing header label, so the
+    derived zone width is 0 and shrink-to-fit is disabled)."""
+    bio_x: int = 0
+    """Left edge (px) of the bio/repo_label text in the stat card header.
+    Used both to position the template element (replacing hardcoded x="110"
+    / x="122" template literals) and to derive ``identity_zone_width``.
+    Cellular: 110. Brutalist: 122. Chrome: 0 (no header bio)."""
+    identity_padding: int = 0
+    """Breathing gap (px) reserved between a clamped username's right edge
+    and ``bio_x``. Prevents the shrunk username from butting directly
+    against the bio text. Cellular: 2. Brutalist: 8."""
+    identity_breathing_margin: int = 0
+    """Gap (px) between the username's visible-ink end and the bio text
+    in ADAPTIVE bio_x mode. The resolver computes
+    ``adaptive_bio_x = identity_x + identity_ink_width + identity_breathing_margin``
+    using per-glyph ink measurement (measure_text_ink_width from the v0.3.9
+    LUT extraction). Short usernames snap bio close (tight visual); when
+    the identity gets clamped via textLength, the same formula with
+    ``identity_zone_w`` substituted reproduces the v0.3.8 fixed bio_x
+    automatically. Brutalist: 8 (reproduces v0.3.8 bio_x=122 for clamped
+    identities, gives tight snap for short like ELI64S). Cellular: 4."""
+    bio_collision_clamp: bool = False
+    """When True, the resolver measures the bio's natural rendered width and
+    emits ``bio_text_length`` so the template applies SVG ``textLength``
+    shrink-to-fit when the bio would visually collide with the right-edge
+    HYPERWEAVE branding element. Cellular: True (bio and branding share the
+    header band row, so long bios collide). Brutalist: False (branding lives
+    in the footer row, no collision). v0.3.9: addresses the karpathy-bio /
+    HYPERWEAVE overlap reported in visual review."""
+    identity_font_family: str = "Inter"
+    """Font family used by the paradigm's stats username/identity CSS class.
+    The resolver passes this to ``measure_text`` so the measured natural width
+    matches what the template renders. The resolver previously measured with
+    Inter while paradigms rendered Orbitron / JetBrains Mono / etc., producing
+    under-measured widths and missed overflow clamps. Cellular: 'Orbitron'.
+    Brutalist: 'JetBrains Mono'. Chrome: 'Orbitron'."""
+    identity_font_size: float = 13
+    """Font size (px) for the username/identity CSS class. Brutalist: 11.
+    Cellular: 13. Chrome: 13."""
+    identity_font_weight: int = 700
+    """Font weight for the username/identity CSS class. Brutalist: 800.
+    Cellular: 700. Chrome: 700."""
+    identity_letter_spacing_em: float = 0.0
+    """CSS letter-spacing (em) for username/identity. Brutalist: 0.22.
+    Cellular: 0.16. Chrome: 0.16. ``measure_text`` applies ``(N-1) * size * em``
+    so the reserved width matches actual render — a 0.16em spacing on 8 chars
+    at 13px adds 13.4px that the previous Inter-13/700/0 measurement missed."""
+    identity_text_transform: Literal["none", "uppercase"] = "none"
+    """Text transform applied by the stats template before render. The resolver
+    must measure the transformed text, otherwise lower-case connector data
+    underestimates templates that render ``{{ stats_username | upper }}``."""
 
 
 class ParadigmStripConfig(FrozenModel):
@@ -135,6 +200,16 @@ class ParadigmStripConfig(FrozenModel):
     show_icon_box: bool = False
     icon_box_size: int = 28
     icon_box_pad: int = 8
+    strip_glyph_ratio: float = 0.346
+    """Identity glyph size as fraction of strip height. Computed value:
+    ``strip_glyph_size = round(strip_height * strip_glyph_ratio)``. Default
+    0.346 yields 18px at strip_height=52 — the design constant established in
+    v0.3.9 (brutalist's specimen-derived 18px in a 52px strip). Changing this
+    field changes the proportional glyph across every paradigm uniformly;
+    changing strip_height in one paradigm produces a correctly-scaled glyph
+    without per-paradigm re-tuning. v0.3.9 replaces the previous hand-synced
+    pair (chrome ``glyph_size: 22`` + brutalist ``identity_glyph_size: 18``)
+    that had to stay in proportional agreement by manual update."""
     divider_render_mode: Literal["gradient", "class"] = "class"
     """``gradient`` routes through chrome-defs ``url(#{uid}-sep)`` stroke;
     ``class`` uses a flat CSS-class-colored divider."""
@@ -212,7 +287,10 @@ class ParadigmStripConfig(FrozenModel):
     ornament_y: int = 0
     """Identity ornament top edge. Brutalist: 19."""
     ornament_size: int = 0
-    """Identity ornament side length. Brutalist: 14."""
+    """Identity ornament side length. Brutalist: 14. This field also sizes
+    the right-edge bookend placeholder square (rendered via
+    brutalist-{dark,light}-content.j2). To resize the left identity GitHub
+    glyph independently, set ``identity_glyph_size`` instead."""
     ornament_inner_inset: int = 0
     """Ornament inner-cutout inset (so inner = ornament_size - 2*inset).
     Brutalist: 3 (8x8 inner cutout in 14x14 outer)."""
@@ -234,14 +312,26 @@ class ParadigmStripConfig(FrozenModel):
     strip_width: int = 0
     """Total strip canvas width. Brutalist: 560."""
 
+    strip_min_width: int = 0
+    """Minimum total strip canvas width in pixels. When ``> 0``, the layout
+    engine clamps the strip's total width to at least this value and pads the
+    trailing edge after the bookend. Chrome: 320 (prevents 1-metric strips
+    from aspect-warping in README columns). Zero (default) means no clamp —
+    width grows additively from cells."""
+
 
 class ParadigmBadgeConfig(FrozenModel):
     """Badge frame config within a paradigm."""
 
+    default_size: Literal["default", "compact"] = "default"
+    """Size class used when a request leaves ``ComposeSpec.size`` at
+    ``"default"``. Cellular sets ``compact`` so automata badges use the
+    small badge form by default while still allowing an explicit non-compact
+    size request to use ``frame_height``."""
     label_font_family: str = "Inter"
     value_font_family: str = "Inter"
-    label_font_size: int = 11
-    value_font_size: int = 11
+    label_font_size: float = 11
+    value_font_size: float = 11
     value_font_weight: int = 700
     show_indicator: bool = True
     """When False, the status-indicator zone collapses. Cellular paradigm
@@ -258,9 +348,18 @@ class ParadigmBadgeConfig(FrozenModel):
     glyph_offset_left_compact: int = 0
     """Compact-variant glyph offset. Empty (0) falls back to glyph_offset_left."""
     glyph_size: int = 14
-    """Glyph render box. Brutalist/chrome: 14. Cellular default: 12."""
+    """Fallback glyph render box when no proportional ratio is declared."""
     glyph_size_compact: int = 0
     """Compact-variant glyph size. Empty (0) falls back to glyph_size."""
+    glyph_size_ratio: float = 0.0
+    """When >0, derive the glyph render box from ``frame_height * ratio``.
+    This is the preferred path for paradigms that should share one visual
+    glyph weight at the same badge height."""
+    glyph_size_compact_ratio: float = 0.0
+    """Compact-variant ratio. Empty (0) falls back to glyph_size_ratio."""
+    glyph_size_max: int = 0
+    """Optional upper bound for derived badge glyph sizes. Useful for taller
+    badge variants that should keep the canonical compact identity weight."""
     text_y_factor: float = 0.69
     """Vertical placement of label/value text baseline as fraction of
     frame_height. Brutalist/chrome: 0.69. Cellular specimen: 0.656 (y=21 at
@@ -324,6 +423,74 @@ class ParadigmBadgeConfig(FrozenModel):
     uppercase shy-from-seam adjustment. Zero (default) preserves legacy
     layout for chrome/cellular/default paradigms; brutalist sets 8 to match
     the v16 prototype's symmetric composition."""
+
+    pad: int = 8
+    """Equal-spacing constant (px) used by ``compute_badge_zones``. Every gap
+    between PRESENT zones equals ``pad`` — left edge → glyph (when present),
+    glyph → label (when present), label → panel separator, panel separator →
+    value, value → state indicator (when present), state indicator → right
+    edge. Absent zones collapse entirely so a glyph-less badge has no phantom
+    slot. Brutalist 5, cellular 8, chrome 7. Independent from ``rhythm_gap``.
+
+    Half-gap rule for seam: when ``seam_render_w > 0`` (chrome etched seam),
+    the seam consumes ``pad/2`` on each side. Without this rule, a literal
+    label+pad+seam+pad+value walk would produce ``2*pad + seam`` between
+    label-end and value-start instead of the prototype's ``pad + seam``."""
+
+    text_anchor: Literal["start", "middle"] = "middle"
+    """SVG ``text-anchor`` value for label and value text. ``middle`` (default,
+    brutalist + cellular) — layout emits center x positions. ``start`` (chrome
+    paradigm) — layout emits first-character x positions, matching chrome's
+    Orbitron typography with letter-spacing where centered alignment causes
+    visual drift in narrow frames."""
+
+    seam_render_w: float = 0.0
+    """Width (px) of the etched seam slot between label and value zones. When
+    ``> 0`` (chrome paradigm declares 1.0), the layout engine reserves this
+    slot in the cursor walk and emits ``seam_left_x`` + ``seam_specular_x``
+    for the chrome etched-groove rendering (two hairlines: dark cut + specular
+    catch). When ``0`` (brutalist + cellular), the panel separator instead
+    uses ``sep_w + seam_w`` (structural stroke + mark) at the panel boundary
+    — the conventional brutalist/cellular badge composition."""
+
+    seam_specular_offset: float = 0.0
+    """Horizontal offset (px) of the specular-catch hairline from the dark-cut
+    hairline in the etched seam. Chrome declares 0.6 to match the spatial
+    study prototype. Only used when ``seam_render_w > 0``."""
+
+    glyph_y_offset: float = 0.0
+    """Per-paradigm vertical offset (px) applied to glyph_y AFTER frame-center
+    placement. Addresses the perception that the glyph sits "too high"
+    relative to label text. The frame-center calculation
+    (height - glyph_size) / 2 produces a geometrically-centered glyph, but
+    text visual-center may not equal frame center — chrome uses
+    dominant-baseline=central (text visual center == y attr), brutalist and
+    cellular use the default alphabetic baseline (visual center sits ~0.35 *
+    font_size above baseline y). For paradigms where these differ, declare
+    a positive offset to push the glyph down to the text visual center.
+    Cellular default (h=32, font 9): 2.0. Brutalist: 0. Chrome: 0."""
+
+    glyph_y_offset_compact: float = 0.0
+    """Compact-variant override for glyph_y_offset. The text-visual-center vs
+    frame-center delta scales with frame height and label font size —
+    cellular's +2px offset at h=32 with 9px font is
+    ~+0.67px at h=20 with smaller compact font. Applying the same offset
+    verbatim to compact overshoots by ~1.3px (glyph sits below text). Set
+    to 0 for compact variants where the text-baseline difference is
+    negligible. Zero (default) inherits the main glyph_y_offset value."""
+
+    min_total_width: int = 0
+    """Aesthetic floor (px) for the total badge width. Zero defers to the
+    layout engine's default (60). Chrome paradigm declares a smaller floor
+    (40) because chrome's identity is content-driven shrinkage — a single-
+    character X/1 badge should render as a tight chip, not a 60px block with
+    visible dead space. Brutalist/cellular keep the 60px floor for chunkier
+    legibility on small content."""
+    text_visual_center_offset_em: float = 0.3
+    """Distance from the label baseline to its visual center in em units.
+    Alphabetic-baseline text uses ~0.3em. Paradigms that render badge text
+    with dominant-baseline=central set this to 0 so glyphs align to the same
+    center line the text uses."""
 
 
 class ParadigmIconConfig(FrozenModel):

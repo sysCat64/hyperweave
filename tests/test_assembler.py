@@ -28,6 +28,48 @@ def test_voltage_emits_no_light_mode_media_query() -> None:
     )
 
 
+def test_chrome_emits_no_light_mode_media_query() -> None:
+    """Chrome's identity is a dark midnight envelope (gradient stops are
+    hex-baked via url(#env), scheme-stable). A light_mode block in chrome.json
+    caused the assembler to emit `@media (prefers-color-scheme: light)` rules
+    that swapped --dna-ink-primary to a dark slate (#1E293B) on light GitHub
+    READMEs. Result: the GitHub provider glyph and identity/metric text on
+    chrome stats/chart cards rendered as dark-slate-on-dark-envelope, nearly
+    invisible — while the envelope itself stayed dark because the gradient
+    fill is hex, not var-driven. Pin the disable.
+    """
+    spec = ComposeSpec(type="stats", genome_id="chrome")
+    css = compose(spec).svg
+    assert "prefers-color-scheme: light" not in css, (
+        "chrome must not emit a light-mode media query — chrome is a "
+        "scheme-stable dark-envelope identity; remove the light_mode block "
+        "from chrome.json"
+    )
+
+
+def test_chrome_stats_and_chart_headers_use_badge_identity_roles() -> None:
+    """Chrome stats/chart header slots consume the same roles as badges."""
+    stats_svg = compose(ComposeSpec(type="stats", genome_id="chrome", variant="horizon")).svg
+    chart_svg = compose(
+        ComposeSpec(
+            type="chart",
+            genome_id="chrome",
+            variant="horizon",
+            connector_data={
+                "points": [{"date": "2024-01-01", "stars": 10}, {"date": "2024-02-01", "stars": 20}],
+                "current_stars": 20,
+            },
+        )
+    ).svg
+
+    for svg in (stats_svg, chart_svg):
+        assert "--dna-glyph-inner: #E0ECF6;" in svg
+        assert "fill: var(--dna-signal)" in svg
+        assert "--hw-core: var(--dna-signal)" in svg
+        assert "var(--dna-status-passing-core, #22C55E)" not in svg
+        assert 'fill="var(--dna-glyph-inner, var(--dna-signal))"' in svg
+
+
 def test_static_motion_omits_motion_css_but_retains_status() -> None:
     """motion=static should exclude motion keyframes but keep ambient status animations.
 

@@ -59,8 +59,9 @@ async def hw_compose(
 
     genome: brutalist (dark, sharp corners, emerald accent) |
             chrome (dark, metallic, 5 named variants: horizon/abyssal/lightning/graphite/moth) |
-            automata (cellular, 12 solo tones: violet/teal/bone/steel/amber/jade/magenta/
-              cobalt/toxic/solar/abyssal/crimson — pair any two via ?pair=...)
+            automata (cellular, 16 solo tones: violet/teal/bone/steel/amber/jade/magenta/
+              cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper
+              — pair any two via ?pair=...)
             — or pass ``genome_override`` as an inline genome dict to bypass
               the built-in registry (equivalent to CLI ``--genome-file``).
 
@@ -99,7 +100,8 @@ async def hw_compose(
     shape: square | circle (icon frame shape, genome-dependent)
     variant: chrome → horizon | abyssal | lightning | graphite | moth
              automata → violet | teal | bone | steel | amber | jade | magenta |
-                        cobalt | toxic | solar | abyssal | crimson (12 solo tones)
+                        cobalt | toxic | solar | abyssal | crimson | sulfur |
+                        indigo | burgundy | copper (16 solo tones)
              empty = frame default flagship variant (cellular default = teal)
     pair: cellular paradigm pairing modifier (automata only). Composes any two
           solo tones — e.g. variant="teal" pair="violet". Bifamily frames

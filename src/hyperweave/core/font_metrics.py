@@ -49,6 +49,21 @@ class FontMetrics(FrozenModel):
     char_width_px: float = 0.0
     aliases: list[str] = Field(default_factory=list)
     widths: dict[str, int] = Field(default_factory=dict)
+    bearings: dict[str, list[int]] = Field(default_factory=dict)
+    """Per-glyph ``[lsb, rsb]`` in tenths-of-pixels at ``baseline_size_px``.
+    Optional — predates the v0.3.9 ink-width measurement work. When empty,
+    ``measure_text_ink_width`` falls back to advance-width behavior
+    (equivalent to ``measure_text``). Populated by
+    ``scripts/extract_font_metrics.py`` via fonttools BoundsPen."""
+    widths_by_weight: dict[str, dict[str, int]] = Field(default_factory=dict)
+    """Optional per-weight advance widths for variable fonts.
+
+    Keys are CSS font weights as strings (``"400"``, ``"700"``, etc.).
+    When present, text measurement uses the nearest available real weight
+    metrics instead of applying ``bold_expansion_factor`` to the default
+    outlines."""
+    bearings_by_weight: dict[str, dict[str, list[int]]] = Field(default_factory=dict)
+    """Optional per-weight bearings matching ``widths_by_weight``."""
 
 
 class FontRegistry:

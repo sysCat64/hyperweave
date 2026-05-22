@@ -25,6 +25,15 @@ from hyperweave.mcp.server import (
 # ===========================================================================
 
 
+def test_hw_compose_docstring_advertises_16_automata_tones() -> None:
+    """MCP docs must match the 16-tone automata registry."""
+    doc = hw_compose.__doc__ or ""
+    assert "16 solo tones" in doc
+    assert "12 solo tones" not in doc
+    for tone in ("sulfur", "indigo", "burgundy", "copper"):
+        assert tone in doc
+
+
 async def test_hw_compose_badge() -> None:
     result = await hw_compose(type="badge", title="build", value="passing")
     assert isinstance(result, str)

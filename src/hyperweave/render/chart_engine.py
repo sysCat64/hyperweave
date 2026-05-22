@@ -31,6 +31,7 @@ Public API:
 from __future__ import annotations
 
 import math
+from calendar import monthrange
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -282,10 +283,9 @@ def _build_area_path(projected: list[tuple[int, int]], baseline_y: int) -> str:
 
 # ── Cellular area-fill (v2 star chart) ────────────────────────────────────
 #
-# Round 6 / Issue G replaces the v1 left-teal / right-amethyst flank cells with
-# an area-fill approach: cells exist ONLY under the data polyline, with
+# Area-fill approach: cells exist only under the data polyline, with
 # brightness encoding vertical proximity to the curve. The chart's chromatic
-# identity migrates from border decoration to area substrate.
+# identity lives in the area substrate instead of border decoration.
 #
 # Returns structured dicts per Invariant 6 (zero SVG strings in Python). The
 # template renders each cell as a <rect> with the supplied class for animation
@@ -302,7 +302,7 @@ _AREA_CELL_CLASSES: tuple[str, ...] = ("b1", "b2", "b3", "b4")
 
 # Cellular automata chart algorithm constants.
 #
-# Round 14: smooth-ombré + tiny-noise approach. The position gradient
+# Smooth-ombré + tiny-noise approach. The position gradient
 # (col_norm * 0.6 + row_from_top_norm * 0.4) produces a continuous trend
 # from bottom-left dim → top-right bright; small ±0.08 perturbation per
 # cell adds organic variance. The chart_levels list serves as 6 control
@@ -644,12 +644,6 @@ def _build_markers(
 # instead of a pre-rendered SVG string. Chart content templates consume the
 # shapes via ``{% include %}`` partials under ``templates/components/``.
 
-# Minimum horizontal pixel gap between two milestone labels. Clustered
-# crossings (e.g. mega-repos where 500, 1K, 5K, 10K all happen in the same
-# early-history window) would otherwise render labels stacked on top of each
-# other. We keep only the first milestone in any cluster.
-MILESTONE_MIN_GAP_PX: int = 40
-
 
 def _build_axes(vp: Viewport) -> list[dict[str, Any]]:
     """L-frame axes at the viewport's left and bottom edges."""
@@ -688,15 +682,27 @@ def _build_milestones(
     projected: list[tuple[int, int]],
     vp: Viewport,
     thresholds: list[int],
+    y_labels: list[dict[str, Any]] | None = None,
+    marker_size: int = 0,
 ) -> list[dict[str, Any]]:
     """Vertical marker lines at points where value crosses a threshold.
 
     Walks the series in order and emits a marker the first time a point's
     value meets or exceeds each threshold. After all crossings are found,
-    applies de-overlap: milestones within ``MILESTONE_MIN_GAP_PX`` of an
-    already-kept milestone are dropped so labels never stack (e.g. the
-    openclaw mega-repo's ``500``/``1K``/``5K``/``10K`` cluster that
-    rendered as an illegible pile before this fix).
+    applies width-aware de-overlap:
+
+    1. Each milestone candidate's label is measured via :func:`_label_pixel_width`
+       so collision uses actual rendered bounds instead of a fixed center-to-
+       center px gap.
+    2. Y-axis tick labels (when provided) participate in collision detection —
+       milestones near the y-axis don't render text on top of "50K"/"500"
+       tick text.
+    3. Candidates iterate in VALUE-DESCENDING order so when two milestones
+       compete, the more significant one wins (a 10K crossing beats a 5K
+       crossing). Iterating by x-position would keep early low-value
+       milestones and suppress later high-value ones.
+    4. Kept milestones re-sort by x-position before return so the rendered
+       DOM reads left-to-right for sensible reading order.
     """
     if not points or not projected or not thresholds:
         return []
@@ -728,14 +734,73 @@ def _build_milestones(
                 )
         last_val = p.value
 
-    # De-overlap: keep only the first crossing in any x-cluster so labels
-    # stay legible when the polyline climbs rapidly through many thresholds.
+    # Build y-axis tick label bounds (anchor=end at x = vp.x - 10 per the
+    # cellular/brutalist/chrome chart templates). When y_labels is None or
+    # empty, only milestones collide against each other.
+    y_label_bounds: list[dict[str, Any]] = []
+    for yl in y_labels or []:
+        y_label_bounds.append(
+            {
+                "x": vp.x - 10,
+                "text": str(yl["text"]),
+                "anchor": "end",
+            }
+        )
+
+    # Width-aware de-overlap. Iterate VALUE-DESCENDING so high-value milestones
+    # win conflicts. Milestone labels render text-anchor=middle 24px above the
+    # curve (see chart-milestone.svg.j2), so the bounds use anchor=middle.
+    # Proper bbox-overlap check (max-of-lefts < min-of-rights + padding) avoids
+    # the order-sensitivity of _labels_collide which only works when left<right.
+    def _bbox_overlap(a: dict[str, Any], b: dict[str, Any]) -> bool:
+        al, ar = _label_bounds(a)
+        bl, br = _label_bounds(b)
+        return max(al, bl) < min(ar, br) + _LABEL_EDGE_PADDING_PX
+
+    def _to_bound(d: dict[str, Any]) -> dict[str, Any]:
+        return {"x": float(d["x"]), "text": str(d["text"]), "anchor": d.get("anchor", "middle")}
+
+    # v0.3.9 Bug D: include data-point markers in the collision pass.
+    # Milestones render labels 24px above the curve, but they extend
+    # laterally for the label's full width. A long milestone label centered
+    # at one data point can extend over an ADJACENT data point's diamond
+    # marker. Exclude the marker AT the milestone's own x position
+    # (same data point, no visual conflict).
+    marker_half = marker_size / 2.0 if marker_size > 0 else 0.0
+
+    def _milestone_overlaps_marker(ms_x: float, label_left: float, label_right: float) -> bool:
+        if marker_half <= 0:
+            return False
+        for marker_x, _marker_y in projected:
+            if abs(marker_x - ms_x) < 0.5:
+                continue  # marker at the milestone's own x position
+            m_left = marker_x - marker_half
+            m_right = marker_x + marker_half
+            if max(label_left, m_left) < min(label_right, m_right) + _LABEL_EDGE_PADDING_PX:
+                return True
+        return False
+
     kept: list[dict[str, Any]] = []
-    last_x = -(10**9)
-    for ms in sorted(raw, key=lambda m: m["x"]):
-        if ms["x"] - last_x >= MILESTONE_MIN_GAP_PX:
-            kept.append(ms)
-            last_x = ms["x"]
+    for ms in sorted(raw, key=lambda m: -int(m["value"])):
+        ms_label_bound = {"x": float(ms["x"]), "text": str(ms["label"]), "anchor": "middle"}
+        collides = any(_bbox_overlap(ms_label_bound, _to_bound(other)) for other in (*kept, *y_label_bounds))
+        if not collides:
+            ms_left, ms_right = _label_bounds(ms_label_bound)
+            collides = _milestone_overlaps_marker(float(ms["x"]), ms_left, ms_right)
+        if not collides:
+            kept.append(
+                {
+                    "x": ms["x"],
+                    "text": ms["label"],
+                    "value": ms["value"],
+                    "y": ms["y"],
+                    "bottom_y": ms["bottom_y"],
+                    "label": ms["label"],
+                }
+            )
+
+    # Re-sort by x-position for left-to-right DOM order.
+    kept.sort(key=lambda m: m["x"])
     return kept
 
 
@@ -809,12 +874,6 @@ def _build_y_labels(ticks: list[int], v_min: int, v_max: int, vp: Viewport) -> l
 # even when the gap "rule" passed. We now compute each label's actual rendered
 # bounding box and check edge-to-edge separation.
 
-# Conservative per-character width covering the widest paradigm (brutalist:
-# 9px sans-serif + 0.20em letter-spacing + uppercase). Cellular and chrome
-# render narrower, so this estimate is a safe upper bound for all genome
-# paradigms — it never under-estimates collision.
-_LABEL_CHAR_WIDTH_PX: float = 7.5
-
 # Minimum visual gap between two label bounding boxes. Smaller than the full
 # character width — readers tolerate close-packed labels as long as the glyphs
 # don't actually touch.
@@ -822,8 +881,24 @@ _LABEL_EDGE_PADDING_PX: float = 6.0
 
 
 def _label_pixel_width(text: str) -> float:
-    """Worst-case rendered width of `text` in pixels."""
-    return len(text) * _LABEL_CHAR_WIDTH_PX
+    """Rendered width of `text` in pixels at the widest milestone label CSS.
+
+    Uses real ``measure_text`` against the brutalist milestone CSS
+    (JetBrains Mono 9px/800/0.12em — the widest across all three chart
+    paradigms; cellular uses 8px/700/0em and chrome uses 8.5px/700/0.14em,
+    both narrower).
+    Conservative for collision detection — using the widest paradigm's
+    rendering as the bound means cellular and chrome will keep their
+    natural milestones when they would have fit under the narrower CSS.
+
+    Audit data showed the fixed estimate over-counted by ~11px on a 12-char
+    label like "10K · AUG 23" (90px estimate vs ~79px actual JBMono render),
+    causing false-positive milestone collisions that suppressed visible
+    milestones.
+    """
+    from hyperweave.core.text import measure_text
+
+    return measure_text(text, font_family="JetBrains Mono", font_size=9, font_weight=800, letter_spacing_em=0.12)
 
 
 def _label_bounds(label: dict[str, Any]) -> tuple[float, float]:
@@ -849,15 +924,78 @@ def _labels_collide(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return right_left < left_right + _LABEL_EDGE_PADDING_PX
 
 
-def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[str, Any]]:
-    """Adaptive x-axis date labels — granularity follows the data's temporal span.
+def _add_months(dt: datetime, months: int) -> datetime:
+    """Return ``dt`` shifted by whole calendar months, clamping day safely."""
+    month_index = dt.month - 1 + months
+    year = dt.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(dt.day, monthrange(year, month)[1])
+    return dt.replace(year=year, month=month, day=day)
 
-    Tick formats:
-        < 14 days  → daily   ("Apr 05")
-        < 90 days  → weekly  ("Apr 05" at 7-day steps)
-        < 2 years  → monthly ("Apr 2026")
-        < 10 years → yearly  ("2026")
-        else       → every other year ("2012", "2014", ...)
+
+def _project_date_label(
+    dt: datetime,
+    t0: datetime,
+    span_seconds: float,
+    vp: Viewport,
+    format_str: str,
+) -> dict[str, Any]:
+    frac_t = (dt - t0).total_seconds() / span_seconds
+    px = vp.x + round(frac_t * vp.w)
+    return {"x": px, "text": dt.strftime(format_str), "anchor": "middle"}
+
+
+def _calendar_month_candidates(
+    t0: datetime,
+    t1: datetime,
+    vp: Viewport,
+    target_label_count: int,
+) -> list[dict[str, Any]]:
+    """Generate visually even calendar-month labels for medium spans."""
+    span_seconds = max((t1 - t0).total_seconds(), 1.0)
+    span_months = max(1.0, span_seconds / (365.2425 * 24 * 60 * 60 / 12))
+    raw_month_step = span_months / max(1, target_label_count - 1)
+    step_months = min((1, 2, 3, 6), key=lambda step: (abs(step - raw_month_step), step))
+
+    candidates = [_project_date_label(t0, t0, span_seconds, vp, "%b %Y")]
+    first_month = datetime(t0.year, t0.month, 1, tzinfo=t0.tzinfo)
+    cursor = _add_months(first_month, step_months)
+    while cursor < t1:
+        if cursor > t0:
+            candidates.append(_project_date_label(cursor, t0, span_seconds, vp, "%b %Y"))
+        cursor = _add_months(cursor, step_months)
+    return candidates
+
+
+def _space_axis_labels_evenly(labels: list[dict[str, Any]], vp: Viewport) -> list[dict[str, Any]]:
+    """Return labels distributed evenly across the viewport."""
+    if len(labels) <= 1:
+        return labels
+    step = vp.w / (len(labels) - 1)
+    spaced: list[dict[str, Any]] = []
+    for idx, label in enumerate(labels):
+        next_label = dict(label)
+        next_label["x"] = vp.x + round(idx * step)
+        if idx == 0:
+            next_label["anchor"] = "start"
+        elif idx == len(labels) - 1:
+            next_label["anchor"] = "end"
+        spaced.append(next_label)
+    return spaced
+
+
+def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[str, Any]]:
+    """Adaptive x-axis date labels — count-driven (~6 labels across any span).
+
+    v0.3.9 Bug #4 refactor: pre-fix this was STEP-driven (fixed 7-day
+    step for spans <90d, 30-day step for <2y, etc.), producing 8+ weekly
+    labels on short-span repos and dense monthly labels on multi-year
+    spans. Now COUNT-DRIVEN: target ~6 labels, compute the raw step
+    (span / (count-1)), then snap to the nearest "nice" interval from a
+    curated vocabulary spanning days→years. Result: a 50-day span gets
+    ~4-5 biweekly labels; a 10-year span gets ~5 every-other-year labels.
+    Label count stays roughly constant regardless of span — the
+    star-history.com pattern the user referenced.
 
     A single-point input renders one centered label with full "%b %d, %Y".
     After candidate generation, a width-aware de-overlap pass removes any
@@ -876,33 +1014,56 @@ def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[st
     t1 = points[-1].date
     span = t1 - t0
 
-    # Select granularity + format from the actual span.
-    if span < timedelta(days=14):
-        format_str = "%b %d"
-        step = timedelta(days=1)
-    elif span < timedelta(days=90):
-        format_str = "%b %d"
-        step = timedelta(days=7)
-    elif span < timedelta(days=730):
-        format_str = "%b %Y"
-        step = timedelta(days=30)  # ≈ 1 month
-    elif span < timedelta(days=3650):
-        format_str = "%Y"
-        step = timedelta(days=365)
+    # Pick a "nice" step from the curated vocabulary that yields ~6 labels.
+    # Month-scale spans use calendar-month ticks so a 15-month repo snaps to
+    # quarterly/monthly cadence instead of an uneven 6-month cadence plus a
+    # short terminal endpoint.
+    _NICE_STEPS: list[tuple[timedelta, str]] = [
+        (timedelta(days=1), "%b %d"),
+        (timedelta(days=2), "%b %d"),
+        (timedelta(days=3), "%b %d"),
+        (timedelta(days=7), "%b %d"),
+        (timedelta(days=14), "%b %d"),
+        (timedelta(days=30), "%b %Y"),
+        (timedelta(days=60), "%b %Y"),
+        (timedelta(days=90), "%b %Y"),
+        (timedelta(days=180), "%b %Y"),
+        (timedelta(days=365), "%Y"),
+        (timedelta(days=730), "%Y"),
+        (timedelta(days=1825), "%Y"),
+    ]
+    _TARGET_LABEL_COUNT = 6
+    raw_step_seconds = span.total_seconds() / max(1, _TARGET_LABEL_COUNT - 1)
+    # Granularity floor: long spans should stay at the year boundary
+    # (avoid "Jun 2024" labels on a 3-year chart — yearly format reads
+    # cleaner). Short spans get day-level resolution.
+    if span >= timedelta(days=730):
+        min_step_seconds = timedelta(days=365).total_seconds()
+    elif span >= timedelta(days=90):
+        min_step_seconds = timedelta(days=30).total_seconds()
     else:
-        format_str = "%Y"
-        step = timedelta(days=730)  # every other year
+        min_step_seconds = timedelta(days=1).total_seconds()
+    target_step_seconds = max(raw_step_seconds, min_step_seconds)
+    use_calendar_months = timedelta(days=90) <= span < timedelta(days=730)
+    if use_calendar_months:
+        format_str = "%b %Y"
+        candidates = _calendar_month_candidates(t0, t1, vp, _TARGET_LABEL_COUNT)
+    else:
+        eligible_steps = [(s, f) for s, f in _NICE_STEPS if s.total_seconds() >= min_step_seconds]
+        step, format_str = min(
+            eligible_steps,
+            key=lambda item: (abs(item[0].total_seconds() - target_step_seconds), item[0].total_seconds()),
+            default=_NICE_STEPS[-1],
+        )
 
-    # Generate candidate ticks, projecting each to pixel x via the same scale
-    # as the polyline so labels sit directly under their corresponding data.
-    t_span_s = max(span.total_seconds(), 1.0)
-    candidates: list[dict[str, Any]] = []
-    cursor = t0
-    while cursor <= t1:
-        frac_t = (cursor - t0).total_seconds() / t_span_s
-        px = vp.x + round(frac_t * vp.w)
-        candidates.append({"x": px, "text": cursor.strftime(format_str), "anchor": "middle"})
-        cursor = cursor + step
+        # Generate candidate ticks, projecting each to pixel x via the same scale
+        # as the polyline so labels sit directly under their corresponding data.
+        t_span_s = max(span.total_seconds(), 1.0)
+        candidates = []
+        cursor = t0
+        while cursor <= t1:
+            candidates.append(_project_date_label(cursor, t0, t_span_s, vp, format_str))
+            cursor = cursor + step
 
     # Ensure the terminal endpoint is in the candidate set (may not land on a
     # step boundary otherwise).
@@ -918,7 +1079,7 @@ def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[st
     # collision (not center-to-center) so labels of different widths
     # (e.g. monthly "Apr 2026" vs yearly "2026") behave correctly.
     if len(candidates) <= 2:
-        return candidates
+        return _space_axis_labels_evenly(candidates, vp) if use_calendar_months else candidates
     kept: list[dict[str, Any]] = [candidates[0]]
     for label in candidates[1:-1]:
         if not _labels_collide(kept[-1], label):
@@ -927,13 +1088,19 @@ def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[st
     # the last-kept middle label, or has identical text (e.g. yearly
     # granularity where the last jan-1 tick and the terminal point both
     # read "2026"), replace that middle rather than duplicating.
+    # After replacing, the new kept[-1] may still collide with kept[-2].
+    # With narrower measure_text widths, the terminal label can have a longer
+    # leftward extent than the prior anchor=middle label it replaced.
+    # Cascade-pop until the chain is collision-free.
     last_candidate = candidates[-1]
     same_text = last_candidate["text"] == kept[-1]["text"]
     if same_text or _labels_collide(kept[-1], last_candidate):
         kept[-1] = last_candidate
     else:
         kept.append(last_candidate)
-    return kept
+    while len(kept) >= 2 and _labels_collide(kept[-2], kept[-1]):
+        kept.pop(-2)
+    return _space_axis_labels_evenly(kept, vp) if use_calendar_months else kept
 
 
 def _build_empty_state(vp: Viewport, message: str) -> dict[str, Any] | None:
@@ -1052,14 +1219,14 @@ def build_chart_svg(
         gridlines = _build_gridlines_from_ticks(y_labels, viewport)
     else:
         gridlines = _build_gridlines(viewport, rows=4)
-    milestones_list = _build_milestones(points, projected, viewport, milestones or [])
+    milestones_list = _build_milestones(points, projected, viewport, milestones or [], y_labels, marker_size=point_size)
 
     # Empty state overlay: only when there are no data points AND a message
     # was provided. Without a message the chart degrades silently (useful for
     # embedded charts in stats.py that don't need a user-facing label).
     empty_state = _build_empty_state(viewport, empty_message or "") if not points else None
 
-    # Cellular automata chart substrate (Round 13). Three layers:
+    # Cellular automata chart substrate. Three layers:
     #   - dormant_cells: full-viewport tile in near-black tone-family hues,
     #     softens the clip boundary so the void area above the curve reads as
     #     warm undertone instead of pure black.

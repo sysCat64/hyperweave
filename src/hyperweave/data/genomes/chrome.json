@@ -298,16 +298,6 @@
   "state_building_bright": "#DDD6FE",
   "state_offline_core": "#94A3B8",
   "state_offline_bright": "#CBD5E1",
-  "light_mode": {
-    "surface": "#F8FAFC",
-    "surface_alt": "#F1F5F9",
-    "surface_deep": "#E2E8F0",
-    "ink": "#1E293B",
-    "ink_muted": "#64748B",
-    "ink_ghost": "#CBD5E1",
-    "border": "#CBD5E1",
-    "sep": "#CBD5E1"
-  },
   "paradigms": {
     "badge": "chrome",
     "strip": "chrome",

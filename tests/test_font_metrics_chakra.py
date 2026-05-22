@@ -1,8 +1,9 @@
-"""Chakra Petch font metrics — Phase 2 validation.
+"""Chakra Petch and Barlow Condensed font metrics validation.
 
 The automata genome uses Chakra Petch 700 for hero value text in badges
-and strips. Source: Google Fonts (OFL-1.1). Extracted via
-``scripts/extract_font_metrics.py chakra-petch`` at baseline 12px.
+and strips. The brutalist paradigm uses Barlow Condensed 700/900 for
+stats and strip values. Source: Google Fonts (OFL-1.1). Extracted via
+``scripts/extract_font_metrics.py chakra-petch barlow-condensed-900``.
 """
 
 from __future__ import annotations
@@ -19,7 +20,9 @@ def test_chakra_petch_lut_loads() -> None:
     assert metrics.font_family == "Chakra Petch"
     assert metrics.baseline_size_px == 12
     assert metrics.is_monospace is False
-    assert metrics.bold_expansion_factor > 1.0
+    assert metrics.bold_expansion_factor == 1.0
+    assert sorted(metrics.widths_by_weight) == ["400", "700", "900"]
+    assert sorted(metrics.bearings_by_weight) == ["400", "700", "900"]
     # Latin ASCII coverage
     for ch in ("A", "B", "0", "9", " ", ".", "v"):
         assert ch in metrics.widths, f"missing ASCII glyph '{ch}'"
@@ -48,8 +51,28 @@ def test_chakra_petch_wider_than_jetbrains_mono_for_same_digits() -> None:
     assert abs(chakra - mono) > 0.5, "expected measurable difference between mono and proportional"
 
 
-def test_chakra_petch_bold_expansion_applies_at_weight_700() -> None:
-    """bold_expansion_factor multiplies width at font_weight >= 700."""
+def test_chakra_petch_weighted_metrics_disable_scalar_bold_expansion() -> None:
+    """Chakra uses weighted metric maps instead of scalar bold expansion."""
     normal = measure_text("test", font_family="Chakra Petch", font_size=12, font_weight=400)
     bold = measure_text("test", font_family="Chakra Petch", font_size=12, font_weight=700)
-    assert bold > normal, "bold 700 should render wider than normal 400"
+    assert normal == bold
+
+
+def test_barlow_condensed_weighted_lut_loads() -> None:
+    """Registry exposes Barlow Condensed metrics for production weights."""
+    reset_registry()
+    registry = get_registry()
+    metrics = registry.get("Barlow Condensed")
+    assert metrics.font_family == "Barlow Condensed"
+    assert metrics.baseline_size_px == 18
+    assert metrics.is_monospace is False
+    assert metrics.bold_expansion_factor == 1.0
+    assert sorted(metrics.widths_by_weight) == ["400", "700", "900"]
+    assert sorted(metrics.bearings_by_weight) == ["400", "700", "900"]
+
+
+def test_barlow_condensed_900_uses_black_face_metrics() -> None:
+    """Barlow 900 measurements use the bundled black face, not a scalar."""
+    bold = measure_text("1234", font_family="Barlow Condensed", font_size=18, font_weight=700)
+    black = measure_text("1234", font_family="Barlow Condensed", font_size=18, font_weight=900)
+    assert black > bold

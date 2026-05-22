@@ -12,15 +12,12 @@ badge:
   label_font_size: 11
   value_font_size: 11
   value_font_weight: 700
-  # Glyph dimensions. Reverted to 14 in v0.3.2 follow-up: the inline glyph
-  # SVG component hardcodes width=14 height=14, so dropping paradigm value
-  # to 10 created a 2px vertical offset (glyph_y centered for 10 but actual
-  # render is 14 → visible "moved down"). Layout-side glyph_size value 14
-  # keeps the existing inline component coherent. Visual match to prototype's
-  # scale(.42) 10px effective glyph deferred until inline component takes the
-  # paradigm value as its width/height attrs.
-  glyph_size: 14
+  # Glyph size derives from badge height so all 20px badge paradigms carry the
+  # same provider-glyph visual weight.
+  glyph_size: 12
   glyph_size_compact: 0
+  glyph_size_ratio: 0.6
+  glyph_size_max: 12
   # v0.3.3: indicator geometry calibrated to the v16 dark-badge matrix
   # prototype. 10×10 outer ring + 6×6 inner bit at offset 2; stroke-width
   # 1.5 (heavier than chrome's 0.5 diamond ring). The 10-px size anchored
@@ -45,6 +42,12 @@ badge:
   rhythm_gap: 5
   label_letter_spacing_em: 0.06
   value_letter_spacing_em: 0.04
+  # v0.3.9 equal-spacing rule (compute_badge_zones): single pad applied
+  # between every PRESENT zone; absent zones collapse fully. Matches the
+  # rhythm_gap value above so brutalist badge geometry is preserved across
+  # the rhythm_gap → pad migration. The two fields are independent; pad
+  # is the new code path's input.
+  pad: 5
 
 strip:
   value_font_size: 18
@@ -78,6 +81,13 @@ strip:
   triple_divider_x: 162
   triple_divider_bar_width: 3
   triple_divider_void_width: 2
+  # ornament_size controls the right-edge BOOKEND ornament (the empty-square
+  # status indicator placeholder rendered in brutalist-{dark,light}-content.j2
+  # lines 110-117). The LEFT identity glyph is sized separately by the
+  # paradigm-shared ``strip_glyph_ratio`` (default 0.346 → 18px at
+  # strip_height=52). Both paradigms (chrome + brutalist) now derive their
+  # identity glyph from the same ratio so changes to design intent update
+  # uniformly without per-paradigm re-tuning.
   ornament_x: 22
   ornament_y: 19
   ornament_size: 14
@@ -89,7 +99,9 @@ strip:
   metric_value_y: 36
   identity_text_x: 50
   identity_text_y: 30
-  strip_width: 560
+  # strip_width removed v0.3.9 — canvas now adapts to content via additive
+  # slot assembly. bookend_x snaps dynamically to the right edge of the
+  # last cell in compose/resolver.py.
 
 chart:
   # v0.3.2 visual review: viewport aligned to prototype pigment panel
@@ -104,6 +116,28 @@ chart:
 stats:
   card_height: 280
   embeds_chart: false
+  # Username header layout. ``identity_zone_width`` is derived as
+  # ``bio_x - identity_x - identity_padding = 134 - 44 - 20 = 70`` instead
+  # of carried as an independent magic number. bio_x includes breathing
+  # margin after clamped usernames, and the derivation absorbs that spacing
+  # without per-paradigm re-tuning.
+  identity_x: 44
+  bio_x: 134
+  identity_padding: 20
+  # Adaptive bio_x: bio sits at identity_x + identity_ink_width +
+  # identity_breathing_margin. For ELI64S (short, ~52px ink): bio at x=104
+  # (tight v0.3.8 feel). For clamped long identity (zone_w=70): bio at
+  # x=122 (matches v0.3.8 hardcoded value exactly). bio_x:134 above acts
+  # as the ceiling — bio never extends past it.
+  identity_breathing_margin: 8
+  # Identity measurement matches brutalist-defs.j2 CSS (.{{uid}}-u) exactly.
+  # JBMono 11/800/0.22em renders ~95px for 9-char names vs Inter 13/700/0's
+  # 65px, so resolver measurement must use the rendered font.
+  identity_font_family: JetBrains Mono
+  identity_font_size: 11
+  identity_font_weight: 800
+  identity_letter_spacing_em: 0.22
+  identity_text_transform: uppercase
 
 icon:
   supported_shapes: [circle, square]

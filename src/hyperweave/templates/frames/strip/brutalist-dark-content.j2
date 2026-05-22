@@ -55,9 +55,19 @@
      fallback brand mark. The slot enables ?glyph={slug} to test brand
      identity composition without changing template architecture. #}
   {% if glyph_path %}
-  <g data-hw-zone="brand-glyph" transform="translate({{ ornament_x }},{{ ornament_y }})">
-    <svg viewBox="{{ glyph_viewbox }}" width="{{ ornament_size }}" height="{{ ornament_size }}">
-      <path d="{{ glyph_path }}" fill="var(--dna-signal)"/>
+  {# v0.3.9 algorithmic strip glyph: identity glyph sized by ``strip_glyph_size``
+     (derived from ``strip_height * strip_glyph_ratio`` in compose/resolver.py)
+     instead of a hand-tuned magic number that had to be re-synced with
+     chrome's glyph size. Distinct from ornament_size (14) which sizes the
+     right bookend square below. Glyph y-shifts so it stays vertically
+     centered at the same line as the legacy 14×14 ornament
+     (center y = ornament_y + 7). #}
+  {% set _idg_size = strip_glyph_size %}
+  {% set _idg_y = ornament_y + (ornament_size - _idg_size) // 2 %}
+  {% set _idg_x = ornament_x + (ornament_size - _idg_size) // 2 %}
+  <g data-hw-zone="brand-glyph" transform="translate({{ _idg_x }},{{ _idg_y }})">
+    <svg viewBox="{{ glyph_viewbox }}" width="{{ _idg_size }}" height="{{ _idg_size }}">
+      <path d="{{ glyph_path }}" fill="var(--dna-glyph-inner, var(--dna-signal))"/>
     </svg>
   </g>
   {% else %}
@@ -71,10 +81,13 @@
         fill="var(--dna-surface)"/>
   {% endif %}
 
-  {# (7) HYPERWEAVE identity text — Barlow Condensed 11px 900 inside brand panel. #}
+  {# (7) HYPERWEAVE identity text — Barlow Condensed 11px 900 inside brand panel.
+     v0.3.9: textLength + lengthAdjust shrink-to-fit when identity overflows the
+     brand panel (computed by compute_strip_zones). Empty for normal-length
+     identities. Attribute lives on <text>, NOT <tspan> (Camo inconsistency). #}
   <text data-hw-zone="identity"
         x="{{ identity_text_x }}" y="{{ identity_text_y }}"
-        class="{{ uid }}-brand-text">{{ identity | upper }}</text>
+        class="{{ uid }}-brand-text"{% if identity_text_length and identity_text_length > 0 %} textLength="{{ identity_text_length }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ identity | upper }}</text>
 
   {# (8) Metric cells with inter-cell dividers. Skips the first seam (already
      painted as the ACCENT-VOID-ACCENT triple at triple_divider_x). cell_layouts[i]

@@ -32,6 +32,12 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
         # the breaker that fronts pypi.org.
         "pypistats.org",
         "registry.npmjs.org",
+        # api.npmjs.org hosts the download stats endpoint (v0.3.9: was
+        # routed through registry.npmjs.org/-/downloads/* which returns
+        # 404 for all packages — the public stats live on a separate api
+        # subdomain). registry stays in the list for version/license
+        # metadata lookups.
+        "api.npmjs.org",
         "export.arxiv.org",
         "huggingface.co",
         "hub.docker.com",

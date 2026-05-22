@@ -49,12 +49,12 @@
 <style>
 {{ font_faces | safe }}
 .{{ uid }}-label {
-  font-family: var(--dna-font-mono, 'JetBrains Mono', 'SF Mono', monospace);
-  font-size: 8px; font-weight: 600; letter-spacing: 0.10em;
+  font-family: var(--dna-font-display, 'Orbitron', 'Space Grotesk', sans-serif);
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.10em;
 }
 .{{ uid }}-value {
   font-family: var(--dna-font-display, 'Orbitron', 'Space Grotesk', sans-serif);
-  font-size: 11px; font-weight: 900; letter-spacing: 0.02em;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.03em;
 }
 </style>
 <clipPath id="{{ uid }}-clip"><rect width="{{ width }}" height="{{ height }}" rx="{{ chrome_corner | default('4') }}"/></clipPath>

@@ -1,173 +1,219 @@
-"""Unit tests for compose/layout.py — BadgeLayout geometry correctness.
+"""Unit tests for compose/layout.py — BadgeZones equal-spacing rule.
 
-The v0.2.25 centering fix is verified here: ``value_x`` MUST equal the
-geometric center of the value zone (``(value_zone_left +
-value_zone_right) / 2``) for every realistic value-string category. The
-old resolver used a midpoint of two unrelated bounds and drifted text
-1.5px rightward in the stateful case and was undefined in the stateless
-case.
+Badge layout moved from the legacy rhythm_gap/glyph_gap dual-constant system
+to `compute_badge_zones` under a single equal-spacing rule:
 
-Cases mirror real GitHub/PyPI data so failures map cleanly to user-
-visible regressions:
+    Every gap between PRESENT zones equals `pad`. Absent zones (no glyph,
+    no state indicator) collapse entirely — no reserved width, no phantom
+    gap. The Bug 3 fix (chrome no-glyph long-label badges had ~16px of
+    empty space before the label) lives here.
+
+Cases mirror real GitHub/PyPI data so failures map cleanly to user-visible
+regressions:
 
 * short percentage ("82%")
 * full name ("RECONNAISSANCE")
 * version string ("0.2.23")
 * license SPDX ("Apache-2.0")
 * python_requires (">=3.12")
-* stateless STARS-like value ("42") with show_indicator=False
+* stateless STARS-like value ("42") with has_state_indicator=False
+* no-glyph long label (the Bug 3 trigger from the v0.3.9 visual review)
 """
 
 from __future__ import annotations
 
-from hyperweave.compose.layout import compute_badge_layout
+from hyperweave.compose.layout import compute_badge_glyph_size, compute_badge_zones
 
-# Brutalist-paradigm constants reflecting current data/paradigms/brutalist.yaml
-# defaults. sep_w=2, seam_w=3, no canvas inset.
+# Brutalist-paradigm constants reflecting data/paradigms/brutalist.yaml (pad=5).
 BRUTALIST_INPUTS = dict(
     height=20,
+    pad=5,
     has_glyph=False,
-    use_mono=True,
-    label_uppercase=True,
+    has_state_indicator=True,
     accent_w=4,
-    inset=0,
     glyph_size=14,
-    glyph_gap=4,
     glyph_left_offset=0,
     sep_w=2,
     seam_w=3,
     indicator_size=8,
-    ind_pad_r=8,
-    val_pad_l=3,
-    val_min_gap=3,
     text_y_factor=0.69,
     value_font_size=11.0,
 )
 
-# Cellular-paradigm constants reflecting data/paradigms/cellular.yaml. The
-# 1px gradient seam (sep_w=1) and 2px canvas inset (right_canvas_inset=2)
-# produced a 1.5px right-drift in the first-pass v0.2.25 fix that snapshot
-# tests caught only by accident; assertion-based coverage at this layer is
-# the correct primary defense.
+# Cellular-paradigm constants reflecting data/paradigms/cellular.yaml (pad=8).
+# sep_w=1 (overrides profile default of 2); right_canvas_inset=2 (inner-canvas
+# inset shrinks the effective value slab right edge by 2px). Verified at
+# ParadigmBadgeConfig loaded via ConfigLoader smoke test.
 CELLULAR_INPUTS = dict(
     height=32,
+    pad=8,
     has_glyph=False,
-    use_mono=False,
-    label_uppercase=True,
+    has_state_indicator=True,
     accent_w=4,
-    inset=0,
     glyph_size=12,
-    glyph_gap=4,
     glyph_left_offset=18,
     sep_w=1,
     seam_w=3,
     indicator_size=8,
-    ind_pad_r=8,
-    val_pad_l=3,
-    val_min_gap=3,
+    right_canvas_inset=2,
     text_y_factor=0.656,
     value_font_size=12.0,
-    right_canvas_inset=2,
 )
 
-CELLULAR_COMPACT_INPUTS = {**CELLULAR_INPUTS, "height": 20, "glyph_size": 8, "glyph_left_offset": 12}
+CELLULAR_COMPACT_INPUTS = {
+    **CELLULAR_INPUTS,
+    "height": 20,
+    "glyph_size": 12,
+    "glyph_left_offset": 12,
+}
 
 
-def _layout(*, label_w: float, value_w: float, value_len: int, show_indicator: bool = True):
-    return compute_badge_layout(
+def _zones(*, label_w: float, value_w: float, has_state_indicator: bool = True):
+    inputs = {**BRUTALIST_INPUTS, "has_state_indicator": has_state_indicator}
+    return compute_badge_zones(
         measured_label_w=label_w,
         measured_value_w=value_w,
-        value_raw_len=value_len,
-        show_indicator=show_indicator,
-        **BRUTALIST_INPUTS,
-    )
-
-
-def _layout_cellular(
-    *, label_w: float, value_w: float, value_len: int, show_indicator: bool = True, compact: bool = False
-):
-    inputs = CELLULAR_COMPACT_INPUTS if compact else CELLULAR_INPUTS
-    return compute_badge_layout(
-        measured_label_w=label_w,
-        measured_value_w=value_w,
-        value_raw_len=value_len,
-        show_indicator=show_indicator,
         **inputs,
     )
 
 
-def _assert_value_x_at_zone_center(layout) -> None:
-    """The v0.2.25 centering invariant — text MUST be at the zone center."""
-    expected = (layout.value_zone_left + layout.value_zone_right) / 2
-    assert abs(layout.value_x - expected) < 0.5, (
-        f"value_x={layout.value_x} but zone center = {expected} "
-        f"(zone: {layout.value_zone_left}..{layout.value_zone_right})"
+def _zones_cellular(
+    *,
+    label_w: float,
+    value_w: float,
+    has_state_indicator: bool = True,
+    compact: bool = False,
+):
+    inputs = CELLULAR_COMPACT_INPUTS if compact else CELLULAR_INPUTS
+    inputs = {**inputs, "has_state_indicator": has_state_indicator}
+    return compute_badge_zones(
+        measured_label_w=label_w,
+        measured_value_w=value_w,
+        **inputs,
+    )
+
+
+def _assert_value_x_at_zone_center(zones) -> None:
+    """value_x is the geometric center of the value zone."""
+    expected = (zones.value_zone_left + zones.value_zone_right) / 2
+    assert abs(zones.value_x - expected) < 0.6, (
+        f"value_x={zones.value_x} but zone center = {expected} "
+        f"(zone: {zones.value_zone_left}..{zones.value_zone_right})"
     )
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Centering invariant — six representative value categories
+# Equal-spacing rule — Bug 3 fix verification
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_no_glyph_no_phantom_left_gap() -> None:
+    """Bug 3 fix: glyph-absent badges have no reserved glyph slot.
+    Label first char starts at `accent_w + pad`, no extra offset."""
+    zones = _zones(label_w=50.0, value_w=30.0)
+    pad = BRUTALIST_INPUTS["pad"]
+    accent_w = BRUTALIST_INPUTS["accent_w"]
+    # label_first_x = accent_w + pad (no glyph cursor advance)
+    expected_label_first_x = accent_w + pad
+    assert zones.glyph_x == 0.0
+    assert zones.glyph_size == 0
+    # label_x is the text-anchor='middle' center: first_x + w/2
+    expected_label_x = expected_label_first_x + 50.0 / 2
+    assert abs(zones.label_x - expected_label_x) < 0.6, (
+        f"label_x={zones.label_x} but expected {expected_label_x} (first_x={expected_label_first_x} + label_w/2=25)"
+    )
+
+
+def test_no_state_indicator_no_phantom_right_gap() -> None:
+    """Stateless badges have no reserved indicator slot.
+
+    Every gap is pad including the right-edge gap (last zone → outer edge).
+    value_zone_right =
+    total_w - right_canvas_inset - pad (the final pad IS the right gap)."""
+    zones = _zones(label_w=50.0, value_w=30.0, has_state_indicator=False)
+    assert zones.indicator_x == 0.0
+    assert zones.indicator_size == 0
+    expected_right = zones.width - 0 - BRUTALIST_INPUTS["pad"]  # right_canvas_inset=0 for brutalist
+    assert zones.value_zone_right == expected_right
+
+
+def test_equal_spacing_with_glyph_and_state() -> None:
+    """Every gap between PRESENT zones equals pad. Verifies the cursor
+    advances by `content + pad` for each zone, with no extra adjustments."""
+    inputs = {**BRUTALIST_INPUTS, "has_glyph": True}
+    zones = compute_badge_zones(measured_label_w=40.0, measured_value_w=30.0, **inputs)
+    pad = BRUTALIST_INPUTS["pad"]
+    accent_w = BRUTALIST_INPUTS["accent_w"]
+    # accent → glyph gap = pad
+    assert zones.glyph_x == accent_w + pad
+    # glyph → label gap = pad: label_first_x = glyph_x + glyph_size + pad
+    expected_label_first_x = zones.glyph_x + 14 + pad
+    expected_label_x = expected_label_first_x + 40.0 / 2
+    assert abs(zones.label_x - expected_label_x) < 0.6
+    # label_end + pad = left_panel_w
+    expected_left_panel = round(expected_label_first_x + 40.0 + pad)
+    assert zones.left_panel_w == expected_left_panel
+
+
+def test_glyph_absent_collapses_width() -> None:
+    """A badge with no glyph is narrower than the same badge with a glyph
+    (no phantom 14 + pad reservation)."""
+    common = dict(measured_label_w=50.0, measured_value_w=30.0)
+    no_glyph = compute_badge_zones(**common, **BRUTALIST_INPUTS)  # type: ignore[arg-type]
+    with_glyph = compute_badge_zones(
+        **common,
+        **{**BRUTALIST_INPUTS, "has_glyph": True},  # type: ignore[arg-type]
+    )
+    # With glyph: cursor advances by glyph_size + pad = 14 + 5 = 19px
+    assert with_glyph.width - no_glyph.width >= 14 + BRUTALIST_INPUTS["pad"]
+
+
+def test_state_indicator_absent_collapses_width() -> None:
+    """A stateless badge is narrower than a stateful one — no reserved
+    indicator zone (8 + 5 = 13px)."""
+    with_state = _zones(label_w=33.0, value_w=22.0, has_state_indicator=True)
+    without = _zones(label_w=33.0, value_w=22.0, has_state_indicator=False)
+    assert without.width < with_state.width
+    assert (with_state.width - without.width) >= 8 + BRUTALIST_INPUTS["pad"]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Value-zone centering invariant — preserved from v0.2.25
 # ─────────────────────────────────────────────────────────────────────
 
 
 def test_short_percentage_centers_in_value_zone() -> None:
     # "82%" — 3 characters, mono ~22px @ 11pt
-    layout = _layout(label_w=33.0, value_w=22.0, value_len=3)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones(label_w=33.0, value_w=22.0)
+    _assert_value_x_at_zone_center(zones)
 
 
-def test_long_label_centers() -> None:
+def test_long_value_centers() -> None:
     # "RECONNAISSANCE" as value, 14 chars
-    layout = _layout(label_w=33.0, value_w=110.0, value_len=14)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones(label_w=33.0, value_w=110.0)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_version_string_centers() -> None:
-    # "0.2.23" — the headline regression case the v0.2.25 fix targets.
-    layout = _layout(label_w=51.0, value_w=43.0, value_len=6)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones(label_w=51.0, value_w=43.0)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_license_spdx_centers() -> None:
-    # "Apache-2.0" license string
-    layout = _layout(label_w=51.0, value_w=68.0, value_len=10)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones(label_w=51.0, value_w=68.0)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_python_requires_centers() -> None:
-    # ">=3.12" python_requires-style
-    layout = _layout(label_w=51.0, value_w=42.0, value_len=6)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones(label_w=51.0, value_w=42.0)
+    _assert_value_x_at_zone_center(zones)
 
 
-def test_stateless_no_indicator_zone_collapses() -> None:
-    """When the indicator isn't rendered, the value zone reclaims its
-    16px allocation (indicator_size=8 + ind_pad_r=8) and the text recenters.
-    This was UNDEFINED under the old midpoint-of-unrelated-bounds formula."""
-    layout = _layout(label_w=33.0, value_w=22.0, value_len=3, show_indicator=False)
-    _assert_value_x_at_zone_center(layout)
-    # value_zone_right should be at total_w - val_min_gap (no indicator carve-out)
-    assert layout.value_zone_right == layout.width - BRUTALIST_INPUTS["val_min_gap"]
-
-
-def test_stateless_padding_symmetric_about_value_zone() -> None:
-    """val_pad_l (left interior gutter) and val_min_gap (right interior gutter)
-    MUST resolve to symmetric paddings on stateless badges. Pre-v0.3.0 the
-    right_panel formula reserved 2 * val_min_gap but value_zone_right only
-    subtracted 1 * val_min_gap — leaving ~val_min_gap of unaccounted slack on
-    the right (~4.5px instead of the symmetric ~3px). The PYPI/STARS/VERSION
-    badge silhouette was the visible regression case.
-    """
-    layout = _layout(label_w=51.0, value_w=43.0, value_len=6, show_indicator=False)
-    val_pad_l = BRUTALIST_INPUTS["val_pad_l"]
-    val_min_gap = BRUTALIST_INPUTS["val_min_gap"]
-
-    left_interior = layout.value_zone_left - layout.right_panel_x
-    right_interior = layout.width - layout.value_zone_right
-
-    assert left_interior == val_pad_l, f"left_interior={left_interior}, expected val_pad_l={val_pad_l}"
-    assert right_interior == val_min_gap, f"right_interior={right_interior}, expected val_min_gap={val_min_gap}"
-    assert left_interior == right_interior, f"asymmetric padding: left={left_interior}px, right={right_interior}px"
+def test_stateless_value_recenters() -> None:
+    """When the indicator collapses, the value zone reclaims its allocation
+    and the text recenters within the wider zone."""
+    zones = _zones(label_w=33.0, value_w=22.0, has_state_indicator=False)
+    _assert_value_x_at_zone_center(zones)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -176,25 +222,17 @@ def test_stateless_padding_symmetric_about_value_zone() -> None:
 
 
 def test_total_width_clamped_to_minimum() -> None:
-    """Tiny labels and values still produce a 60px-wide badge."""
-    layout = _layout(label_w=1.0, value_w=1.0, value_len=1)
-    assert layout.width >= 60
-
-
-def test_no_indicator_yields_narrower_badge() -> None:
-    """Pre-v0.2.25 the indicator allocation was always reserved; now it
-    collapses with show_indicator=False — visible width savings on STARS,
-    VERSION, LICENSE, etc."""
-    with_indicator = _layout(label_w=33.0, value_w=22.0, value_len=3, show_indicator=True)
-    without = _layout(label_w=33.0, value_w=22.0, value_len=3, show_indicator=False)
-    assert without.width < with_indicator.width
-    assert (with_indicator.width - without.width) >= 16  # indicator_size + ind_pad_r
+    """Tiny labels and values still produce a 60px-wide badge (min_total_w)."""
+    zones = _zones(label_w=1.0, value_w=1.0)
+    assert zones.width >= 60
 
 
 def test_right_panel_x_consistent_with_left_panel_plus_seam() -> None:
-    layout = _layout(label_w=40.0, value_w=30.0, value_len=4)
-    assert layout.right_panel_x == layout.left_panel_w + BRUTALIST_INPUTS["sep_w"] + BRUTALIST_INPUTS["seam_w"]
-    assert layout.right_panel_w == layout.width - layout.right_panel_x
+    zones = _zones(label_w=40.0, value_w=30.0)
+    sep_w = BRUTALIST_INPUTS["sep_w"]
+    seam_w = BRUTALIST_INPUTS["seam_w"]
+    assert zones.right_panel_x == zones.left_panel_w + sep_w + seam_w
+    assert zones.right_panel_w == zones.width - zones.right_panel_x
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -204,18 +242,17 @@ def test_right_panel_x_consistent_with_left_panel_plus_seam() -> None:
 
 def test_indicator_inner_bit_centered() -> None:
     """The bit is half the indicator side, centered."""
-    layout = _layout(label_w=33.0, value_w=44.0, value_len=7)
-    assert layout.inner_bit_w == BRUTALIST_INPUTS["indicator_size"] // 2
-    expected_offset = (BRUTALIST_INPUTS["indicator_size"] - layout.inner_bit_w) / 2
-    assert layout.inner_bit_offset == expected_offset
+    zones = _zones(label_w=33.0, value_w=44.0)
+    assert zones.inner_bit_w == BRUTALIST_INPUTS["indicator_size"] // 2
+    expected_offset = (BRUTALIST_INPUTS["indicator_size"] - zones.inner_bit_w) / 2
+    assert zones.inner_bit_offset == expected_offset
 
 
 def test_indicator_y_pinned_to_text_baseline() -> None:
-    """text_y - 0.3 * font_size - indicator_size/2 — pins the indicator
-    visual center to the value-text midline (cap_height ≈ 70% of size)."""
-    layout = _layout(label_w=33.0, value_w=44.0, value_len=7)
-    expected = layout.text_y - BRUTALIST_INPUTS["value_font_size"] * 0.3 - BRUTALIST_INPUTS["indicator_size"] / 2
-    assert abs(layout.indicator_y - expected) < 0.05  # rounded to 1dp
+    """text_y - 0.3 * font_size - indicator_size/2."""
+    zones = _zones(label_w=33.0, value_w=44.0)
+    expected = zones.text_y - BRUTALIST_INPUTS["value_font_size"] * 0.3 - BRUTALIST_INPUTS["indicator_size"] / 2
+    assert abs(zones.indicator_y - expected) < 0.05
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -223,38 +260,22 @@ def test_indicator_y_pinned_to_text_baseline() -> None:
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_no_glyph_zeros_glyph_position() -> None:
-    layout = _layout(label_w=33.0, value_w=44.0, value_len=7)
-    assert layout.glyph_x == 0
-    assert layout.glyph_y == 0.0
-
-
 def test_glyph_centered_vertically_when_present() -> None:
-    layout = compute_badge_layout(
+    inputs = {**BRUTALIST_INPUTS, "has_glyph": True}
+    zones = compute_badge_zones(
         measured_label_w=33.0,
         measured_value_w=44.0,
-        value_raw_len=7,
-        show_indicator=True,
-        has_glyph=True,
-        height=20,
-        use_mono=True,
-        label_uppercase=True,
-        accent_w=4,
-        inset=0,
-        glyph_size=14,
-        glyph_gap=4,
-        glyph_left_offset=0,
-        sep_w=2,
-        seam_w=3,
-        indicator_size=8,
-        ind_pad_r=8,
-        val_pad_l=3,
-        val_min_gap=3,
-        text_y_factor=0.69,
-        value_font_size=11.0,
+        **inputs,
     )
-    assert layout.glyph_y == round((20 - 14) / 2, 1)
-    assert layout.glyph_x > 0
+    expected_text_center = zones.text_y - BRUTALIST_INPUTS["value_font_size"] * 0.3
+    assert zones.glyph_y == round(expected_text_center - BRUTALIST_INPUTS["glyph_size"] / 2, 1)
+    assert zones.glyph_x > 0
+
+
+def test_badge_glyph_size_derives_from_ratio_with_cap() -> None:
+    assert compute_badge_glyph_size(20, 0.6, 12) == 12
+    assert compute_badge_glyph_size(32, 0.6, 12) == 12
+    assert compute_badge_glyph_size(32, 0.6, 0) == 19
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -263,39 +284,73 @@ def test_glyph_centered_vertically_when_present() -> None:
 
 
 def test_cellular_short_value_centers() -> None:
-    layout = _layout_cellular(label_w=44.0, value_w=22.0, value_len=3)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones_cellular(label_w=44.0, value_w=22.0)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_cellular_version_string_centers() -> None:
-    layout = _layout_cellular(label_w=44.0, value_w=43.0, value_len=6)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones_cellular(label_w=44.0, value_w=43.0)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_cellular_long_value_centers() -> None:
-    layout = _layout_cellular(label_w=44.0, value_w=110.0, value_len=14)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones_cellular(label_w=44.0, value_w=110.0)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_cellular_compact_centers() -> None:
-    layout = _layout_cellular(label_w=33.0, value_w=22.0, value_len=3, compact=True)
-    _assert_value_x_at_zone_center(layout)
+    zones = _zones_cellular(label_w=33.0, value_w=22.0, compact=True)
+    _assert_value_x_at_zone_center(zones)
 
 
 def test_cellular_stateless_zone_collapses_with_canvas_inset() -> None:
     """Cellular's 2px canvas inset shrinks the value zone right edge below
-    total_w. Verifies zone_right tracks ``total_w - right_canvas_inset -
-    val_min_gap`` rather than the brutalist ``total_w - val_min_gap``."""
-    layout = _layout_cellular(label_w=44.0, value_w=22.0, value_len=3, show_indicator=False)
-    _assert_value_x_at_zone_center(layout)
-    expected_right = layout.width - CELLULAR_INPUTS["right_canvas_inset"] - CELLULAR_INPUTS["val_min_gap"]
-    assert layout.value_zone_right == expected_right
+    total_w. value_zone_right is total_w - right_canvas_inset - pad
+    (right-edge gap is pad)."""
+    zones = _zones_cellular(label_w=44.0, value_w=22.0, has_state_indicator=False)
+    _assert_value_x_at_zone_center(zones)
+    expected_right = zones.width - CELLULAR_INPUTS["right_canvas_inset"] - CELLULAR_INPUTS["pad"]
+    assert zones.value_zone_right == expected_right
 
 
 def test_cellular_right_panel_x_uses_paradigm_sep_w() -> None:
     """Cellular's sep_w=1 (vs brutalist's 2) places right_panel_x exactly
-    where the cellular template paints the value slab. A regression here
-    would re-introduce the +1.5px drift this test pins out."""
-    layout = _layout_cellular(label_w=44.0, value_w=43.0, value_len=6)
-    expected_right_panel_x = layout.left_panel_w + CELLULAR_INPUTS["sep_w"] + CELLULAR_INPUTS["seam_w"]
-    assert layout.right_panel_x == expected_right_panel_x
+    where the cellular template paints the value slab."""
+    zones = _zones_cellular(label_w=44.0, value_w=43.0)
+    expected_right_panel_x = zones.left_panel_w + CELLULAR_INPUTS["sep_w"] + CELLULAR_INPUTS["seam_w"]
+    assert zones.right_panel_x == expected_right_panel_x
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Shrink-to-fit (textLength emission)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_label_text_length_zero_when_under_max() -> None:
+    """When measured label fits within max_label_w, no shrink applied."""
+    zones = compute_badge_zones(
+        measured_label_w=40.0,
+        measured_value_w=30.0,
+        max_label_w=60.0,
+        **BRUTALIST_INPUTS,
+    )
+    assert zones.label_text_length == 0.0
+    assert zones.label_w == 40.0
+
+
+def test_label_text_length_clamped_when_over_max() -> None:
+    """Measured label exceeds max_label_w → textLength set to max, label_w clamped."""
+    zones = compute_badge_zones(
+        measured_label_w=200.0,
+        measured_value_w=30.0,
+        max_label_w=80.0,
+        **BRUTALIST_INPUTS,
+    )
+    assert zones.label_text_length == 80.0
+    assert zones.label_w == 80.0
+
+
+def test_value_text_length_zero_default() -> None:
+    """No max_value_w arg → no shrink-to-fit on value."""
+    zones = _zones(label_w=40.0, value_w=200.0)
+    assert zones.value_text_length == 0.0

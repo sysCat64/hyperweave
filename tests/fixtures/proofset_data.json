@@ -1,0 +1,811 @@
+{
+  "arxiv:2310.06825.authors": {
+    "fetched_at": 1779392915.31508,
+    "value": [
+      "Albert Q. Jiang",
+      "Alexandre Sablayrolles",
+      "Arthur Mensch",
+      "Chris Bamford",
+      "Devendra Singh Chaplot",
+      "Diego de las Casas",
+      "Florian Bressand",
+      "Gianna Lengyel",
+      "Guillaume Lample",
+      "Lucile Saulnier",
+      "L\u00e9lio Renard Lavaud",
+      "Marie-Anne Lachaux",
+      "Pierre Stock",
+      "Teven Le Scao",
+      "Thibaut Lavril",
+      "Thomas Wang",
+      "Timoth\u00e9e Lacroix",
+      "William El Sayed"
+    ]
+  },
+  "arxiv:2310.06825.title": {
+    "fetched_at": 1779392915.306155,
+    "value": "Mistral 7B"
+  },
+  "arxiv:2501.12948.authors": {
+    "fetched_at": 1779392915.3124921,
+    "value": [
+      "DeepSeek-AI",
+      "Daya Guo",
+      "Dejian Yang",
+      "Haowei Zhang",
+      "Junxiao Song",
+      "Peiyi Wang",
+      "Qihao Zhu",
+      "Runxin Xu",
+      "Ruoyu Zhang",
+      "Shirong Ma",
+      "Xiao Bi",
+      "Xiaokang Zhang",
+      "Xingkai Yu",
+      "Yu Wu",
+      "Z. F. Wu",
+      "Zhibin Gou",
+      "Zhihong Shao",
+      "Zhuoshu Li",
+      "Ziyi Gao",
+      "Aixin Liu",
+      "Bing Xue",
+      "Bingxuan Wang",
+      "Bochao Wu",
+      "Bei Feng",
+      "Chengda Lu",
+      "Chenggang Zhao",
+      "Chengqi Deng",
+      "Chenyu Zhang",
+      "Chong Ruan",
+      "Damai Dai",
+      "Deli Chen",
+      "Dongjie Ji",
+      "Erhang Li",
+      "Fangyun Lin",
+      "Fucong Dai",
+      "Fuli Luo",
+      "Guangbo Hao",
+      "Guanting Chen",
+      "Guowei Li",
+      "H. Zhang",
+      "Han Bao",
+      "Hanwei Xu",
+      "Haocheng Wang",
+      "Honghui Ding",
+      "Huajian Xin",
+      "Huazuo Gao",
+      "Hui Qu",
+      "Hui Li",
+      "Jianzhong Guo",
+      "Jiashi Li",
+      "Jiawei Wang",
+      "Jingchang Chen",
+      "Jingyang Yuan",
+      "Junjie Qiu",
+      "Junlong Li",
+      "J. L. Cai",
+      "Jiaqi Ni",
+      "Jian Liang",
+      "Jin Chen",
+      "Kai Dong",
+      "Kai Hu",
+      "Kaige Gao",
+      "Kang Guan",
+      "Kexin Huang",
+      "Kuai Yu",
+      "Lean Wang",
+      "Lecong Zhang",
+      "Liang Zhao",
+      "Litong Wang",
+      "Liyue Zhang",
+      "Lei Xu",
+      "Leyi Xia",
+      "Mingchuan Zhang",
+      "Minghua Zhang",
+      "Minghui Tang",
+      "Meng Li",
+      "Miaojun Wang",
+      "Mingming Li",
+      "Ning Tian",
+      "Panpan Huang",
+      "Peng Zhang",
+      "Qiancheng Wang",
+      "Qinyu Chen",
+      "Qiushi Du",
+      "Ruiqi Ge",
+      "Ruisong Zhang",
+      "Ruizhe Pan",
+      "Runji Wang",
+      "R. J. Chen",
+      "R. L. Jin",
+      "Ruyi Chen",
+      "Shanghao Lu",
+      "Shangyan Zhou",
+      "Shanhuang Chen",
+      "Shengfeng Ye",
+      "Shiyu Wang",
+      "Shuiping Yu",
+      "Shunfeng Zhou",
+      "Shuting Pan",
+      "S. S. Li",
+      "Shuang Zhou",
+      "Shaoqing Wu",
+      "Shengfeng Ye",
+      "Tao Yun",
+      "Tian Pei",
+      "Tianyu Sun",
+      "T. Wang",
+      "Wangding Zeng",
+      "Wanjia Zhao",
+      "Wen Liu",
+      "Wenfeng Liang",
+      "Wenjun Gao",
+      "Wenqin Yu",
+      "Wentao Zhang",
+      "W. L. Xiao",
+      "Wei An",
+      "Xiaodong Liu",
+      "Xiaohan Wang",
+      "Xiaokang Chen",
+      "Xiaotao Nie",
+      "Xin Cheng",
+      "Xin Liu",
+      "Xin Xie",
+      "Xingchao Liu",
+      "Xinyu Yang",
+      "Xinyuan Li",
+      "Xuecheng Su",
+      "Xuheng Lin",
+      "X. Q. Li",
+      "Xiangyue Jin",
+      "Xiaojin Shen",
+      "Xiaosha Chen",
+      "Xiaowen Sun",
+      "Xiaoxiang Wang",
+      "Xinnan Song",
+      "Xinyi Zhou",
+      "Xianzu Wang",
+      "Xinxia Shan",
+      "Y. K. Li",
+      "Y. Q. Wang",
+      "Y. X. Wei",
+      "Yang Zhang",
+      "Yanhong Xu",
+      "Yao Li",
+      "Yao Zhao",
+      "Yaofeng Sun",
+      "Yaohui Wang",
+      "Yi Yu",
+      "Yichao Zhang",
+      "Yifan Shi",
+      "Yiliang Xiong",
+      "Ying He",
+      "Yishi Piao",
+      "Yisong Wang",
+      "Yixuan Tan",
+      "Yiyang Ma",
+      "Yiyuan Liu",
+      "Yongqiang Guo",
+      "Yuan Ou",
+      "Yuduan Wang",
+      "Yue Gong",
+      "Yuheng Zou",
+      "Yujia He",
+      "Yunfan Xiong",
+      "Yuxiang Luo",
+      "Yuxiang You",
+      "Yuxuan Liu",
+      "Yuyang Zhou",
+      "Y. X. Zhu",
+      "Yanhong Xu",
+      "Yanping Huang",
+      "Yaohui Li",
+      "Yi Zheng",
+      "Yuchen Zhu",
+      "Yunxian Ma",
+      "Ying Tang",
+      "Yukun Zha",
+      "Yuting Yan",
+      "Z. Z. Ren",
+      "Zehui Ren",
+      "Zhangli Sha",
+      "Zhe Fu",
+      "Zhean Xu",
+      "Zhenda Xie",
+      "Zhengyan Zhang",
+      "Zhewen Hao",
+      "Zhicheng Ma",
+      "Zhigang Yan",
+      "Zhiyu Wu",
+      "Zihui Gu",
+      "Zijia Zhu",
+      "Zijun Liu",
+      "Zilin Li",
+      "Ziwei Xie",
+      "Ziyang Song",
+      "Zizheng Pan",
+      "Zhen Huang",
+      "Zhipeng Xu",
+      "Zhongyu Zhang",
+      "Zhen Zhang"
+    ]
+  },
+  "arxiv:2501.12948.title": {
+    "fetched_at": 1779392915.324737,
+    "value": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning"
+  },
+  "arxiv:2505.09388.authors": {
+    "fetched_at": 1779392915.314333,
+    "value": [
+      "An Yang",
+      "Anfeng Li",
+      "Baosong Yang",
+      "Beichen Zhang",
+      "Binyuan Hui",
+      "Bo Zheng",
+      "Bowen Yu",
+      "Chang Gao",
+      "Chengen Huang",
+      "Chenxu Lv",
+      "Chujie Zheng",
+      "Dayiheng Liu",
+      "Fan Zhou",
+      "Fei Huang",
+      "Feng Hu",
+      "Hao Ge",
+      "Haoran Wei",
+      "Huan Lin",
+      "Jialong Tang",
+      "Jian Yang",
+      "Jianhong Tu",
+      "Jianwei Zhang",
+      "Jianxin Yang",
+      "Jiaxi Yang",
+      "Jing Zhou",
+      "Jingren Zhou",
+      "Junyang Lin",
+      "Kai Dang",
+      "Keqin Bao",
+      "Kexin Yang",
+      "Le Yu",
+      "Lianghao Deng",
+      "Mei Li",
+      "Mingfeng Xue",
+      "Mingze Li",
+      "Pei Zhang",
+      "Peng Wang",
+      "Qin Zhu",
+      "Rui Men",
+      "Ruize Gao",
+      "Shixuan Liu",
+      "Shuang Luo",
+      "Tianhao Li",
+      "Tianyi Tang",
+      "Wenbiao Yin",
+      "Xingzhang Ren",
+      "Xinyu Wang",
+      "Xinyu Zhang",
+      "Xuancheng Ren",
+      "Yang Fan",
+      "Yang Su",
+      "Yichang Zhang",
+      "Yinger Zhang",
+      "Yu Wan",
+      "Yuqiong Liu",
+      "Zekun Wang",
+      "Zeyu Cui",
+      "Zhenru Zhang",
+      "Zhipeng Zhou",
+      "Zihan Qiu"
+    ]
+  },
+  "arxiv:2505.09388.title": {
+    "fetched_at": 1779392915.3161442,
+    "value": "Qwen3 Technical Report"
+  },
+  "arxiv:2602.15763.authors": {
+    "fetched_at": 1779392915.49809,
+    "value": [
+      "GLM-5-Team",
+      ":",
+      "Aohan Zeng",
+      "Xin Lv",
+      "Zhenyu Hou",
+      "Zhengxiao Du",
+      "Qinkai Zheng",
+      "Bin Chen",
+      "Da Yin",
+      "Chendi Ge",
+      "Chenghua Huang",
+      "Chengxing Xie",
+      "Chenzheng Zhu",
+      "Congfeng Yin",
+      "Cunxiang Wang",
+      "Gengzheng Pan",
+      "Hao Zeng",
+      "Haoke Zhang",
+      "Haoran Wang",
+      "Huilong Chen",
+      "Jiajie Zhang",
+      "Jian Jiao",
+      "Jiaqi Guo",
+      "Jingsen Wang",
+      "Jingzhao Du",
+      "Jinzhu Wu",
+      "Kedong Wang",
+      "Lei Li",
+      "Lin Fan",
+      "Lucen Zhong",
+      "Mingdao Liu",
+      "Mingming Zhao",
+      "Pengfan Du",
+      "Qian Dong",
+      "Rui Lu",
+      "Shuang-Li",
+      "Shulin Cao",
+      "Song Liu",
+      "Ting Jiang",
+      "Xiaodong Chen",
+      "Xiaohan Zhang",
+      "Xuancheng Huang",
+      "Xuezhen Dong",
+      "Yabo Xu",
+      "Yao Wei",
+      "Yifan An",
+      "Yilin Niu",
+      "Yitong Zhu",
+      "Yuanhao Wen",
+      "Yukuo Cen",
+      "Yushi Bai",
+      "Zhongpei Qiao",
+      "Zihan Wang",
+      "Zikang Wang",
+      "Zilin Zhu",
+      "Ziqiang Liu",
+      "Zixuan Li",
+      "Bojie Wang",
+      "Bosi Wen",
+      "Can Huang",
+      "Changpeng Cai",
+      "Chao Yu",
+      "Chen Li",
+      "Chengwei Hu",
+      "Chenhui Zhang",
+      "Dan Zhang",
+      "Daoyan Lin",
+      "Dayong Yang",
+      "Di Wang",
+      "Ding Ai",
+      "Erle Zhu",
+      "Fangzhou Yi",
+      "Feiyu Chen",
+      "Guohong Wen",
+      "Hailong Sun",
+      "Haisha Zhao",
+      "Haiyi Hu",
+      "Hanchen Zhang",
+      "Hanrui Liu",
+      "Hanyu Zhang",
+      "Hao Peng",
+      "Hao Tai",
+      "Haobo Zhang",
+      "He Liu",
+      "Hongwei Wang",
+      "Hongxi Yan",
+      "Hongyu Ge",
+      "Huan Liu",
+      "Huanpeng Chu",
+      "Jia'ni Zhao",
+      "Jiachen Wang",
+      "Jiajing Zhao",
+      "Jiamin Ren",
+      "Jiapeng Wang",
+      "Jiaxin Zhang",
+      "Jiayi Gui",
+      "Jiayue Zhao",
+      "Jijie Li",
+      "Jing An",
+      "Jing Li",
+      "Jingwei Yuan",
+      "Jinhua Du",
+      "Jinxin Liu",
+      "Junkai Zhi",
+      "Junwen Duan",
+      "Kaiyue Zhou",
+      "Kangjian Wei",
+      "Ke Wang",
+      "Keyun Luo",
+      "Laiqiang Zhang",
+      "Leigang Sha",
+      "Liang Xu",
+      "Lindong Wu",
+      "Lintao Ding",
+      "Lu Chen",
+      "Minghao Li",
+      "Nianyi Lin",
+      "Pan Ta",
+      "Qiang Zou",
+      "Rongjun Song",
+      "Ruiqi Yang",
+      "Shangqing Tu",
+      "Shangtong Yang",
+      "Shaoxiang Wu",
+      "Shengyan Zhang",
+      "Shijie Li",
+      "Shuang Li",
+      "Shuyi Fan",
+      "Wei Qin",
+      "Wei Tian",
+      "Weining Zhang",
+      "Wenbo Yu",
+      "Wenjie Liang",
+      "Xiang Kuang",
+      "Xiangmeng Cheng",
+      "Xiangyang Li",
+      "Xiaoquan Yan",
+      "Xiaowei Hu",
+      "Xiaoying Ling",
+      "Xing Fan",
+      "Xingye Xia",
+      "Xinyuan Zhang",
+      "Xinze Zhang",
+      "Xirui Pan",
+      "Xu Zou",
+      "Xunkai Zhang",
+      "Yadi Liu",
+      "Yandong Wu",
+      "Yanfu Li",
+      "Yidong Wang",
+      "Yifan Zhu",
+      "Yijun Tan",
+      "Yilin Zhou",
+      "Yiming Pan",
+      "Ying Zhang",
+      "Yinpei Su",
+      "Yipeng Geng",
+      "Yong Yan",
+      "Yonglin Tan",
+      "Yuean Bi",
+      "Yuhan Shen",
+      "Yuhao Yang",
+      "Yujiang Li",
+      "Yunan Liu",
+      "Yunqing Wang",
+      "Yuntao Li",
+      "Yurong Wu",
+      "Yutao Zhang",
+      "Yuxi Duan",
+      "Yuxuan Zhang",
+      "Zezhen Liu",
+      "Zhengtao Jiang",
+      "Zhenhe Yan",
+      "Zheyu Zhang",
+      "Zhixiang Wei",
+      "Zhuo Chen",
+      "Zhuoer Feng",
+      "Zijun Yao",
+      "Ziwei Chai",
+      "Ziyuan Wang",
+      "Zuzhou Zhang",
+      "Bin Xu",
+      "Minlie Huang",
+      "Hongning Wang",
+      "Juanzi Li",
+      "Yuxiao Dong",
+      "Jie Tang"
+    ]
+  },
+  "arxiv:2602.15763.title": {
+    "fetched_at": 1779392915.499531,
+    "value": "GLM-5: from Vibe Coding to Agentic Engineering"
+  },
+  "docker:n8nio/n8n.pull_count": {
+    "fetched_at": 1779392915.25489,
+    "value": 214113112
+  },
+  "docker:n8nio/n8n.star_count": {
+    "fetched_at": 1779392915.265506,
+    "value": 1270
+  },
+  "docker:ollama/ollama.pull_count": {
+    "fetched_at": 1779392915.235432,
+    "value": 136505923
+  },
+  "docker:ollama/ollama.star_count": {
+    "fetched_at": 1779392915.247623,
+    "value": 1574
+  },
+  "docker:vllm/vllm-openai.pull_count": {
+    "fetched_at": 1779392915.255601,
+    "value": 21717663
+  },
+  "docker:vllm/vllm-openai.star_count": {
+    "fetched_at": 1779392915.247846,
+    "value": 282
+  },
+  "github:FoundationAgents/MetaGPT.forks": {
+    "fetched_at": 1779392915.496145,
+    "value": 8685
+  },
+  "github:FoundationAgents/MetaGPT.stars": {
+    "fetched_at": 1779392915.4135349,
+    "value": 68193
+  },
+  "github:JuliusBrussee/caveman.forks": {
+    "fetched_at": 1779392915.330915,
+    "value": 3547
+  },
+  "github:JuliusBrussee/caveman.stars": {
+    "fetched_at": 1779392915.3307579,
+    "value": 63216
+  },
+  "github:NousResearch/hermes-agent.forks": {
+    "fetched_at": 1779392915.421293,
+    "value": 26235
+  },
+  "github:NousResearch/hermes-agent.stars": {
+    "fetched_at": 1779392915.421022,
+    "value": 161302
+  },
+  "github:Significant-Gravitas/AutoGPT.forks": {
+    "fetched_at": 1779392915.536373,
+    "value": 46227
+  },
+  "github:Significant-Gravitas/AutoGPT.issues": {
+    "fetched_at": 1779392915.534751,
+    "value": 428
+  },
+  "github:Significant-Gravitas/AutoGPT.stars": {
+    "fetched_at": 1779392915.503096,
+    "value": 184443
+  },
+  "github:anthropics/claude-code.forks": {
+    "fetched_at": 1779392915.53575,
+    "value": 20615
+  },
+  "github:anthropics/claude-code.stars": {
+    "fetched_at": 1779392915.535312,
+    "value": 125492
+  },
+  "github:cline/cline.forks": {
+    "fetched_at": 1779392915.438116,
+    "value": 6491
+  },
+  "github:cline/cline.stars": {
+    "fetched_at": 1779392915.537123,
+    "value": 62149
+  },
+  "github:crewAIInc/crewAI.forks": {
+    "fetched_at": 1779392915.538112,
+    "value": 7192
+  },
+  "github:crewAIInc/crewAI.stars": {
+    "fetched_at": 1779392915.399461,
+    "value": 51895
+  },
+  "github:langchain-ai/langchain.forks": {
+    "fetched_at": 1779392915.537473,
+    "value": 22714
+  },
+  "github:langchain-ai/langchain.issues": {
+    "fetched_at": 1779392915.593246,
+    "value": 582
+  },
+  "github:langchain-ai/langchain.stars": {
+    "fetched_at": 1779392915.532144,
+    "value": 137313
+  },
+  "github:langflow-ai/langflow.forks": {
+    "fetched_at": 1779392915.501523,
+    "value": 9080
+  },
+  "github:langflow-ai/langflow.issues": {
+    "fetched_at": 1779392915.536052,
+    "value": 932
+  },
+  "github:langflow-ai/langflow.stars": {
+    "fetched_at": 1779392915.535915,
+    "value": 148613
+  },
+  "github:langgenius/dify.forks": {
+    "fetched_at": 1779392915.436505,
+    "value": 22353
+  },
+  "github:langgenius/dify.issues": {
+    "fetched_at": 1779392915.436759,
+    "value": 809
+  },
+  "github:langgenius/dify.stars": {
+    "fetched_at": 1779392915.534473,
+    "value": 142166
+  },
+  "github:mattpocock/skills.forks": {
+    "fetched_at": 1779392915.331179,
+    "value": 8745
+  },
+  "github:mattpocock/skills.stars": {
+    "fetched_at": 1779392915.421398,
+    "value": 98827
+  },
+  "github:mem0ai/mem0.forks": {
+    "fetched_at": 1779392915.399263,
+    "value": 6420
+  },
+  "github:mem0ai/mem0.stars": {
+    "fetched_at": 1779392915.398964,
+    "value": 56364
+  },
+  "github:n8n-io/n8n.forks": {
+    "fetched_at": 1779392915.539225,
+    "value": 57881
+  },
+  "github:n8n-io/n8n.issues": {
+    "fetched_at": 1779392915.502763,
+    "value": 1468
+  },
+  "github:n8n-io/n8n.stars": {
+    "fetched_at": 1779392915.5346382,
+    "value": 189057
+  },
+  "github:ollama/ollama.forks": {
+    "fetched_at": 1779392915.437999,
+    "value": 16228
+  },
+  "github:ollama/ollama.stars": {
+    "fetched_at": 1779392915.437809,
+    "value": 171921
+  },
+  "github:openclaw/openclaw.forks": {
+    "fetched_at": 1779392915.533838,
+    "value": 77645
+  },
+  "github:openclaw/openclaw.issues": {
+    "fetched_at": 1779392915.534065,
+    "value": 7401
+  },
+  "github:openclaw/openclaw.stars": {
+    "fetched_at": 1779392915.500133,
+    "value": 373760
+  },
+  "github:vllm-project/vllm.forks": {
+    "fetched_at": 1779392915.495264,
+    "value": 17066
+  },
+  "github:vllm-project/vllm.issues": {
+    "fetched_at": 1779392915.413353,
+    "value": 5024
+  },
+  "github:vllm-project/vllm.stars": {
+    "fetched_at": 1779392915.533022,
+    "value": 80662
+  },
+  "github:zai-org/GLM-5.forks": {
+    "fetched_at": 1779392915.498688,
+    "value": 356
+  },
+  "github:zai-org/GLM-5.stars": {
+    "fetched_at": 1779392915.538269,
+    "value": 3292
+  },
+  "hf:NousResearch/Hermes-3-Llama-3.1-8B.downloads": {
+    "fetched_at": 1779392915.2808,
+    "value": 217940
+  },
+  "hf:NousResearch/Hermes-3-Llama-3.1-8B.likes": {
+    "fetched_at": 1779392915.269356,
+    "value": 433
+  },
+  "hf:Qwen/Qwen3-235B-A22B.downloads": {
+    "fetched_at": 1779392915.2625852,
+    "value": 449822
+  },
+  "hf:Qwen/Qwen3-235B-A22B.likes": {
+    "fetched_at": 1779392915.269526,
+    "value": 1092
+  },
+  "hf:meta-llama/Llama-4-Scout-17B-16E-Instruct.downloads": {
+    "fetched_at": 1779392915.260591,
+    "value": 407873
+  },
+  "hf:meta-llama/Llama-4-Scout-17B-16E-Instruct.likes": {
+    "fetched_at": 1779392915.2653902,
+    "value": 1283
+  },
+  "hf:zai-org/GLM-5.1.downloads": {
+    "fetched_at": 1779392915.258378,
+    "value": 205517
+  },
+  "hf:zai-org/GLM-5.1.likes": {
+    "fetched_at": 1779392915.2812648,
+    "value": 1675
+  },
+  "npm:@anthropic-ai/sdk.downloads": {
+    "fetched_at": 1779392915.585829,
+    "value": 18425351
+  },
+  "npm:@anthropic-ai/sdk.version": {
+    "fetched_at": 1779392915.3916411,
+    "value": "0.97.1"
+  },
+  "npm:@langchain/langgraph.downloads": {
+    "fetched_at": 1779392915.5869062,
+    "value": 2371744
+  },
+  "npm:@langchain/langgraph.version": {
+    "fetched_at": 1779392915.375926,
+    "value": "1.3.2"
+  },
+  "npm:@openai/agents.downloads": {
+    "fetched_at": 1779392915.593034,
+    "value": 931490
+  },
+  "npm:@openai/agents.version": {
+    "fetched_at": 1779392915.318041,
+    "value": "0.11.4"
+  },
+  "npm:n8n.downloads": {
+    "fetched_at": 1779392915.591249,
+    "value": 99519
+  },
+  "npm:n8n.version": {
+    "fetched_at": 1779392915.531625,
+    "value": "2.21.7"
+  },
+  "pypi:crewai.downloads": {
+    "fetched_at": 1779392915.263787,
+    "value": 10907047
+  },
+  "pypi:crewai.version": {
+    "fetched_at": 1779392915.2688708,
+    "value": "1.14.5"
+  },
+  "pypi:dify-client.downloads": {
+    "fetched_at": 1779320609.292337,
+    "value": 9157
+  },
+  "pypi:dify-client.version": {
+    "fetched_at": 1779392915.255966,
+    "value": "0.1.10"
+  },
+  "pypi:hyperweave.downloads": {
+    "fetched_at": 1779320609.291776,
+    "value": 3790
+  },
+  "pypi:hyperweave.version": {
+    "fetched_at": 1779392915.2666602,
+    "value": "0.3.8"
+  },
+  "pypi:langchain.downloads": {
+    "fetched_at": 1779392915.258726,
+    "value": 247943932
+  },
+  "pypi:langchain.version": {
+    "fetched_at": 1779392915.2405162,
+    "value": "1.3.1"
+  },
+  "pypi:mem0ai.downloads": {
+    "fetched_at": 1779320609.286117,
+    "value": 3070758
+  },
+  "pypi:mem0ai.version": {
+    "fetched_at": 1779392915.2536929,
+    "value": "2.0.2"
+  },
+  "pypi:readmeai.downloads": {
+    "fetched_at": 1779392915.0915468,
+    "value": 6941
+  },
+  "pypi:readmeai.version": {
+    "fetched_at": 1779392915.091542,
+    "value": "0.6.3"
+  },
+  "pypi:vllm.downloads": {
+    "fetched_at": 1779320609.290242,
+    "value": 6145889
+  },
+  "pypi:vllm.version": {
+    "fetched_at": 1779392915.252169,
+    "value": "0.21.0"
+  }
+}

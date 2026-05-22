@@ -18,7 +18,46 @@ next process start (or after :func:`hyperweave.core.font_metrics.reset_registry`
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from hyperweave.core.font_metrics import get_registry
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from hyperweave.core.font_metrics import FontMetrics
+
+
+def _nearest_weight_key(weighted: Mapping[str, object], font_weight: int) -> str | None:
+    """Return the nearest available CSS weight key for a weighted metrics map."""
+    if not weighted:
+        return None
+    numeric_keys: list[int] = []
+    for key in weighted:
+        try:
+            numeric_keys.append(int(key))
+        except ValueError:
+            continue
+    if not numeric_keys:
+        return None
+    nearest = min(numeric_keys, key=lambda value: abs(value - font_weight))
+    return str(nearest)
+
+
+def _widths_for_weight(metrics: FontMetrics, font_weight: int) -> tuple[dict[str, int], bool]:
+    """Return width map plus whether it came from real weight-specific data."""
+    key = _nearest_weight_key(metrics.widths_by_weight, font_weight)
+    if key is None:
+        return metrics.widths, False
+    return metrics.widths_by_weight[key], True
+
+
+def _bearings_for_weight(metrics: FontMetrics, font_weight: int) -> dict[str, list[int]]:
+    """Return weight-specific bearings when available, else default bearings."""
+    key = _nearest_weight_key(metrics.bearings_by_weight, font_weight)
+    if key is None:
+        return metrics.bearings
+    return metrics.bearings_by_weight[key]
 
 
 def measure_text(
@@ -40,8 +79,9 @@ def measure_text(
        scaled linearly by ``font_size / baseline_size_px``.
        For proportional fonts, sum per-codepoint advance widths (tenths
        of pixels at ``baseline_size_px``), divide by 10, scale by size.
-    3. Apply ``bold_expansion_factor`` when ``font_weight >= 700`` for
-       non-monospace fonts (true monospace has no bold width change).
+    3. For variable fonts with per-weight LUT data, use the nearest real
+       weight's advance widths. Otherwise apply ``bold_expansion_factor``
+       when ``font_weight >= 700`` for non-monospace fonts.
     4. Absorb letter-spacing: add ``max(0, len(text) - 1) *
        font_size * letter_spacing_em`` so callers don't repeat the
        arithmetic themselves.
@@ -52,14 +92,105 @@ def measure_text(
     if metrics.is_monospace:
         base_px = len(text) * metrics.char_width_px * (font_size / baseline)
     else:
+        widths, used_weighted_metrics = _widths_for_weight(metrics, font_weight)
         total_tenths = 0.0
         for ch in text:
-            total_tenths += metrics.widths.get(ch, metrics.fallback_width)
+            total_tenths += widths.get(ch, metrics.fallback_width)
         base_px = (total_tenths / 10.0) * (font_size / baseline)
-        if font_weight >= 700:
+        if not used_weighted_metrics and font_weight >= 700:
             base_px *= metrics.bold_expansion_factor
 
     if text and letter_spacing_em:
         base_px += max(0, len(text) - 1) * font_size * letter_spacing_em
 
     return base_px
+
+
+def measure_text_ink_width(
+    text: str,
+    *,
+    font_family: str = "Inter",
+    font_size: float = 11.0,
+    font_weight: int = 400,
+    letter_spacing_em: float = 0.0,
+) -> float:
+    """Estimate the rendered visible-ink width of ``text`` in pixels.
+
+    Like :func:`measure_text` but subtracts the first glyph's left side
+    bearing (LSB) and the last glyph's right side bearing (RSB) from the
+    advance width. The result is the distance between the leftmost
+    visible ink and the rightmost visible ink — what a human perceives
+    as the text's "actual width".
+
+    For SEAM/right-edge placement (single-sided), use
+    :func:`measure_text_trailing_bearing` instead — that returns only the
+    last-glyph RSB which is the correct correction for cursor-walk
+    placement at the text's right side.
+
+    Fallback: when the font's LUT lacks the optional ``bearings`` map
+    (e.g., Inter, which predates v0.3.9 extraction), returns the same
+    value as :func:`measure_text`. New fonts extracted via
+    ``scripts/extract_font_metrics.py`` carry bearings by default.
+
+    Whitespace-only strings return 0 (no visible ink).
+    """
+    if not text:
+        return 0.0
+
+    advance = measure_text(
+        text,
+        font_family=font_family,
+        font_size=font_size,
+        font_weight=font_weight,
+        letter_spacing_em=letter_spacing_em,
+    )
+
+    metrics = get_registry().get(font_family)
+    bearings = _bearings_for_weight(metrics, font_weight)
+    if not bearings:
+        return advance
+
+    baseline = metrics.baseline_size_px
+    scale = font_size / baseline
+    first_char = text[0]
+    last_char = text[-1]
+    # bearings stored as tenths-of-pixels at baseline_size_px; scale to
+    # the requested font_size and back to pixels.
+    first_lsb_tenths, _first_rsb = bearings.get(first_char, [0, 0])
+    _last_lsb, last_rsb_tenths = bearings.get(last_char, [0, 0])
+    lsb_px = (first_lsb_tenths / 10.0) * scale
+    rsb_px = (last_rsb_tenths / 10.0) * scale
+    return max(0.0, advance - lsb_px - rsb_px)
+
+
+def measure_text_trailing_bearing(
+    text: str,
+    *,
+    font_family: str = "Inter",
+    font_size: float = 11.0,
+    font_weight: int = 400,
+) -> float:
+    """Return the last glyph's right-side bearing in pixels at ``font_size``.
+
+    The cursor-walk in ``compute_badge_zones`` uses this to place the seam
+    at ``visible_ink_end + pad/2`` instead of ``advance_end + pad/2``.
+    For text-anchor=start paradigms (chrome), the trailing bearing
+    accumulates on the right side as visual asymmetry — subtracting it
+    closes the seam gap to the design-intent ``pad/2`` uniformly across
+    all labels regardless of last-glyph identity (S, K, I all corrected
+    appropriately by their own RSB, not a paradigm-wide scalar).
+
+    Returns 0.0 when the font's LUT lacks bearings (Inter fallback) or
+    when text is empty.
+    """
+    if not text:
+        return 0.0
+    metrics = get_registry().get(font_family)
+    bearings = _bearings_for_weight(metrics, font_weight)
+    if not bearings:
+        return 0.0
+    baseline = metrics.baseline_size_px
+    scale = font_size / baseline
+    last_char = text[-1]
+    _last_lsb, last_rsb_tenths = bearings.get(last_char, [0, 0])
+    return (last_rsb_tenths / 10.0) * scale

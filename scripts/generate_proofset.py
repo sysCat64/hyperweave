@@ -214,6 +214,21 @@ LIVE_SPECS: list[dict[str, Any]] = [
 ]
 
 
+def _github_subtitle(token: str) -> dict[str, str]:
+    """Derive connector_data with repo_slug for GitHub-sourced specs.
+
+    Resolves ``gh:owner/repo`` (or raw ``owner/repo``) to a connector_data dict
+    containing ``repo_slug``. The resolver then emits subtitle = ``owner/repo``,
+    distinct from title (which is typically just the repo name). Returns an
+    empty dict for non-GitHub tokens so callers can spread it unconditionally.
+    """
+    if token.startswith("gh:"):
+        return {"repo_slug": token[len("gh:") :]}
+    if "/" in token and not token.startswith(("pypi:", "npm:", "docker:", "hf:", "arxiv:")):
+        return {"repo_slug": token}
+    return {}
+
+
 def _compose(
     frame_type: str,
     genome: str,
@@ -277,7 +292,7 @@ def generate_static() -> int:
     from hyperweave.serve.data_tokens import resolve_data_tokens as _resolve_marquee_tokens
 
     _MARQUEE_PREFETCH_TOKENS = (
-        "gh:eli64s/readme-ai.stars,gh:eli64s/readme-ai.forks,pypi:readmeai.version,pypi:readmeai.downloads"
+        "github:eli64s/readme-ai.stars,gh:eli64s/readme-ai.forks,pypi:readmeai.version,pypi:readmeai.downloads"
     )
 
     async def _prefetch_marquee_tokens() -> list[Any]:
@@ -411,10 +426,12 @@ def generate_static() -> int:
                     svg = _compose("badge", genome, "BUILD", status.value, status, "github", variant=variant)
                     _write(var_dir / f"badge_{status}_{variant}.svg", svg)
                     total += 1
-                # Icon — chrome supports both circle + square (binary-opposition
-                # icon_variant); other genomes are monoshape. Render both for
-                # chrome so the variant matrix shows shape coverage too.
-                if genome == GenomeId.CHROME:
+                # Icon shapes — both chrome and brutalist paradigms declare
+                # ``icon.supported_shapes: [circle, square]`` in their yaml,
+                # so render both shapes per variant to show shape coverage.
+                # Automata is square-only (``cellular.yaml: [square]``); emit
+                # the single canonical icon there.
+                if genome in (GenomeId.CHROME, GenomeId.BRUTALIST):
                     svg = _compose("icon", genome, glyph="github", shape="circle", variant=variant)
                     _write(var_dir / f"icon_github_{variant}_circle.svg", svg)
                     total += 1
@@ -961,8 +978,8 @@ async def _generate_multi_provider_marquee(proofset_root: Path) -> int:
     # field exactly), not `pulls`. The five tokens cross three providers:
     # GitHub (stars + forks), PyPI (version + downloads), Docker (pull_count).
     data_string = (
-        "gh:eli64s/readme-ai.stars,"
-        "gh:eli64s/readme-ai.forks,"
+        "github:eli64s/readme-ai.stars,"
+        "github:eli64s/readme-ai.forks,"
         "pypi:readmeai.version,"
         "pypi:readmeai.downloads,"
         "docker:zeroxeli/readme-ai.pull_count"
@@ -1116,13 +1133,30 @@ def _connector_strip_filenames() -> list[str]:
 
 
 def generate_readme(total: int, live_total: int) -> None:
-    """Generate outputs/README.md with image references.
+    """Generate outputs/README.md — slim cross-reference + parity summary.
 
-    Each genome gets its complete artifact suite inline — base frames,
-    states, stats, chart, motions, and (for automata) the family-axis
-    coverage. Telemetry lives at the bottom (genome-independent).
+    Per-variant artifact matrices live in the genome-specific READMEs
+    (README_BRUTALIST.md, README_CHROME.md, README_AUTOMATA.md). Telemetry
+    artifacts live in README_TELEMETRY.md. The main README keeps a quick
+    base-frames tour per genome, the editorial dividers, per-genome border
+    motions, per-genome policy lanes (preserved as reference for future
+    governance work), and the parity matrix summary.
     """
-    lines = ["# HyperWeave Proof Set", ""]
+    lines = [
+        "# HyperWeave Proof Set",
+        "",
+        "Quick-reference proofset for the three production genomes plus telemetry "
+        "and parity surfaces. Per-variant artifact matrices live in dedicated files:",
+        "",
+        "- [README_BRUTALIST.md](README_BRUTALIST.md) — 12 brutalist variants (6 dark monochromes + 6 light scholars)",
+        "- [README_CHROME.md](README_CHROME.md) — 5 chrome material identities "
+        "(horizon, abyssal, lightning, graphite, moth)",
+        "- [README_AUTOMATA.md](README_AUTOMATA.md) — 16 automata solo tones plus pairing-grammar showcase",
+        "- [README_TELEMETRY.md](README_TELEMETRY.md) — receipt + rhythm-strip across all 4 telemetry skins",
+        "",
+        "---",
+        "",
+    ]
 
     for genome in GenomeId:
         g = genome.value
@@ -1186,134 +1220,15 @@ def generate_readme(total: int, live_total: int) -> None:
                 lines.append(f"![{stem}](proofset/{g}/connectors/{stem}.svg)")
                 lines.append("")
 
-        # v0.3.0 variant matrix — every shipped variant rendered for visual
-        # palette verification. One row per variant: badge default + compact,
-        # icon, strip. Automata's 12-tone matrix lives in a sibling file
-        # (README_AUTOMATA.md) so the main README doesn't bloat — only a
-        # brief stub + link is inlined here. Chrome's 5-variant matrix stays
-        # inline since it fits comfortably alongside the rest of the README.
-        genome_cfg_for_readme = load_genomes().get(g)
-        if genome_cfg_for_readme and genome_cfg_for_readme.variants:
-            variants = genome_cfg_for_readme.variants
-            divider_slug_for_genome = "band" if g == GenomeId.CHROME else "dissolve"
+        # Per-variant matrices (badge/icon/strip/marquee/divider/stats/chart
+        # + 5 states) live in the genome-specific READMEs — see the
+        # cross-link block at the top of this file. State Machine + Profile
+        # Card + Star History Chart are mirrored there too. Policy lanes
+        # and border motions stay inline below as governance + motion
+        # reference scaffolding.
 
-            if g == GenomeId.AUTOMATA:
-                # Brief stub in main README; full matrix moves to README_AUTOMATA.md.
-                lines.extend(
-                    [
-                        f"### Variant Matrix ({len(variants)} variants)",
-                        "",
-                        f"Automata ships {len(variants)} solo tones plus a request-time pairing grammar "
-                        f"(`?variant=primary&pair=secondary`) that composes any two tones into a bifamily "
-                        f"strip or divider. The full matrix — 12 solo artifact suites + freestyle paired "
-                        f"showcases — lives in [README_AUTOMATA.md](README_AUTOMATA.md).",
-                        "",
-                    ]
-                )
-                # Spot-check: render a handful of representative tones inline
-                # so the main README still gives a flavor of the chromatic
-                # surface without enumerating all 12.
-                spot_check = [v for v in ("teal", "magenta", "jade", "amber", "cobalt") if v in variants]
-                if spot_check:
-                    lines.append(
-                        " ".join(f"![{v}](proofset/{g}/variants/badge_pypi_{v}_default.svg)" for v in spot_check)
-                    )
-                    lines.append("")
-                continue
-
-            lines.extend(
-                [
-                    f"### Variant Matrix ({len(variants)} variants)",
-                    "",
-                    "Every shipped chromatic variant rendered against PYPI:v0.3.0 + readme-ai strip.",
-                    "",
-                ]
-            )
-            for v in variants:
-                lines.append(f"**`?variant={v}`**")
-                lines.append("")
-                # Row 1: badge default (+ compact when paradigm supports) + icon(s).
-                # Chrome supports binary-opposition icons (circle + square) but
-                # not compact-size badges; other variant-bearing genomes are
-                # monoshape but support compact via cellular paradigm. The
-                # compact image only appears when the file actually exists on
-                # disk so the README never ships dead links.
-                row1 = f"![badge default](proofset/{g}/variants/badge_pypi_{v}_default.svg) "
-                compact_path = OUT / "proofset" / g / "variants" / f"badge_pypi_{v}_compact.svg"
-                if compact_path.exists():
-                    row1 += f"![badge compact](proofset/{g}/variants/badge_pypi_{v}_compact.svg) "
-                if g == GenomeId.CHROME:
-                    row1 += (
-                        f"![icon circle](proofset/{g}/variants/icon_github_{v}_circle.svg) "
-                        f"![icon square](proofset/{g}/variants/icon_github_{v}_square.svg)"
-                    )
-                else:
-                    row1 += f"![icon](proofset/{g}/variants/icon_github_{v}.svg)"
-                lines.append(row1)
-                lines.append("")
-                # Row 2: strip
-                lines.append(f"![strip](proofset/{g}/variants/strip_{v}.svg)")
-                lines.append("")
-                # Row 3: marquee
-                lines.append(f"![marquee](proofset/{g}/variants/marquee_horizontal_{v}.svg)")
-                lines.append("")
-                # Row 4: divider — chrome.band sweep
-                lines.append(
-                    f"![divider {divider_slug_for_genome}]"
-                    f"(proofset/{g}/variants/divider_{divider_slug_for_genome}_{v}.svg)"
-                )
-                lines.append("")
-                # Row 5: stats card
-                stats_path = OUT / "proofset" / g / "variants" / f"stats_{v}.svg"
-                if stats_path.exists():
-                    lines.append(f"![stats](proofset/{g}/variants/stats_{v}.svg)")
-                    lines.append("")
-                # Row 6: star history chart (only when generated — skipped on
-                # GitHub stargazer cross-check failure per --live policy)
-                chart_path = OUT / "proofset" / g / "variants" / f"chart_stars_{v}.svg"
-                if chart_path.exists():
-                    lines.append(f"![chart](proofset/{g}/variants/chart_stars_{v}.svg)")
-                    lines.append("")
-                # Rows 7-11: badge states stacked vertically (one per row)
-                # for spatial scan-diff. Inline-row layout (pre-fix) packed all
-                # 5 states into a single line, making it hard to compare state
-                # colors across variants. Vertical stack matches the brutalist
-                # "State Machine" section's pattern below.
-                for s in (
-                    ArtifactStatus.PASSING,
-                    ArtifactStatus.WARNING,
-                    ArtifactStatus.CRITICAL,
-                    ArtifactStatus.BUILDING,
-                    ArtifactStatus.OFFLINE,
-                ):
-                    lines.append(f"![{s.value}](proofset/{g}/variants/badge_{s.value}_{v}.svg)")
-                lines.append("")
-
-        # States
-        lines.extend(["### State Machine", ""])
-        for s in (
-            ArtifactStatus.PASSING,
-            ArtifactStatus.WARNING,
-            ArtifactStatus.CRITICAL,
-            ArtifactStatus.BUILDING,
-            ArtifactStatus.OFFLINE,
-        ):
-            lines.append(f"![badge {s}](proofset/{g}/states/badge_{s}.svg)")
-        lines.append("")
-        for s in (ArtifactStatus.ACTIVE, ArtifactStatus.WARNING, ArtifactStatus.CRITICAL):
-            lines.append(f"![strip {s}](proofset/{g}/states/strip_{s}.svg)")
-        lines.append("")
-
-        # Stats card + Star chart inline per genome
-        lines.extend(["### Profile Card (stats)", ""])
-        lines.append(f"![stats {g}](proofset/{g}/data-cards/stats.svg)")
-        lines.append("")
-
-        lines.extend(["### Star History Chart", ""])
-        lines.append(f"![chart full {g}](proofset/{g}/data-cards/chart_stars_full.svg)")
-        lines.append("")
-
-        # Policy lanes
+        # Policy lanes (kept as reference for future governance work —
+        # data-hw-regime swaps surface scaffolding without rerendering).
         lines.extend(["### Policy Lanes", ""])
         for r in (Regime.NORMAL, Regime.UNGOVERNED):
             lines.append(f"![badge {r}](proofset/{g}/policy-lanes/badge_{r}.svg)")
@@ -1339,51 +1254,19 @@ def generate_readme(total: int, live_total: int) -> None:
 
     # Telemetry visual-fidelity matrix (v0.2.23): runtime-paired skins.
     # Each transcript renders only under its matched-runtime skin + voltage
-    # (the universal fallback). Mock data renders under all 4 skins for chrome
-    # demonstration on a neutral baseline. Cross-runtime renders (codex data
-    # in cream skin, claude-code data in codex skin) are NOT generated —
-    # they're noise rather than signal.
-    lines.extend(["## Telemetry", ""])
-    lines.append(
-        "*Each real transcript renders against its matched-runtime skin plus telemetry-voltage "
-        "(the universal fallback). Mock data demonstrates all 4 skin chromes on a neutral baseline. "
-        "Skin precedence chain: explicit `--genome` override → JSONL `runtime` field → `telemetry-voltage` fallback.*"
+    # Telemetry content lives in README_TELEMETRY.md — the main README only
+    # cross-links there to keep the surface tour scannable.
+    lines.extend(
+        [
+            "## Telemetry",
+            "",
+            "Receipt + rhythm-strip artifacts across all 4 telemetry skins "
+            "(voltage, claude-code, cream, codex) — including mock data and "
+            "real transcripts from Claude Code and Codex sessions — live in "
+            "[README_TELEMETRY.md](README_TELEMETRY.md).",
+            "",
+        ]
     )
-    lines.append("")
-
-    # Mock under all 4 skins
-    lines.extend(["### Mock (all 4 skins — chrome demonstration)", ""])
-    for skin in ("telemetry-voltage", "telemetry-claude-code", "telemetry-cream", "telemetry-codex"):
-        lines.append(f"**{skin}**")
-        lines.append("")
-        for ft in (FrameType.RECEIPT, FrameType.RHYTHM_STRIP):
-            lines.append(f"![{ft}-{skin}-mock](proofset/telemetry/{ft.value.replace('-', '_')}_{skin}_mock.svg)")
-            lines.append("")
-
-    # Real transcripts grouped by source runtime (matched skin + voltage)
-    real_groups: list[tuple[str, list[tuple[str, Path]], str]] = [
-        ("Claude Code transcripts", _REAL_TRANSCRIPTS, "telemetry-claude-code"),
-        ("Codex transcripts", _REAL_CODEX_TRANSCRIPTS, "telemetry-codex"),
-    ]
-    for group_title, group_transcripts, matched_skin in real_groups:
-        labels_present = [label for label, p in group_transcripts if p.exists()]
-        if not labels_present:
-            continue
-        lines.extend([f"### {group_title} ({matched_skin} + telemetry-voltage)", ""])
-        for label in labels_present:
-            lines.append(f"**{label}**")
-            lines.append("")
-            for skin in (matched_skin, "telemetry-voltage"):
-                for ft in (FrameType.RECEIPT, FrameType.RHYTHM_STRIP):
-                    lines.append(
-                        f"![{ft}-{skin}-{label}](proofset/telemetry/{ft.value.replace('-', '_')}_{skin}_{label}.svg)"
-                    )
-                    lines.append("")
-
-    lines.append("### master-card (voltage only, deferred to v0.3.0)")
-    lines.append("")
-    lines.append("![master-card](proofset/telemetry/master_card.svg)")
-    lines.append("")
 
     if live_total > 0:
         lines.extend(["## Live Data (requires --live)", ""])
@@ -1399,12 +1282,85 @@ def generate_readme(total: int, live_total: int) -> None:
     (OUT / "README.md").write_text("\n".join(lines) + "\n")
     _emit_automata_readme()
     _emit_brutalist_readme()
+    _emit_chrome_readme()
+    _emit_telemetry_readme()
+
+
+def _emit_telemetry_readme() -> None:
+    """Emit outputs/README_TELEMETRY.md with the full telemetry artifact tour.
+
+    Receipt + rhythm-strip rendered under each of the four telemetry skins
+    (voltage, claude-code, cream, codex) with mock data, plus real
+    transcripts from Claude Code and Codex sessions matched to their
+    runtime-paired skin alongside the voltage fallback. master-card too.
+
+    Cross-runtime renders (codex data in cream skin, claude-code data in
+    codex skin) are not generated — they're noise rather than signal.
+    """
+    lines: list[str] = [
+        "# HyperWeave Telemetry — Receipt + Rhythm-Strip Matrix",
+        "",
+        "Telemetry artifacts (receipt cards, rhythm strips, master-cards) are "
+        "**genome-independent at the rendering layer** but render under one of "
+        "four named skins: `telemetry-voltage` (universal fallback), "
+        "`telemetry-claude-code`, `telemetry-cream`, `telemetry-codex`.",
+        "",
+        "Each real transcript renders against its matched-runtime skin plus "
+        "voltage. Mock data demonstrates all 4 skins on a neutral baseline. "
+        "Skin precedence chain: explicit `--genome` override → JSONL `runtime` "
+        "field → `telemetry-voltage` fallback.",
+        "",
+        "---",
+        "",
+        "## Mock (all 4 skins — chromatic demonstration)",
+        "",
+    ]
+    for skin in ("telemetry-voltage", "telemetry-claude-code", "telemetry-cream", "telemetry-codex"):
+        lines.append(f"### {skin}")
+        lines.append("")
+        for ft in (FrameType.RECEIPT, FrameType.RHYTHM_STRIP):
+            lines.append(f"![{ft}-{skin}-mock](proofset/telemetry/{ft.value.replace('-', '_')}_{skin}_mock.svg)")
+            lines.append("")
+
+    real_groups: list[tuple[str, list[tuple[str, Path]], str]] = [
+        ("Claude Code transcripts", _REAL_TRANSCRIPTS, "telemetry-claude-code"),
+        ("Codex transcripts", _REAL_CODEX_TRANSCRIPTS, "telemetry-codex"),
+    ]
+    for group_title, group_transcripts, matched_skin in real_groups:
+        labels_present = [label for label, p in group_transcripts if p.exists()]
+        if not labels_present:
+            continue
+        lines.extend([f"## {group_title} ({matched_skin} + telemetry-voltage)", ""])
+        for label in labels_present:
+            lines.append(f"### {label}")
+            lines.append("")
+            for skin in (matched_skin, "telemetry-voltage"):
+                for ft in (FrameType.RECEIPT, FrameType.RHYTHM_STRIP):
+                    lines.append(
+                        f"![{ft}-{skin}-{label}](proofset/telemetry/{ft.value.replace('-', '_')}_{skin}_{label}.svg)"
+                    )
+                    lines.append("")
+
+    lines.extend(
+        [
+            "## master-card (voltage only)",
+            "",
+            "![master-card](proofset/telemetry/master_card.svg)",
+            "",
+            "## Cross-reference",
+            "",
+            "- [Main README](README.md) — proofset overview + genome cross-links",
+            "",
+        ]
+    )
+
+    (OUT / "README_TELEMETRY.md").write_text("\n".join(lines) + "\n")
 
 
 def _emit_automata_readme() -> None:
-    """Emit outputs/README_AUTOMATA.md with the full 12-tone variant matrix
+    """Emit outputs/README_AUTOMATA.md with the full 16-tone variant matrix
     plus a freestyle pairings showcase. Lifted out of the main README to
-    keep that file scannable; with 12 solo tones x 7 frame types + 5 badge
+    keep that file scannable; with 16 solo tones x 7 frame types + 5 badge
     states each, the full matrix dominates whatever else lives there.
 
     Image references point at LOCAL artifacts under outputs/proofset/automata/
@@ -1417,10 +1373,11 @@ def _emit_automata_readme() -> None:
     variants = cfg.variants
 
     lines: list[str] = [
-        "# HyperWeave Automata — 12-Tone Variant Matrix",
+        "# HyperWeave Automata — 16-Tone Variant Matrix",
         "",
-        "Automata is the cellular paradigm: 12 solo tones (`violet`, `teal`, `bone`, `steel`, "
-        "`amber`, `jade`, `magenta`, `cobalt`, `toxic`, `solar`, `abyssal`, `crimson`) plus a "
+        "Automata is the cellular paradigm: 16 solo tones (`violet`, `teal`, `bone`, `steel`, "
+        "`amber`, `jade`, `magenta`, `cobalt`, `toxic`, `solar`, `abyssal`, `crimson`, "
+        "`sulfur`, `indigo`, `burgundy`, `copper`) plus a "
         "request-time pairing grammar that composes any two tones into a bifamily strip or "
         "divider. Use `?variant=primary&pair=secondary` to pair, `?variant=primary` alone for solo.",
         "",
@@ -1486,7 +1443,7 @@ def _emit_automata_readme() -> None:
             "The pairing grammar (`?variant=primary&pair=secondary`) composes any two solo tones "
             "into bifamily strips and dissolve dividers. Other frame types (badge, stats, chart, "
             "marquee, icon) silently ignore the pair and render the primary tone solo. The 10 "
-            "combinations below sample the combinatorial surface; any of the 12x11=132 possible "
+            "combinations below sample the combinatorial surface; any of the 16x15=240 possible "
             "pairings work the same way.",
             "",
         ]
@@ -1544,6 +1501,17 @@ _BRUTALIST_LIGHT_PHENOMENOLOGY: list[tuple[str, str]] = [
     ("afterimage", "the optical echo persisting — perception's residue"),
     ("primer", "the base coat applied — preparation as foundation"),
 ]
+_CHROME_PHENOMENOLOGY: list[tuple[str, str]] = [
+    (
+        "horizon",
+        "the frozen midnight envelope — slate held over copper sliver "
+        "(flagship; bare `chrome.static` URL renders this for byte-equality)",
+    ),
+    ("abyssal", "deep-water teal — the cold-cyan envelope"),
+    ("lightning", "electric blue arrest — voltage held still"),
+    ("graphite", "warm gray cast — pencil lead under pressure"),
+    ("moth", "umber iridescence — wing-dust spectra"),
+]
 
 
 def _emit_brutalist_readme() -> None:
@@ -1588,8 +1556,10 @@ def _emit_brutalist_readme() -> None:
         "Stratum: `002-TRIBE`. Flagship variant: `celadon` (byte-equal to pre-v0.3.2 "
         "brutalist palette for backwards compat).",
         "",
-        "Every variant below renders the full artifact suite (badge default, icon, strip, "
-        "marquee, divider seam, stats card, star chart, 5 badge states).",
+        "Brutalist supports both `circle` and `square` icon shapes; each variant embeds "
+        "both. Every variant below renders the full artifact suite (default badge, "
+        "circle + square icons, strip, marquee, divider seam, stats card, star chart, "
+        "5 badge states).",
         "",
         "---",
         "",
@@ -1602,20 +1572,22 @@ def _emit_brutalist_readme() -> None:
         lines.append("")
         lines.append(f"_{phenomenology}_")
         lines.append("")
-        # Row 1: badge default + icon (no compact for brutalist)
-        row1 = (
-            f"![badge default](proofset/{g}/variants/badge_pypi_{v}_default.svg) "
-            f"![icon](proofset/{g}/variants/icon_github_{v}.svg)"
-        )
-        lines.append(row1)
+        # Row 1: badge default (alone, mirroring chrome's layout)
+        lines.append(f"![badge default](proofset/{g}/variants/badge_pypi_{v}_default.svg)")
         lines.append("")
-        # Row 2: strip
+        # Row 2: icons (circle + square side by side)
+        lines.append(
+            f"![icon circle](proofset/{g}/variants/icon_github_{v}_circle.svg) "
+            f"![icon square](proofset/{g}/variants/icon_github_{v}_square.svg)"
+        )
+        lines.append("")
+        # Row 3: strip
         lines.append(f"![strip](proofset/{g}/variants/strip_{v}.svg)")
         lines.append("")
-        # Row 3: marquee
+        # Row 4: marquee
         lines.append(f"![marquee](proofset/{g}/variants/marquee_horizontal_{v}.svg)")
         lines.append("")
-        # Row 4: divider seam (brutalist's only declared divider)
+        # Row 5: divider seam (brutalist's only declared divider)
         lines.append(f"![divider seam](proofset/{g}/variants/divider_seam_{v}.svg)")
         lines.append("")
         # Row 5: stats card
@@ -1686,6 +1658,2860 @@ def _emit_brutalist_readme() -> None:
     (OUT / "README_BRUTALIST.md").write_text("\n".join(lines) + "\n")
 
 
+def _emit_chrome_readme() -> None:
+    """Emit outputs/README_CHROME.md mirroring brutalist/automata structure.
+
+    Chrome ships 5 named variants (horizon/abyssal/lightning/graphite/moth);
+    each renders the full artifact suite. Chrome's divider variant is `band`
+    (per genome.dividers, distinct from brutalist `seam` and automata
+    `dissolve`). Chrome supports both circular AND square icon shapes, so
+    each variant block embeds both alongside the standard 12-artifact suite.
+
+    Source data: `eli64s/readme-ai` to match the other two genome READMEs.
+    Image refs point at LOCAL artifacts under outputs/proofset/chrome/.
+    """
+    g = "chrome"
+    cfg = load_genomes().get(g)
+    if cfg is None or not cfg.variants:
+        return
+
+    lines: list[str] = [
+        "# HyperWeave Chrome — 5-Variant Material Identity Matrix",
+        "",
+        "Chrome is the dark-envelope flagship: midnight gradient + slate seam + sparing "
+        "warm-metal accents. Each variant changes the **material identity** of the envelope "
+        "while keeping the same structural chrome (envelope + well + rim + rhythm).",
+        "",
+        "Five variants: **`horizon`** (frozen midnight + slate + copper sliver; flagship), "
+        "**`abyssal`** (deep-water teal), **`lightning`** (electric blue), "
+        "**`graphite`** (warm gray cast), **`moth`** (umber iridescence).",
+        "",
+        "The bare `chrome.static` URL renders `horizon` for byte-equality with pre-v0.3 "
+        "output. Named variants emit per-variant chromatic overrides via inline SVG-root "
+        "style — every chrome envelope is hex-baked into its `url(#-env)` gradient stops "
+        "and is therefore **scheme-stable** (light-mode CSS variables do not invert the "
+        "envelope; that bug was fixed in v0.3.9 by removing the inherited `light_mode` "
+        "block from the chrome genome).",
+        "",
+        "Chrome supports both `circle` and `square` icon shapes; each variant embeds both. "
+        "Every variant below renders the full artifact suite (default badge, circle + "
+        "square icons, strip, marquee, band divider, stats card, star chart, 5 badge states).",
+        "",
+        "---",
+        "",
+    ]
+
+    def _emit_variant_block(v: str, phenomenology: str) -> None:
+        lines.append(f"### `?variant={v}`")
+        lines.append("")
+        lines.append(f"_{phenomenology}_")
+        lines.append("")
+        # Row 1: default badge
+        lines.append(f"![badge default](proofset/{g}/variants/badge_pypi_{v}_default.svg)")
+        lines.append("")
+        # Row 2: icons (circle + square)
+        lines.append(
+            f"![icon circle](proofset/{g}/variants/icon_github_{v}_circle.svg) "
+            f"![icon square](proofset/{g}/variants/icon_github_{v}_square.svg)"
+        )
+        lines.append("")
+        # Row 3: strip
+        lines.append(f"![strip](proofset/{g}/variants/strip_{v}.svg)")
+        lines.append("")
+        # Row 4: marquee
+        lines.append(f"![marquee](proofset/{g}/variants/marquee_horizontal_{v}.svg)")
+        lines.append("")
+        # Row 5: band divider (chrome's only declared divider)
+        lines.append(f"![divider band](proofset/{g}/variants/divider_band_{v}.svg)")
+        lines.append("")
+        # Row 6: stats card
+        stats_path = OUT / "proofset" / g / "variants" / f"stats_{v}.svg"
+        if stats_path.exists():
+            lines.append(f"![stats](proofset/{g}/variants/stats_{v}.svg)")
+            lines.append("")
+        # Row 7: star history chart
+        chart_path = OUT / "proofset" / g / "variants" / f"chart_stars_{v}.svg"
+        if chart_path.exists():
+            lines.append(f"![chart](proofset/{g}/variants/chart_stars_{v}.svg)")
+            lines.append("")
+        # Rows 8-12: badge states stacked
+        for s in (
+            ArtifactStatus.PASSING,
+            ArtifactStatus.WARNING,
+            ArtifactStatus.CRITICAL,
+            ArtifactStatus.BUILDING,
+            ArtifactStatus.OFFLINE,
+        ):
+            lines.append(f"![{s.value}](proofset/{g}/variants/badge_{s.value}_{v}.svg)")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    for v, phen in _CHROME_PHENOMENOLOGY:
+        if v in cfg.variants:
+            _emit_variant_block(v, phen)
+
+    lines.extend(
+        [
+            "## Material Architecture",
+            "",
+            "Chrome's identity lives in the hex-baked envelope gradient (a multi-stop "
+            "`<linearGradient>` at `templates/frames/{frame}/chrome-defs.j2`), the well "
+            "(content background), and the rim (specular highlight band). Per-variant "
+            "overrides in `data/genomes/chrome.json:variant_overrides` swap the stops "
+            "without touching the structural geometry.",
+            "",
+            "Light-mode behavior: chrome is **scheme-stable**. The genome no longer "
+            "declares a `light_mode` block (v0.3.9), so the assembler emits no "
+            "`@media (prefers-color-scheme: light)` swap CSS. Chrome strips/badges/"
+            "icons render identically on dark and light GitHub READMEs. See "
+            "`docs/decisions/chrome-lightmode-removal.md` for the diagnosis.",
+            "",
+            "## Cross-reference",
+            "",
+            "- [Main README](../README.md) — installation, compose grammar, all genomes",
+            "- [Brutalist README](README_BRUTALIST.md) — 12-variant substrate matrix",
+            "- [Automata README](README_AUTOMATA.md) — 16-tone cellular matrix",
+            "",
+        ]
+    )
+
+    (OUT / "README_CHROME.md").write_text("\n".join(lines) + "\n")
+
+
+# DATA_PROJECTS — the real-data corpus the parity matrix exercises against.
+# Tokens shape: ``(provider, identifier, metric)``. Resolved once via
+# ``fetch_or_cache`` (live fetch with fixture cache fallback) and shared
+# across all three entry points so byte-equality is testable.
+#
+# Project list per v0.3.9 plan Part 3c: 19 gh repos + 8 pypi + 4 npm +
+# 4 docker + 3 hf + 3 arxiv. Each provides at least one scalar metric the
+# harness pre-fetches at proofset start. Future spec entries can reference
+# any pre-fetched token via the resolved_data dict.
+DATA_PROJECTS: dict[str, list[tuple[str, ...]]] = {
+    # Provider keys match ``hyperweave.connectors._CONNECTORS`` canonical
+    # names (github / pypi / npm / docker / huggingface / arxiv). The
+    # user-facing ``gh:`` / ``hf:`` aliases live in serve/data_tokens.py
+    # and don't apply at the fetch_metric layer the harness uses.
+    #
+    # corpus refresh: 16 GitHub agentic repos relevant to
+    # May 2026, 7 PyPI packages, 4 npm packages (scoped paths work via
+    # registry.npmjs.org directly), 3 Docker images with pull + star
+    # counts, 3 HuggingFace models with downloads + likes, 3 arXiv papers
+    # (transformer-era + recent agentic). Replaces v0.3.8 corpus
+    # (eli64s/readme-ai + DeepSeek-R1 + 2203.02155 etc).
+    "github": [
+        ("openclaw/openclaw", "stars"),
+        ("openclaw/openclaw", "forks"),
+        ("openclaw/openclaw", "issues"),
+        ("NousResearch/hermes-agent", "stars"),
+        ("NousResearch/hermes-agent", "forks"),
+        ("JuliusBrussee/caveman", "stars"),
+        ("JuliusBrussee/caveman", "forks"),
+        ("mattpocock/skills", "stars"),
+        ("mattpocock/skills", "forks"),
+        ("langflow-ai/langflow", "stars"),
+        ("langflow-ai/langflow", "forks"),
+        ("langflow-ai/langflow", "issues"),
+        ("langgenius/dify", "stars"),
+        ("langgenius/dify", "forks"),
+        ("langgenius/dify", "issues"),
+        ("n8n-io/n8n", "stars"),
+        ("n8n-io/n8n", "forks"),
+        ("n8n-io/n8n", "issues"),
+        ("Significant-Gravitas/AutoGPT", "stars"),
+        ("Significant-Gravitas/AutoGPT", "forks"),
+        ("Significant-Gravitas/AutoGPT", "issues"),
+        ("ollama/ollama", "stars"),
+        ("ollama/ollama", "forks"),
+        ("cline/cline", "stars"),
+        ("cline/cline", "forks"),
+        ("mem0ai/mem0", "stars"),
+        ("mem0ai/mem0", "forks"),
+        ("crewAIInc/crewAI", "stars"),
+        ("crewAIInc/crewAI", "forks"),
+        ("langchain-ai/langchain", "stars"),
+        ("langchain-ai/langchain", "forks"),
+        ("langchain-ai/langchain", "issues"),
+        ("anthropics/claude-code", "stars"),
+        ("anthropics/claude-code", "forks"),
+        ("vllm-project/vllm", "stars"),
+        ("vllm-project/vllm", "forks"),
+        ("vllm-project/vllm", "issues"),
+        ("FoundationAgents/MetaGPT", "stars"),
+        ("FoundationAgents/MetaGPT", "forks"),
+        # Z.AI GLM-5 ecosystem (cross-provider showcase)
+        ("zai-org/GLM-5", "stars"),
+        ("zai-org/GLM-5", "forks"),
+    ],
+    "pypi": [
+        ("langchain", "version"),
+        ("langchain", "downloads"),
+        ("vllm", "version"),
+        ("vllm", "downloads"),
+        ("crewai", "version"),
+        ("crewai", "downloads"),
+        ("dify-client", "version"),
+        ("dify-client", "downloads"),
+        ("readmeai", "version"),
+        ("readmeai", "downloads"),
+        ("mem0ai", "version"),
+        ("mem0ai", "downloads"),
+        ("hyperweave", "version"),
+        ("hyperweave", "downloads"),
+    ],
+    "npm": [
+        # Scoped packages (@scope/name) — registry.npmjs.org accepts the
+        # unencoded path directly; httpx passes it through. Verified
+        # 2026-05-20 against @langchain/langgraph, @anthropic-ai/sdk,
+        # @openai/agents (all 200 OK).
+        ("@langchain/langgraph", "version"),
+        ("@langchain/langgraph", "downloads"),
+        ("@anthropic-ai/sdk", "version"),
+        ("@anthropic-ai/sdk", "downloads"),
+        ("@openai/agents", "version"),
+        ("@openai/agents", "downloads"),
+        ("n8n", "version"),
+        ("n8n", "downloads"),
+    ],
+    "docker": [
+        # Docker Hub connector exposes pull_count + star_count.
+        ("ollama/ollama", "pull_count"),
+        ("ollama/ollama", "star_count"),
+        ("vllm/vllm-openai", "pull_count"),
+        ("vllm/vllm-openai", "star_count"),
+        ("n8nio/n8n", "pull_count"),
+        ("n8nio/n8n", "star_count"),
+    ],
+    "hf": [
+        ("meta-llama/Llama-4-Scout-17B-16E-Instruct", "downloads"),
+        ("meta-llama/Llama-4-Scout-17B-16E-Instruct", "likes"),
+        ("NousResearch/Hermes-3-Llama-3.1-8B", "downloads"),
+        ("NousResearch/Hermes-3-Llama-3.1-8B", "likes"),
+        ("Qwen/Qwen3-235B-A22B", "downloads"),
+        ("Qwen/Qwen3-235B-A22B", "likes"),
+        # Z.AI GLM-5 model card (HuggingFace side).
+        ("zai-org/GLM-5.1", "downloads"),
+        ("zai-org/GLM-5.1", "likes"),
+    ],
+    "arxiv": [
+        # 2310.06825: Mistral 7B paper.
+        # 2501.12948: DeepSeek-R1 reasoning paper.
+        # 2505.09388: recent agentic paper.
+        # 2602.15763: Z.AI GLM-5 paper (R13).
+        ("2310.06825", "title"),
+        ("2310.06825", "authors"),
+        ("2501.12948", "title"),
+        ("2501.12948", "authors"),
+        ("2505.09388", "title"),
+        ("2505.09388", "authors"),
+        ("2602.15763", "title"),
+        ("2602.15763", "authors"),
+    ],
+}
+
+
+def _fmt_count(value: Any) -> str:
+    """Format a raw connector value as a compact display string.
+
+    Strings (versions, titles) pass through unchanged. None/missing becomes
+    ``--`` (v0.3.9: was ``?``; the new sentinel reads as 'unavailable' rather
+    than 'unknown question'). Integers compact to ``k``/``M`` for badge
+    readability. The same formatter runs for direct/http/mcp inputs so all
+    three paths render the identical value string.
+    """
+    if value is None:
+        return "--"
+    if isinstance(value, str):
+        return value
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
+async def _resolve_data_projects(fixtures: dict[str, Any]) -> dict[str, Any]:
+    """Pre-fetch every DATA_PROJECTS token; return ``{token: value}`` map.
+
+    Each fetch is wrapped in ``fetch_or_cache`` so live failures fall back
+    to the committed fixture cache. The harness persists the cache to
+    ``tests/fixtures/proofset_data.json`` after every successful live fetch
+    so subsequent runs (or CI without network) hit the cache instantly.
+    Network resilience contract: a project missing from BOTH live and cache
+    is a hard failure surfaced as ``?`` in the rendered output.
+    """
+    import asyncio as _asyncio
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from proofset_harness import fetch_or_cache
+
+    async def _one(provider: str, identifier: str, metric: str) -> tuple[str, Any]:
+        token = f"{provider}:{identifier}.{metric}"
+        try:
+            value = await fetch_or_cache(provider, identifier, metric, fixtures)
+        except Exception as exc:
+            print(f"  [DATA FETCH FAIL] {token}: {type(exc).__name__}: {exc}")
+            value = None
+        return token, value
+
+    tasks = []
+    for provider, items in DATA_PROJECTS.items():
+        for identifier, metric in items:
+            tasks.append(_one(provider, identifier, metric))
+
+    results = await _asyncio.gather(*tasks)
+    return dict(results)
+
+
+def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[Any]:
+    """Construct the 3-path parity verification matrix.
+
+    Each entry encodes the SAME compositional intent across all three entry
+    points: ``ComposeSpec`` (direct), URL path + query string (HTTP), tool
+    args (MCP). Equivalent inputs must produce byte-identical SVG output
+    after volatile-fragment normalization — any divergence is a parity bug
+    per HyperWeave Invariant 9 (CLI/HTTP/MCP feature parity).
+
+    Coverage spans:
+      - all 3 user-facing genomes (brutalist, chrome, automata)
+      - all 7 user-facing frame types (badge, strip, icon, divider,
+        marquee-horizontal, stats, chart)
+      - state-bearing vs data-only strips (Bug 3 indicator gating)
+      - varying metric counts (Bug 1 cell distribution + Bug 2 height inv)
+      - variant query-param routing (chrome.horizon, automata.teal)
+      - long-namespace via subtitle (Significant-Gravitas/AutoGPT)
+      - **real-data via 6 live connectors** (gh, pypi, npm, docker, hf,
+        arxiv) — values pre-fetched once and passed identically to all
+        three paths so the parity check tests path-equivalence, not
+        connector flakiness
+      - literal connectors (text:, kv:)
+
+    Matrix entries are constructed inline so future contributors see a
+    template per archetype rather than parsing an opaque data structure.
+    """
+    from proofset_harness import ParitySpec
+
+    rd = resolved_data or {}
+    specs: list[Any] = []
+
+    # ── Badges ──────────────────────────────────────────────────────────
+    specs.append(
+        ParitySpec(
+            spec_id="brutalist-badge-build-passing",
+            compose_spec=ComposeSpec(type="badge", genome_id="brutalist", title="build", value="passing"),
+            http_path="/v1/badge/build/passing/brutalist.static",
+            mcp_args={"type": "badge", "title": "build", "value": "passing", "genome": "brutalist"},
+        )
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="chrome-horizon-badge-version",
+            compose_spec=ComposeSpec(
+                type="badge",
+                genome_id="chrome",
+                variant="horizon",
+                title="version",
+                value="v0.3.9",
+            ),
+            http_path="/v1/badge/version/v0.3.9/chrome.static?variant=horizon",
+            mcp_args={
+                "type": "badge",
+                "title": "version",
+                "value": "v0.3.9",
+                "genome": "chrome",
+                "variant": "horizon",
+            },
+        )
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="automata-teal-badge-stars",
+            compose_spec=ComposeSpec(
+                type="badge",
+                genome_id="automata",
+                variant="teal",
+                title="stars",
+                value="2.9k",
+            ),
+            http_path="/v1/badge/stars/2.9k/automata.static?variant=teal",
+            mcp_args={
+                "type": "badge",
+                "title": "stars",
+                "value": "2.9k",
+                "genome": "automata",
+                "variant": "teal",
+            },
+        )
+    )
+
+    # ── Strips: cell distribution + state-indicator gating ──────────────
+    # Bug 1 (n metrics fill canvas) — 4 brutalist strips at counts 1/2/3/4.
+    for n, metrics_csv in [
+        (1, "STARS:2.9k"),
+        (2, "STARS:2.9k,FORKS:278"),
+        (3, "STARS:2.9k,FORKS:278,ISSUES:14"),
+        (4, "STARS:2.9k,FORKS:278,ISSUES:14,PRS:7"),
+    ]:
+        specs.append(
+            ParitySpec(
+                spec_id=f"brutalist-strip-{n}metric-data-only",
+                compose_spec=ComposeSpec(
+                    type="strip",
+                    genome_id="brutalist",
+                    title="readme-ai",
+                    value=metrics_csv,
+                ),
+                http_path=f"/v1/strip/readme-ai/brutalist.static?value={metrics_csv}",
+                mcp_args={
+                    "type": "strip",
+                    "title": "readme-ai",
+                    "value": metrics_csv,
+                    "genome": "brutalist",
+                },
+            )
+        )
+
+    # Bug 2 (chrome height invariance) — 4 chrome strips at counts 1/2/3/4.
+    for n, metrics_csv in [
+        (1, "STARS:2.9k"),
+        (2, "STARS:2.9k,FORKS:278"),
+        (3, "STARS:2.9k,FORKS:278,ISSUES:14"),
+        (4, "STARS:2.9k,FORKS:278,ISSUES:14,PRS:7"),
+    ]:
+        specs.append(
+            ParitySpec(
+                spec_id=f"chrome-strip-{n}metric-data-only",
+                compose_spec=ComposeSpec(
+                    type="strip",
+                    genome_id="chrome",
+                    title="readme-ai",
+                    value=metrics_csv,
+                ),
+                http_path=f"/v1/strip/readme-ai/chrome.static?value={metrics_csv}",
+                mcp_args={
+                    "type": "strip",
+                    "title": "readme-ai",
+                    "value": metrics_csv,
+                    "genome": "chrome",
+                },
+            )
+        )
+
+    # Bug 3 (state indicator gating) — BUILD title triggers indicator.
+    specs.append(
+        ParitySpec(
+            spec_id="brutalist-strip-state-bearing",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="brutalist",
+                title="readme-ai",
+                value="BUILD:passing,STARS:2.9k",
+            ),
+            http_path="/v1/strip/readme-ai/brutalist.static?value=BUILD:passing,STARS:2.9k",
+            mcp_args={
+                "type": "strip",
+                "title": "readme-ai",
+                "value": "BUILD:passing,STARS:2.9k",
+                "genome": "brutalist",
+            },
+        )
+    )
+
+    # High-star data-only (openclaw 373k) — number formatting + NO indicator.
+    specs.append(
+        ParitySpec(
+            spec_id="chrome-strip-highstars-data-only",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="chrome",
+                title="openclaw",
+                value="STARS:373k,FORKS:12k,ISSUES:234",
+            ),
+            http_path="/v1/strip/openclaw/chrome.static?value=STARS:373k,FORKS:12k,ISSUES:234",
+            mcp_args={
+                "type": "strip",
+                "title": "openclaw",
+                "value": "STARS:373k,FORKS:12k,ISSUES:234",
+                "genome": "chrome",
+            },
+        )
+    )
+
+    # ── Icons ───────────────────────────────────────────────────────────
+    # Icon: HTTP route sets title=glyph (see serve/app.py:compose_icon_url:441),
+    # so ComposeSpec and mcp_args must mirror that to maintain parity.
+    specs.append(
+        ParitySpec(
+            spec_id="chrome-horizon-icon-github-circle",
+            compose_spec=ComposeSpec(
+                type="icon",
+                genome_id="chrome",
+                variant="horizon",
+                title="github",
+                glyph="github",
+                shape="circle",
+            ),
+            http_path="/v1/icon/github/chrome.static?variant=horizon&shape=circle",
+            mcp_args={
+                "type": "icon",
+                "title": "github",
+                "glyph": "github",
+                "genome": "chrome",
+                "variant": "horizon",
+                "shape": "circle",
+            },
+        )
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="brutalist-icon-github",
+            compose_spec=ComposeSpec(
+                type="icon",
+                genome_id="brutalist",
+                title="github",
+                glyph="github",
+            ),
+            http_path="/v1/icon/github/brutalist.static",
+            mcp_args={
+                "type": "icon",
+                "title": "github",
+                "glyph": "github",
+                "genome": "brutalist",
+            },
+        )
+    )
+
+    # ── Dividers ────────────────────────────────────────────────────────
+    specs.append(
+        ParitySpec(
+            spec_id="brutalist-divider-seam",
+            compose_spec=ComposeSpec(
+                type="divider",
+                genome_id="brutalist",
+                divider_variant="seam",
+            ),
+            http_path="/v1/divider/seam/brutalist.static",
+            mcp_args={
+                "type": "divider",
+                "genome": "brutalist",
+                "divider_variant": "seam",
+            },
+        )
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="chrome-divider-band",
+            compose_spec=ComposeSpec(
+                type="divider",
+                genome_id="chrome",
+                divider_variant="band",
+            ),
+            http_path="/v1/divider/band/chrome.static",
+            mcp_args={
+                "type": "divider",
+                "genome": "chrome",
+                "divider_variant": "band",
+            },
+        )
+    )
+
+    # ── Marquee ─────────────────────────────────────────────────────────
+    specs.append(
+        ParitySpec(
+            spec_id="chrome-marquee-horizon",
+            compose_spec=ComposeSpec(
+                type="marquee-horizontal",
+                genome_id="chrome",
+                variant="horizon",
+                title="ITEM1 | ITEM2 | ITEM3",
+            ),
+            http_path="/v1/marquee/ITEM1%20%7C%20ITEM2%20%7C%20ITEM3/chrome.static?variant=horizon",
+            mcp_args={
+                "type": "marquee-horizontal",
+                "title": "ITEM1 | ITEM2 | ITEM3",
+                "genome": "chrome",
+                "variant": "horizon",
+            },
+        )
+    )
+
+    # ── Real-data badges (gh:, pypi:, npm:, docker:, hf:) ───────────────
+    # Each spec resolves a DATA_PROJECTS token, formats the value once,
+    # then ships the SAME literal value to all three paths. Parity tests
+    # path-equivalence with real-world values (not connector flakiness).
+    # If a token failed to resolve (no live + no cache) the value renders
+    # as "?" — parity still passes because all three paths see the same "?".
+    from urllib.parse import quote as _urlquote
+
+    _real_data_badges: list[tuple[str, str, str, str, str, str]] = [
+        # (spec_id, token, title, genome, variant, genome_motion)
+        # v0.3.9 corpus refresh: dropped gh-readme-ai-stars (eli64s/readme-ai
+        # no longer in DATA_PROJECTS); InnerAura/hyperweave kept as the
+        # low-count brutalist baseline since it's still queried by the
+        # existing chart/stats generators.
+        ("gh-hyperweave-stars", "github:InnerAura/hyperweave.stars", "STARS", "brutalist", "", "brutalist.static"),
+        ("gh-openclaw-stars", "github:openclaw/openclaw.stars", "STARS", "chrome", "abyssal", "chrome.static"),
+        (
+            "gh-autogpt-stars",
+            "github:Significant-Gravitas/AutoGPT.stars",
+            "STARS",
+            "automata",
+            "teal",
+            "automata.static",
+        ),
+        ("gh-n8n-stars", "github:n8n-io/n8n.stars", "STARS", "chrome", "lightning", "chrome.static"),
+        ("gh-claude-code-stars", "github:anthropics/claude-code.stars", "STARS", "brutalist", "", "brutalist.static"),
+        ("gh-ollama-stars", "github:ollama/ollama.stars", "STARS", "chrome", "graphite", "chrome.static"),
+        ("pypi-hyperweave-version", "pypi:hyperweave.version", "VERSION", "brutalist", "", "brutalist.static"),
+        ("pypi-langchain-downloads", "pypi:langchain.downloads", "DOWNLOADS", "chrome", "moth", "chrome.static"),
+        (
+            "npm-langgraph-downloads",
+            "npm:@langchain/langgraph.downloads",
+            "NPM-WEEKLY",
+            "chrome",
+            "horizon",
+            "chrome.static",
+        ),
+        (
+            "docker-ollama-pulls",
+            "docker:ollama/ollama.pull_count",
+            "DOCKER-PULLS",
+            "chrome",
+            "abyssal",
+            "chrome.static",
+        ),
+        (
+            "hf-hermes-downloads",
+            "hf:NousResearch/Hermes-3-Llama-3.1-8B.downloads",
+            "HF-DL",
+            "automata",
+            "violet",
+            "automata.static",
+        ),
+    ]
+    for spec_id, token, title, genome, variant, http_gm in _real_data_badges:
+        value_str = _fmt_count(rd.get(token))
+        url_value = _urlquote(value_str, safe="")
+        variant_q = f"?variant={variant}" if variant else ""
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id=genome,
+                    variant=variant,
+                    title=title,
+                    value=value_str,
+                ),
+                http_path=f"/v1/badge/{title}/{url_value}/{http_gm}{variant_q}",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": value_str,
+                    "genome": genome,
+                    **({"variant": variant} if variant else {}),
+                },
+            )
+        )
+
+    # ── Real-data strips: long namespace + multi-metric ─────────────────
+    # AutoGPT exercises long-namespace identity text + 3-metric strip;
+    # verifies cell redistribution still fits inside the pinned canvas.
+    autogpt_value = (
+        f"STARS:{_fmt_count(rd.get('github:Significant-Gravitas/AutoGPT.stars'))},"
+        f"FORKS:{_fmt_count(rd.get('github:Significant-Gravitas/AutoGPT.forks'))},"
+        f"ISSUES:{_fmt_count(rd.get('github:Significant-Gravitas/AutoGPT.issues'))}"
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="gh-autogpt-strip-3metric",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="chrome",
+                title="AutoGPT",
+                value=autogpt_value,
+            ),
+            http_path=f"/v1/strip/AutoGPT/chrome.static?value={autogpt_value}",
+            mcp_args={
+                "type": "strip",
+                "title": "AutoGPT",
+                "value": autogpt_value,
+                "genome": "chrome",
+            },
+        )
+    )
+
+    # anthropics/claude-code: short namespace + 2-metric strip.
+    cc_value = (
+        f"STARS:{_fmt_count(rd.get('github:anthropics/claude-code.stars'))},"
+        f"FORKS:{_fmt_count(rd.get('github:anthropics/claude-code.forks'))}"
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="gh-claude-code-strip-2metric",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="brutalist",
+                title="claude-code",
+                value=cc_value,
+            ),
+            http_path=f"/v1/strip/claude-code/brutalist.static?value={cc_value}",
+            mcp_args={
+                "type": "strip",
+                "title": "claude-code",
+                "value": cc_value,
+                "genome": "brutalist",
+            },
+        )
+    )
+
+    # mattpocock/skills: small-repo baseline strip (automata.teal variant).
+    # v0.3.9 corpus refresh swapped eli64s/readme-ai → mattpocock/skills as
+    # the low-count GitHub reference; readme-ai remains queryable via the
+    # PyPI package token (pypi:readmeai) for the new stress specs.
+    skills_value = (
+        f"STARS:{_fmt_count(rd.get('github:mattpocock/skills.stars'))},"
+        f"FORKS:{_fmt_count(rd.get('github:mattpocock/skills.forks'))}"
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="gh-skills-strip-2metric",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="automata",
+                variant="teal",
+                title="skills",
+                value=skills_value,
+            ),
+            http_path=f"/v1/strip/skills/automata.static?value={skills_value}&variant=teal",
+            mcp_args={
+                "type": "strip",
+                "title": "skills",
+                "value": skills_value,
+                "genome": "automata",
+                "variant": "teal",
+            },
+        )
+    )
+
+    # ── Automata compact badges ─────────────────────
+    # Compact variant is 112x20 (vs default 148x32). Exercises the smaller
+    # cellular cell + label vocabulary against multiple tone primitives.
+    _automata_compact: list[tuple[str, str, str, str, str, str]] = [
+        # (spec_id, token, title, variant, fallback_value, glyph_or_empty)
+        # 6 specs — 2 with glyphs verify glyph rendering at
+        # the smaller 112x20 compact form. Glyphs render at paradigm.glyph_size_compact
+        # (= 8 for automata) rather than the default 12.
+        # Note: bone-steel was a paired tone in the locked mapping plan;
+        # the automata genome ships solo variants only, so the swap is to
+        # nearest-adjacent solo tone (steel).
+        ("automata-compact-pypi-vllm-violet", "pypi:vllm.version", "PYPI", "violet", "v0.5.4", ""),
+        ("automata-compact-npm-langgraph-teal", "npm:@langchain/langgraph.version", "NPM", "teal", "v0.2.x", ""),
+        ("automata-compact-docker-ollama-amber", "docker:ollama/ollama.pull_count", "PULLS", "amber", "1.2M", ""),
+        (
+            "automata-compact-hf-llama-steel",
+            "hf:meta-llama/Llama-4-Scout-17B-16E-Instruct.downloads",
+            "HF-DL",
+            "steel",
+            "240k",
+            "",
+        ),
+        # glyph variants — compact + glyph combination
+        ("automata-compact-python-version-jade", "pypi:vllm.version", "PYPI", "jade", "v0.5.4", "python"),
+        (
+            "automata-compact-docker-pulls-cobalt",
+            "docker:ollama/ollama.pull_count",
+            "PULLS",
+            "cobalt",
+            "1.2M",
+            "docker",
+        ),
+    ]
+    for spec_id, token, title, variant, fallback, glyph_slug in _automata_compact:
+        v = rd.get(token)
+        value_str = _fmt_count(v) if v is not None else fallback
+        url_value = _urlquote(value_str, safe="")
+        glyph_q = f"&glyph={glyph_slug}" if glyph_slug else ""
+        compose_kwargs_a: dict[str, Any] = {
+            "type": "badge",
+            "genome_id": "automata",
+            "variant": variant,
+            "title": title,
+            "value": value_str,
+            "size": "compact",
+        }
+        mcp_a: dict[str, Any] = {
+            "type": "badge",
+            "title": title,
+            "value": value_str,
+            "genome": "automata",
+            "variant": variant,
+            "size": "compact",
+        }
+        if glyph_slug:
+            compose_kwargs_a["glyph"] = glyph_slug
+            mcp_a["glyph"] = glyph_slug
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(**compose_kwargs_a),
+                http_path=f"/v1/badge/{title}/{url_value}/automata.static?variant={variant}&size=compact{glyph_q}",
+                mcp_args=mcp_a,
+            )
+        )
+
+    # ── arXiv data badges ───────────────────────────
+    # arXiv connector data not previously exercised in proofset. Paper IDs
+    # map to title strings via the arxiv provider; we render the paper ID
+    # itself as the value (the canonical citation key).
+    _arxiv_badges: list[tuple[str, str, str, str]] = [
+        # (spec_id, arxiv_id, genome, variant)
+        ("arxiv-mistral-brutalist-celadon", "2310.06825", "brutalist", "celadon"),
+        ("arxiv-deepseek-chrome-abyssal", "2501.12948", "chrome", "abyssal"),
+    ]
+    for spec_id, arxiv_id, genome, variant in _arxiv_badges:
+        variant_q = f"?variant={variant}" if variant else ""
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id=genome,
+                    variant=variant,
+                    title="ARXIV",
+                    value=arxiv_id,
+                ),
+                http_path=f"/v1/badge/ARXIV/{arxiv_id}/{genome}.static{variant_q}",
+                mcp_args={
+                    "type": "badge",
+                    "title": "ARXIV",
+                    "value": arxiv_id,
+                    "genome": genome,
+                    **({"variant": variant} if variant else {}),
+                },
+            )
+        )
+
+    # ── Real-data badge coverage (locked paradigm-tone mapping) ───
+    # 16 GitHub + 10 multi-provider specs exercising every brutalist variant
+    # (12), all chrome tones (5), 8 automata tones (solo + paired). Half of
+    # GitHub specs ship with glyph, half without. Light-substrate brutalist
+    # tones (archive/signal/pulse/depth) are over-indexed on non-GitHub
+    # providers since those variants are newer and less exercised.
+    _realdata_specs: list[tuple[str, str, str, str, str, str]] = [
+        # (spec_id, token, title, genome, variant, glyph_slug_or_empty)
+        # GitHub (16) — alternating glyph / no-glyph
+        (
+            "openclaw-brutalist-celadon-glyph",
+            "github:openclaw/openclaw.stars",
+            "STARS",
+            "brutalist",
+            "celadon",
+            "github",
+        ),
+        ("claude-code-chrome-abyssal", "github:anthropics/claude-code.forks", "FORKS", "chrome", "abyssal", ""),
+        ("vllm-automata-violet-glyph", "github:vllm-project/vllm.stars", "STARS", "automata", "violet", "github"),
+        ("hermes-brutalist-carbon", "github:NousResearch/hermes-agent.stars", "STARS", "brutalist", "carbon", ""),
+        (
+            "langflow-chrome-lightning-glyph",
+            "github:langflow-ai/langflow.stars",
+            "STARS",
+            "chrome",
+            "lightning",
+            "github",
+        ),
+        ("dify-automata-teal", "github:langgenius/dify.stars", "STARS", "automata", "teal", ""),
+        ("n8n-brutalist-alloy-glyph", "github:n8n-io/n8n.stars", "STARS", "brutalist", "alloy", "github"),
+        ("autogpt-chrome-graphite", "github:Significant-Gravitas/AutoGPT.forks", "FORKS", "chrome", "graphite", ""),
+        ("ollama-automata-bone-glyph", "github:ollama/ollama.stars", "STARS", "automata", "bone", "github"),
+        ("cline-brutalist-temper", "github:cline/cline.stars", "STARS", "brutalist", "temper", ""),
+        ("mem0-chrome-moth-glyph", "github:mem0ai/mem0.stars", "STARS", "chrome", "moth", "github"),
+        ("crewai-automata-steel", "github:crewAIInc/crewAI.stars", "STARS", "automata", "steel", ""),
+        (
+            "langchain-brutalist-pigment-glyph",
+            "github:langchain-ai/langchain.stars",
+            "STARS",
+            "brutalist",
+            "pigment",
+            "github",
+        ),
+        ("metagpt-chrome-horizon", "github:FoundationAgents/MetaGPT.forks", "FORKS", "chrome", "horizon", ""),
+        (
+            "caveman-automata-sulfur-glyph",
+            "github:JuliusBrussee/caveman.stars",
+            "STARS",
+            "automata",
+            "sulfur",
+            "github",
+        ),
+        ("skills-brutalist-ember", "github:mattpocock/skills.stars", "STARS", "brutalist", "ember", ""),
+        # Multi-provider (10) — light brutalist + chrome + automata pairs
+        ("pypi-vllm-brutalist-archive-glyph", "pypi:vllm.downloads", "DOWNLOADS", "brutalist", "archive", "python"),
+        ("pypi-langchain-chrome-abyssal", "pypi:langchain.downloads", "DOWNLOADS", "chrome", "abyssal", ""),
+        ("pypi-crewai-automata-amber-glyph", "pypi:crewai.downloads", "DOWNLOADS", "automata", "amber", "python"),
+        ("pypi-hyperweave-brutalist-signal", "pypi:hyperweave.version", "VERSION", "brutalist", "signal", ""),
+        (
+            "npm-anthropic-chrome-lightning-glyph",
+            "npm:@anthropic-ai/sdk.downloads",
+            "NPM",
+            "chrome",
+            "lightning",
+            "npm",
+        ),
+        ("npm-n8n-automata-indigo", "npm:n8n.downloads", "NPM", "automata", "indigo", ""),
+        (
+            "docker-ollama-brutalist-pulse-glyph",
+            "docker:ollama/ollama.pull_count",
+            "PULLS",
+            "brutalist",
+            "pulse",
+            "docker",
+        ),
+        ("docker-n8n-chrome-graphite", "docker:n8nio/n8n.pull_count", "PULLS", "chrome", "graphite", ""),
+        (
+            "hf-llama-automata-burgundy-glyph",
+            "hf:meta-llama/Llama-4-Scout-17B-16E-Instruct.downloads",
+            "HF-DL",
+            "automata",
+            "burgundy",
+            "huggingface",
+        ),
+        ("hf-qwen-brutalist-depth", "hf:Qwen/Qwen3-235B-A22B.downloads", "HF-DL", "brutalist", "depth", ""),
+    ]
+    for spec_id, token, title, genome, variant, glyph_slug in _realdata_specs:
+        value_str = _fmt_count(rd.get(token))
+        url_value = _urlquote(value_str, safe="")
+        variant_q = f"variant={variant}"
+        glyph_q = f"&glyph={glyph_slug}" if glyph_slug else ""
+        compose_kwargs: dict[str, Any] = {
+            "type": "badge",
+            "genome_id": genome,
+            "variant": variant,
+            "title": title,
+            "value": value_str,
+        }
+        mcp_a: dict[str, Any] = {
+            "type": "badge",
+            "title": title,
+            "value": value_str,
+            "genome": genome,
+            "variant": variant,
+        }
+        if glyph_slug:
+            compose_kwargs["glyph"] = glyph_slug
+            mcp_a["glyph"] = glyph_slug
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(**compose_kwargs),
+                http_path=f"/v1/badge/{title}/{url_value}/{genome}.static?{variant_q}{glyph_q}",
+                mcp_args=mcp_a,
+            )
+        )
+
+    # ── State badges with real CI/CD titles ─────────
+    # Titles from data/badge_modes.yaml allowlist trigger indicator rendering
+    # and state-aware CSS. Values are realistic for each domain.
+    _state_badges: list[tuple[str, str, str, str, str, str]] = [
+        # (spec_id, title, value, genome, variant, glyph_slug)
+        ("state-build-passing", "BUILD", "passing", "brutalist", "celadon", ""),
+        ("state-tests-failing", "TESTS", "failing", "chrome", "abyssal", ""),
+        ("state-coverage-87", "COVERAGE", "87%", "automata", "teal", ""),
+        ("state-lint-clean", "LINT", "clean", "brutalist", "pulse", ""),
+        ("state-deploy-pending", "DEPLOY", "pending", "chrome", "graphite", ""),
+        ("state-release-stable", "RELEASE", "stable", "automata", "amber", ""),
+    ]
+    for spec_id, title, value, genome, variant, glyph_slug in _state_badges:
+        url_value = _urlquote(value, safe="")
+        variant_q = f"?variant={variant}" if variant else ""
+        compose_kwargs_d: dict[str, Any] = {
+            "type": "badge",
+            "genome_id": genome,
+            "variant": variant,
+            "title": title,
+            "value": value,
+        }
+        mcp_d: dict[str, Any] = {
+            "type": "badge",
+            "title": title,
+            "value": value,
+            "genome": genome,
+            "variant": variant,
+        }
+        if glyph_slug:
+            compose_kwargs_d["glyph"] = glyph_slug
+            mcp_d["glyph"] = glyph_slug
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(**compose_kwargs_d),
+                http_path=f"/v1/badge/{title}/{url_value}/{genome}.static{variant_q}",
+                mcp_args=mcp_d,
+            )
+        )
+
+    # ── Z.AI GLM-5 cross-provider showcase ──────────────
+    # Same project (Z.AI's GLM-5 family) spans GitHub, HuggingFace, and
+    # arXiv. Three badges + one combined strip + one arxiv badge exercise
+    # the cross-provider story end-to-end. Different genomes used per
+    # badge to also stress paradigm consistency across providers.
+    _zai_specs: list[tuple[str, str, str, str, str, str, str]] = [
+        # (spec_id, token, title, genome, variant, glyph, http_paradigm)
+        (
+            "zai-gh-stars-brutalist",
+            "github:zai-org/GLM-5.stars",
+            "STARS",
+            "brutalist",
+            "celadon",
+            "github",
+            "brutalist.static",
+        ),
+        (
+            "zai-hf-downloads-chrome",
+            "hf:zai-org/GLM-5.1.downloads",
+            "HF-DL",
+            "chrome",
+            "abyssal",
+            "huggingface",
+            "chrome.static",
+        ),
+        ("zai-arxiv-paper-automata", "arxiv:2602.15763", "ARXIV", "automata", "violet", "", "automata.static"),
+    ]
+    for spec_id, token, title, genome, variant, glyph_slug, http_gm in _zai_specs:
+        value_str = token[len("arxiv:") :] if token.startswith("arxiv:") else _fmt_count(rd.get(token))
+        url_value = _urlquote(value_str, safe="")
+        glyph_q = f"&glyph={glyph_slug}" if glyph_slug else ""
+        ck_z: dict[str, Any] = {
+            "type": "badge",
+            "genome_id": genome,
+            "variant": variant,
+            "title": title,
+            "value": value_str,
+        }
+        mcp_z: dict[str, Any] = {
+            "type": "badge",
+            "title": title,
+            "value": value_str,
+            "genome": genome,
+            "variant": variant,
+        }
+        if glyph_slug:
+            ck_z["glyph"] = glyph_slug
+            mcp_z["glyph"] = glyph_slug
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(**ck_z),
+                http_path=f"/v1/badge/{title}/{url_value}/{http_gm}?variant={variant}{glyph_q}",
+                mcp_args=mcp_z,
+            )
+        )
+
+    # Z.AI multi-provider strip: combines GitHub stars + HuggingFace
+    # downloads + arXiv paper ID into one identity, exercising the same
+    # ecosystem-strip path as vllm. Chrome paradigm + identity glyph
+    # consistent with cross-provider story.
+    _zai_strip_value = (
+        f"GH:{_fmt_count(rd.get('github:zai-org/GLM-5.stars'))},"
+        f"HF:{_fmt_count(rd.get('hf:zai-org/GLM-5.1.downloads'))},"
+        f"ARXIV:2602.15763"
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="zai-glm5-ecosystem-strip",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="chrome",
+                variant="abyssal",
+                title="GLM-5",
+                value=_zai_strip_value,
+                connector_data={"repo_slug": "zai-org/GLM-5"},
+            ),
+            http_path=(
+                f"/v1/strip/GLM-5/chrome.static?value={_zai_strip_value}"
+                f"&variant=abyssal&subtitle={_urlquote('zai-org/GLM-5', safe='')}"
+            ),
+            mcp_args={
+                "type": "strip",
+                "title": "GLM-5",
+                "value": _zai_strip_value,
+                "genome": "chrome",
+                "variant": "abyssal",
+                "connector_data": {"repo_slug": "zai-org/GLM-5"},
+            },
+        )
+    )
+
+    # ── Spatial Matrix specs ────────────────────────────
+    # 12 specs covering the 4 most common zone configurations across 3
+    # paradigms (celadon, horizon, teal). Same label + value content so
+    # the only variable is which zones are present. Directly exercises
+    # the layout engine's zone-collapse behavior under known inputs.
+    _spatial_matrix: list[tuple[str, str, str, str, str, str, str]] = [
+        # (spec_id, paradigm, variant, title, value, glyph_or_empty, motion_label)
+        # Config 1: label + value (no glyph, no state-bearing title)
+        ("matrix-label-value-brutalist", "brutalist", "celadon", "STARS", "184.4k", "", "label+value only"),
+        ("matrix-label-value-chrome", "chrome", "horizon", "STARS", "184.4k", "", "label+value only"),
+        ("matrix-label-value-automata", "automata", "teal", "STARS", "184.4k", "", "label+value only"),
+        # Config 2: glyph + label + value (no state-bearing title)
+        ("matrix-glyph-label-value-brutalist", "brutalist", "celadon", "STARS", "184.4k", "github", "+ glyph"),
+        ("matrix-glyph-label-value-chrome", "chrome", "horizon", "STARS", "184.4k", "github", "+ glyph"),
+        ("matrix-glyph-label-value-automata", "automata", "teal", "STARS", "184.4k", "github", "+ glyph"),
+        # Config 3: label + value + state (BUILD title triggers state indicator)
+        ("matrix-state-brutalist", "brutalist", "celadon", "BUILD", "passing", "", "+ state"),
+        ("matrix-state-chrome", "chrome", "horizon", "BUILD", "passing", "", "+ state"),
+        ("matrix-state-automata", "automata", "teal", "BUILD", "passing", "", "+ state"),
+        # Config 4: glyph + label + value + state (all zones)
+        ("matrix-glyph-state-brutalist", "brutalist", "celadon", "BUILD", "passing", "github", "all zones"),
+        ("matrix-glyph-state-chrome", "chrome", "horizon", "BUILD", "passing", "github", "all zones"),
+        ("matrix-glyph-state-automata", "automata", "teal", "BUILD", "passing", "github", "all zones"),
+    ]
+    for spec_id, paradigm, variant, title, value, glyph_slug, _motion_label in _spatial_matrix:
+        url_value = _urlquote(value, safe="")
+        glyph_q = f"&glyph={glyph_slug}" if glyph_slug else ""
+        compose_kwargs_m: dict[str, Any] = {
+            "type": "badge",
+            "genome_id": paradigm,
+            "variant": variant,
+            "title": title,
+            "value": value,
+        }
+        mcp_m: dict[str, Any] = {
+            "type": "badge",
+            "title": title,
+            "value": value,
+            "genome": paradigm,
+            "variant": variant,
+        }
+        if glyph_slug:
+            compose_kwargs_m["glyph"] = glyph_slug
+            mcp_m["glyph"] = glyph_slug
+        specs.append(
+            ParitySpec(
+                spec_id=spec_id,
+                compose_spec=ComposeSpec(**compose_kwargs_m),
+                http_path=f"/v1/badge/{title}/{url_value}/{paradigm}.static?variant={variant}{glyph_q}",
+                mcp_args=mcp_m,
+            )
+        )
+
+    # ── Literal connectors (text:, kv: semantics) ───────────────────────
+    specs.append(
+        ParitySpec(
+            spec_id="text-literal-beta",
+            compose_spec=ComposeSpec(
+                type="badge",
+                genome_id="brutalist",
+                title="STATUS",
+                value="BETA",
+            ),
+            http_path="/v1/badge/STATUS/BETA/brutalist.static",
+            mcp_args={
+                "type": "badge",
+                "title": "STATUS",
+                "value": "BETA",
+                "genome": "brutalist",
+            },
+        )
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="kv-status-active",
+            compose_spec=ComposeSpec(
+                type="badge",
+                genome_id="chrome",
+                variant="horizon",
+                title="STATUS",
+                value="ACTIVE",
+            ),
+            http_path="/v1/badge/STATUS/ACTIVE/chrome.static?variant=horizon",
+            mcp_args={
+                "type": "badge",
+                "title": "STATUS",
+                "value": "ACTIVE",
+                "genome": "chrome",
+                "variant": "horizon",
+            },
+        )
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="kv-env-production",
+            compose_spec=ComposeSpec(
+                type="badge",
+                genome_id="brutalist",
+                title="ENV",
+                value="PRODUCTION",
+            ),
+            http_path="/v1/badge/ENV/PRODUCTION/brutalist.static",
+            mcp_args={
+                "type": "badge",
+                "title": "ENV",
+                "value": "PRODUCTION",
+                "genome": "brutalist",
+            },
+        )
+    )
+
+    # ── Edge-case stress matrix (v0.3.9 round 2) ────────────────────────
+    # 27 specs pushing layout limits: multi-source strips, value-length
+    # extremes, label-length extremes, mixed-magnitude, all-states per
+    # genome, numeric-format boundaries, special-char titles. The
+    # additive strip layout (Phase 1 round 2) should handle every shape
+    # below without overflow, blank space, or stretched cells.
+
+    # --- vllm ecosystem strip (4 cells across vllm's footprint on 4 connectors) ---
+    # v0.3.9 Bug 2 fix: was "ECOSYSTEM" (abstract; reviewer couldn't identify
+    # the project). Renamed to "vllm" — every metric is from vllm-project
+    # across github / pypi / docker / hf so the strip reads as "vllm's
+    # cross-ecosystem footprint" instead of an opaque label.
+    vllm_stars = _fmt_count(rd.get("github:vllm-project/vllm.stars"))
+    vllm_dl = _fmt_count(rd.get("pypi:vllm.downloads"))
+    vllm_pulls = _fmt_count(rd.get("docker:vllm/vllm-openai.pull_count"))
+    llama4_dl = _fmt_count(rd.get("hf:meta-llama/Llama-4-Scout-17B-16E-Instruct.downloads"))
+    vllm_value = f"STARS:{vllm_stars},PYPI:{vllm_dl},DOCKER:{vllm_pulls},HF:{llama4_dl}"
+    specs.append(
+        ParitySpec(
+            spec_id="vllm-ecosystem-strip",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="chrome",
+                variant="horizon",
+                title="vllm",
+                value=vllm_value,
+            ),
+            http_path=f"/v1/strip/vllm/chrome.static?value={vllm_value}&variant=horizon",
+            mcp_args={
+                "type": "strip",
+                "title": "vllm",
+                "value": vllm_value,
+                "genome": "chrome",
+                "variant": "horizon",
+            },
+        )
+    )
+
+    # --- Extreme value lengths (badges) ---
+    for sid, value in [
+        ("value-extreme-single-char", "0"),
+        ("value-extreme-long-version", "v0.3.9-beta.2+gita1b2c3d4"),
+        ("value-extreme-compact-magnitude", "1.2M"),
+        ("value-extreme-fallback-mark", "?"),
+    ]:
+        from urllib.parse import quote as _q
+
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="brutalist",
+                    title="VERSION",
+                    value=value,
+                ),
+                http_path=f"/v1/badge/VERSION/{_q(value, safe='')}/brutalist.static",
+                mcp_args={
+                    "type": "badge",
+                    "title": "VERSION",
+                    "value": value,
+                    "genome": "brutalist",
+                },
+            )
+        )
+
+    # --- Extreme label lengths (badges) ---
+    for sid, title, value in [
+        ("label-extreme-single-char", "X", "1"),
+        ("label-extreme-long-status", "BUILD-PASSING-WITH-WARNINGS", "OK"),
+        ("label-extreme-single-letter-v", "v", "1"),
+    ]:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="chrome",
+                    variant="horizon",
+                    title=title,
+                    value=value,
+                ),
+                http_path=f"/v1/badge/{title}/{value}/chrome.static?variant=horizon",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": value,
+                    "genome": "chrome",
+                    "variant": "horizon",
+                },
+            )
+        )
+
+    # --- Long-namespace strips (4 metrics on long name, 1 metric on short) ---
+    autogpt_stars2 = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.stars"))
+    autogpt_forks2 = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.forks"))
+    autogpt_issues2 = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.issues"))
+    autogpt_4m = f"STARS:{autogpt_stars2},FORKS:{autogpt_forks2},ISSUES:{autogpt_issues2},PRS:42"
+    # FastAPI route /v1/strip/{title}/... treats slash as path separator.
+    # The route exposes a ``?t=`` query param to carry slashed titles
+    # (with the path segment as a placeholder). Use it here.
+    specs.append(
+        ParitySpec(
+            spec_id="long-namespace-strip-4metric",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="brutalist",
+                title="Significant-Gravitas/AutoGPT",
+                value=autogpt_4m,
+            ),
+            http_path=(f"/v1/strip/_/brutalist.static?t=Significant-Gravitas%2FAutoGPT&value={autogpt_4m}"),
+            mcp_args={
+                "type": "strip",
+                "title": "Significant-Gravitas/AutoGPT",
+                "value": autogpt_4m,
+                "genome": "brutalist",
+            },
+        )
+    )
+    cc_stars2 = _fmt_count(rd.get("github:anthropics/claude-code.stars"))
+    specs.append(
+        ParitySpec(
+            spec_id="short-name-strip-1metric",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="chrome",
+                variant="abyssal",
+                title="claude-code",
+                value=f"STARS:{cc_stars2}",
+            ),
+            http_path=f"/v1/strip/claude-code/chrome.static?value=STARS:{cc_stars2}&variant=abyssal",
+            mcp_args={
+                "type": "strip",
+                "title": "claude-code",
+                "value": f"STARS:{cc_stars2}",
+                "genome": "chrome",
+                "variant": "abyssal",
+            },
+        )
+    )
+
+    # --- Mixed-magnitude strip (each cell wildly different magnitude) ---
+    # SYNTHETIC demo fixture — exercises strip cell layout under extreme
+    # value-magnitude variance (6-digit, 2-digit, 1-digit, single-zero).
+    # Title and values are obviously synthetic so this never gets misread
+    # as a real project's stats. Real-data strips live in the per-provider
+    # "Real-data badges" sections.
+    mixed_mag = "STARS:999k,FORKS:99,ISSUES:9,PRS:0"
+    _mixed_conn = {"repo_slug": "demo/synthetic-magnitude"}
+    specs.append(
+        ParitySpec(
+            spec_id="mixed-magnitude-strip",
+            compose_spec=ComposeSpec(
+                type="strip",
+                genome_id="automata",
+                variant="violet",
+                title="demo-repo",
+                value=mixed_mag,
+                connector_data=_mixed_conn,
+            ),
+            http_path=f"/v1/strip/demo-repo/automata.static?value={mixed_mag}&variant=violet&subtitle=demo%2Fsynthetic-magnitude",
+            mcp_args={
+                "type": "strip",
+                "title": "demo-repo",
+                "value": mixed_mag,
+                "genome": "automata",
+                "variant": "violet",
+                "connector_data": _mixed_conn,
+            },
+        )
+    )
+
+    # --- All-state badges per genome (15 specs = 5 states x 3 genomes) ---
+    _state_genomes: list[tuple[str, str, str]] = [
+        # (genome, variant, http_genome_motion)
+        ("brutalist", "", "brutalist.static"),
+        ("chrome", "horizon", "chrome.static"),
+        ("automata", "teal", "automata.static"),
+    ]
+    _states = ["passing", "warning", "critical", "building", "offline"]
+    for genome, variant, http_gm in _state_genomes:
+        for state in _states:
+            variant_q = f"&variant={variant}" if variant else ""
+            specs.append(
+                ParitySpec(
+                    spec_id=f"state-{genome}-{state}",
+                    compose_spec=ComposeSpec(
+                        type="badge",
+                        genome_id=genome,
+                        variant=variant,
+                        title="BUILD",
+                        value=state,
+                        state=state,
+                    ),
+                    http_path=f"/v1/badge/BUILD/{state}/{http_gm}?state={state}{variant_q}",
+                    mcp_args={
+                        "type": "badge",
+                        "title": "BUILD",
+                        "value": state,
+                        "state": state,
+                        "genome": genome,
+                        **({"variant": variant} if variant else {}),
+                    },
+                )
+            )
+
+    # --- Numeric format edges (boundary cases for k/M formatting) ---
+    for sid, value in [
+        ("numeric-zero", "0"),
+        ("numeric-three-digit", "999"),
+        ("numeric-k-boundary", "1.0k"),
+        ("numeric-k-max", "999.9k"),
+        ("numeric-m-boundary", "1.0M"),
+    ]:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="brutalist",
+                    title="STARS",
+                    value=value,
+                ),
+                http_path=f"/v1/badge/STARS/{value}/brutalist.static",
+                mcp_args={
+                    "type": "badge",
+                    "title": "STARS",
+                    "value": value,
+                    "genome": "brutalist",
+                },
+            )
+        )
+
+    # --- Special character titles (UTF-8 in title path segment) ---
+    from urllib.parse import quote as _q2
+
+    for sid, title in [
+        ("special-char-middot", "STATUS · LIVE"),
+        ("special-char-arrow", "BUILD → PASS"),
+    ]:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="chrome",
+                    variant="moth",
+                    title=title,
+                    value="OK",
+                ),
+                http_path=f"/v1/badge/{_q2(title, safe='')}/OK/chrome.static?variant=moth",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": "OK",
+                    "genome": "chrome",
+                    "variant": "moth",
+                },
+            )
+        )
+
+    # ── stress matrix ──────────────────────────────────────
+    # 17 new specs covering identity-glyph strips, stats cards, star charts,
+    # and marquees across all three genomes with magnitude + length
+    # variations. Each routes through the full pipeline (direct / http / mcp)
+    # with live tokens where possible.
+
+    # --- D1: Strip identity glyph variety (5 specs) ---
+    # Different paradigms x different glyphs to verify glyph rendering inside
+    # the identity zone (previously only tested without glyphs).
+    autogpt_stars = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.stars"))
+    autogpt_forks = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.forks"))
+    autogpt_issues = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.issues"))
+    vllm_stars3 = _fmt_count(rd.get("github:vllm-project/vllm.stars"))
+    vllm_pypi_dl = _fmt_count(rd.get("pypi:vllm.downloads"))
+    ollama_pulls = _fmt_count(rd.get("docker:ollama/ollama.pull_count"))
+    ollama_stars3 = _fmt_count(rd.get("github:ollama/ollama.stars"))
+    n8n_version = _fmt_count(rd.get("npm:n8n.version"))
+    n8n_npm_dl = _fmt_count(rd.get("npm:n8n.downloads"))
+    cc_stars3 = _fmt_count(rd.get("github:anthropics/claude-code.stars"))
+    cc_forks3 = _fmt_count(rd.get("github:anthropics/claude-code.forks"))
+
+    _strip_glyph_specs = [
+        (
+            "strip-glyph-github-brutalist",
+            "github",
+            "brutalist",
+            "",
+            "brutalist.static",
+            "AutoGPT",
+            f"STARS:{autogpt_stars},FORKS:{autogpt_forks},ISSUES:{autogpt_issues}",
+        ),
+        (
+            "strip-glyph-python-chrome",
+            "python",
+            "chrome",
+            "horizon",
+            "chrome.static",
+            "vllm",
+            f"STARS:{vllm_stars3},PYPI:{vllm_pypi_dl}",
+        ),
+        (
+            "strip-glyph-docker-automata",
+            "docker",
+            "automata",
+            "teal",
+            "automata.static",
+            "ollama",
+            f"STARS:{ollama_stars3},PULLS:{ollama_pulls}",
+        ),
+        (
+            "strip-glyph-npm-brutalist",
+            "npm",
+            "brutalist",
+            "",
+            "brutalist.static",
+            "n8n",
+            f"VERSION:{n8n_version},NPM-DL:{n8n_npm_dl}",
+        ),
+        (
+            "strip-glyph-openai-chrome",
+            "openai",
+            "chrome",
+            "moth",
+            "chrome.static",
+            "claude-code",
+            f"STARS:{cc_stars3},FORKS:{cc_forks3}",
+        ),
+    ]
+    for sid, glyph_slug, genome, variant, http_gm, title, value in _strip_glyph_specs:
+        variant_q = f"&variant={variant}" if variant else ""
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="strip",
+                    genome_id=genome,
+                    title=title,
+                    value=value,
+                    glyph=glyph_slug,
+                    **({"variant": variant} if variant else {}),
+                ),
+                http_path=f"/v1/strip/{title}/{http_gm}?value={value}&glyph={glyph_slug}{variant_q}",
+                mcp_args={
+                    "type": "strip",
+                    "title": title,
+                    "value": value,
+                    "genome": genome,
+                    "glyph": glyph_slug,
+                    **({"variant": variant} if variant else {}),
+                },
+            )
+        )
+
+    # --- D4: Marquee stress (3 specs) ---
+    # Text-only pipe-separated, data-flavored (titles only), and mixed.
+    # Marquees consume the title field as the scrolling text content.
+    _marquee_specs = [
+        (
+            "marquee-text-only-pipe",
+            "brutalist",
+            "",
+            "brutalist.static",
+            "DEPLOYMENTS | INCIDENTS | UPTIME | LATENCY | THROUGHPUT",
+        ),
+        (
+            "marquee-data-flavored",
+            "chrome",
+            "horizon",
+            "chrome.static",
+            f"STARS:{autogpt_stars} · PYPI:{vllm_pypi_dl} · DOCKER:{ollama_pulls}",
+        ),
+        (
+            "marquee-mixed-content",
+            "automata",
+            "teal",
+            "automata.static",
+            f"vllm · {vllm_stars3} ★ · langchain · ollama · {ollama_pulls}",
+        ),
+    ]
+    for sid, genome, variant, http_gm, title in _marquee_specs:
+        variant_q = f"?variant={variant}" if variant else ""
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="marquee-horizontal",
+                    genome_id=genome,
+                    title=title,
+                    **({"variant": variant} if variant else {}),
+                ),
+                http_path=f"/v1/marquee/{_q2(title, safe='')}/{http_gm}{variant_q}",
+                mcp_args={
+                    "type": "marquee-horizontal",
+                    "title": title,
+                    "genome": genome,
+                    **({"variant": variant} if variant else {}),
+                },
+            )
+        )
+
+    # Stats card + star chart stress are generated as STATIC artifacts via
+    # _generate_data_cards (each genome x variant), not through the parity
+    # matrix. The HTTP endpoint fetches GitHub user data live, the direct
+    # path renders with placeholders — the two paths diverge by design.
+    # Parity matrix would report a false-positive failure even though both
+    # paths render correct artifacts in their own right.
+
+    # --- W2 Badge variant matrix (19 specs) ---
+    # Per-genome x per-variant badge coverage with real provider data and
+    # mixed CI/CD + telemetry titles. Earlier the edge cases section had
+    # exactly ONE badge per genome at the default variant — leaves the
+    # variant axis (substrate/tone) entirely untested. These specs cover
+    # the remaining variants so visual review can spot any per-variant
+    # chromatic regressions.
+
+    # Automata solo tones (6 specs) — each pulls a different provider value
+    # so the variant matrix doubles as a connector verification sweep.
+    pypi_vllm_v = _fmt_count(rd.get("pypi:vllm.version"))
+    npm_lg_dl = _fmt_count(rd.get("npm:@langchain/langgraph.downloads"))
+    docker_ollama_pulls = _fmt_count(rd.get("docker:ollama/ollama.pull_count"))
+    hf_qwen_dl = _fmt_count(rd.get("hf:Qwen/Qwen3-235B-A22B.downloads"))
+    hermes_likes = _fmt_count(rd.get("hf:NousResearch/Hermes-3-Llama-3.1-8B.likes"))
+    crewai_dl = _fmt_count(rd.get("pypi:crewai.downloads"))
+
+    _automata_badges = [
+        ("automata-violet-badge-pypi", "violet", "PYPI", pypi_vllm_v),
+        ("automata-bone-badge-npm", "bone", "NPM-DL", npm_lg_dl),
+        ("automata-steel-badge-docker", "steel", "PULLS", docker_ollama_pulls),
+        ("automata-solar-badge-hf", "solar", "HF-DL", hf_qwen_dl),
+        ("automata-amber-badge-likes", "amber", "LIKES", hermes_likes),
+        ("automata-jade-badge-crewai", "jade", "DOWNLOADS", crewai_dl),
+    ]
+    for sid, variant, title, value in _automata_badges:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="automata",
+                    variant=variant,
+                    title=title,
+                    value=value,
+                ),
+                http_path=f"/v1/badge/{title}/{_urlquote(value, safe='')}/automata.static?variant={variant}",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": value,
+                    "genome": "automata",
+                    "variant": variant,
+                },
+            )
+        )
+
+    # Brutalist substrate variety (5 specs) — 3 dark monochromes + 2 light scholars.
+    autogpt_stars2 = _fmt_count(rd.get("github:Significant-Gravitas/AutoGPT.stars"))
+    n8n_v = _fmt_count(rd.get("npm:n8n.version"))
+    langflow_issues = _fmt_count(rd.get("github:langflow-ai/langflow.issues"))
+    _brutalist_badges = [
+        ("brutalist-carbon-badge-stars", "carbon", "STARS", autogpt_stars2),
+        ("brutalist-alloy-badge-version", "alloy", "VERSION", n8n_v),
+        ("brutalist-ember-badge-issues", "ember", "ISSUES", langflow_issues),
+        ("brutalist-pulse-badge-build", "pulse", "BUILD", "passing"),
+        ("brutalist-archive-badge-coverage", "archive", "COVERAGE", "94%"),
+    ]
+    for sid, variant, title, value in _brutalist_badges:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="brutalist",
+                    variant=variant,
+                    title=title,
+                    value=value,
+                ),
+                http_path=f"/v1/badge/{title}/{_urlquote(value, safe='')}/brutalist.static?variant={variant}",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": value,
+                    "genome": "brutalist",
+                    "variant": variant,
+                },
+            )
+        )
+
+    # Chrome variant variety (4 specs).
+    cc_forks_chrome = _fmt_count(rd.get("github:anthropics/claude-code.forks"))
+    dify_issues = _fmt_count(rd.get("github:langgenius/dify.issues"))
+    _chrome_badges = [
+        ("chrome-abyssal-badge-stars", "abyssal", "STARS", cc_forks_chrome),
+        ("chrome-lightning-badge-tests", "lightning", "TESTS", "passing"),
+        ("chrome-moth-badge-license", "moth", "LICENSE", "Apache-2.0"),
+        ("chrome-graphite-badge-issues", "graphite", "ISSUES", dify_issues),
+    ]
+    for sid, variant, title, value in _chrome_badges:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id="chrome",
+                    variant=variant,
+                    title=title,
+                    value=value,
+                ),
+                http_path=f"/v1/badge/{title}/{_urlquote(value, safe='')}/chrome.static?variant={variant}",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": value,
+                    "genome": "chrome",
+                    "variant": variant,
+                },
+            )
+        )
+
+    # Stateful CI/CD across genomes (4 specs) — exercise the state indicator
+    # glyph + threshold-CSS tinting on titles in the badge-modes allowlist.
+    _stateful_badges = [
+        ("stateful-build-passing-brutalist-temper", "brutalist", "temper", "BUILD", "passing"),
+        ("stateful-deploy-active-chrome-horizon", "chrome", "horizon", "DEPLOY", "active"),
+        ("stateful-tests-warning-automata-cobalt", "automata", "cobalt", "TESTS", "warning"),
+        ("stateful-security-critical-brutalist-signal", "brutalist", "signal", "SECURITY", "critical"),
+        ("stateful-ci-failing-chrome-abyssal", "chrome", "abyssal", "CI", "failing"),
+        ("stateful-deploy-rollback-automata-magenta", "automata", "magenta", "DEPLOY", "rollback"),
+        ("stateful-coverage-passing-brutalist-pulse", "brutalist", "pulse", "COVERAGE", "98%"),
+        ("stateful-uptime-active-chrome-moth", "chrome", "moth", "UPTIME", "99.99"),
+    ]
+    for sid, genome, variant, title, value in _stateful_badges:
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(
+                    type="badge",
+                    genome_id=genome,
+                    variant=variant,
+                    title=title,
+                    value=value,
+                ),
+                http_path=f"/v1/badge/{title}/{_urlquote(value, safe='')}/{genome}.static?variant={variant}",
+                mcp_args={
+                    "type": "badge",
+                    "title": title,
+                    "value": value,
+                    "genome": genome,
+                    "variant": variant,
+                },
+            )
+        )
+
+    # --- Glyph + no-glyph paired badges (8 specs = 4 pairs) ---
+    # Each pair has identical title/value/genome — one with glyph, one without.
+    # Directly tests compute_badge_zones zone-collapse: with-glyph has the
+    # glyph slot rendered, no-glyph collapses to pad-glued label_first_x.
+    _glyph_pairs = [
+        ("github", "brutalist", "celadon", "STARS", "184.4k"),
+        ("python", "chrome", "horizon", "PYPI", "v1.3.2"),
+        ("docker", "automata", "teal", "PULLS", "135.9M"),
+        ("npm", "brutalist", "carbon", "VERSION", "2.21.5"),
+    ]
+    for glyph_slug, genome, variant, title, value in _glyph_pairs:
+        for has_glyph, suffix in [(True, "with-glyph"), (False, "no-glyph")]:
+            kwargs: dict[str, Any] = {
+                "type": "badge",
+                "genome_id": genome,
+                "variant": variant,
+                "title": title,
+                "value": value,
+            }
+            mcp = {"type": "badge", "title": title, "value": value, "genome": genome, "variant": variant}
+            glyph_q = ""
+            if has_glyph:
+                kwargs["glyph"] = glyph_slug
+                mcp["glyph"] = glyph_slug
+                glyph_q = f"&glyph={glyph_slug}"
+            specs.append(
+                ParitySpec(
+                    spec_id=f"paired-glyph-{glyph_slug}-{genome}-{suffix}",
+                    compose_spec=ComposeSpec(**kwargs),
+                    http_path=(
+                        f"/v1/badge/{title}/{_urlquote(value, safe='')}/{genome}.static?variant={variant}{glyph_q}"
+                    ),
+                    mcp_args=mcp,
+                )
+            )
+
+    # --- Strip variety: identity + multi-provider + state-bearing (5 specs) ---
+    # Glyph-only identity (no text), label-only short, mixed-magnitude, single
+    # strip pulling from gh+pypi+docker+hf, state-bearing 3-metric.
+    vllm_v = _fmt_count(rd.get("pypi:vllm.version"))
+    vllm_stars_v = _fmt_count(rd.get("github:vllm-project/vllm.stars"))
+    ollama_pulls_v = _fmt_count(rd.get("docker:ollama/ollama.pull_count"))
+    llama_dl_v = _fmt_count(rd.get("hf:meta-llama/Llama-4-Scout-17B-16E-Instruct.downloads"))
+    _strip_variety = [
+        (
+            "strip-mixed-magnitude-brutalist",
+            "brutalist",
+            "celadon",
+            "n8n",
+            f"STARS:189k,FORKS:0,VERSION:{vllm_v}",
+            "github",
+            "n8n-io/n8n",
+        ),
+        (
+            "strip-multi-provider-chrome",
+            "chrome",
+            "horizon",
+            "vllm",
+            f"GH:{vllm_stars_v},PYPI:{vllm_v},DOCKER:{ollama_pulls_v},HF:{llama_dl_v}",
+            "python",
+            "vllm-project/vllm",
+        ),
+        (
+            "strip-state-bearing-build-brutalist",
+            "brutalist",
+            "celadon",
+            "hyperweave",
+            "BUILD:passing,TESTS:passing,COVERAGE:94%",
+            "",
+            "InnerAura/hyperweave",
+        ),
+        (
+            "strip-5-metric-chrome",
+            "chrome",
+            "abyssal",
+            "vllm",
+            f"STARS:{vllm_stars_v},FORKS:9k,ISSUES:1.2k,PRS:340,VERSION:{vllm_v}",
+            "",
+            "vllm-project/vllm",
+        ),
+        (
+            "strip-1-metric-with-glyph-automata",
+            "automata",
+            "violet",
+            "claude-code",
+            "STARS:125.3k",
+            "openai",
+            "anthropics/claude-code",  # subtitle: distinct from title="claude-code"
+        ),
+        # additions
+        (
+            "strip-state-bearing-chrome",
+            "chrome",
+            "lightning",
+            "ollama",
+            "BUILD:passing,STARS:189k,FORKS:9k",
+            "github",
+            "ollama/ollama",
+        ),
+        (
+            "strip-2-metric-automata-teal",
+            "automata",
+            "teal",
+            "langflow",
+            "STARS:38.4k,FORKS:4.7k",
+            "github",
+            "langflow-ai/langflow",
+        ),
+        (
+            "strip-multi-provider-brutalist",
+            "brutalist",
+            "alloy",
+            "n8n",
+            f"GH:189k,DOCKER:{ollama_pulls_v},NPM:5.6m",
+            "n8n",
+            "n8n-io/n8n",
+        ),
+        # state-bearing strips across paradigms.
+        # Titles from data/badge_modes.yaml allowlist trigger indicator
+        # rendering and (when state values use sentinel keywords) state-aware
+        # CSS threshold tinting.
+        (
+            "strip-state-deploy-active-chrome",
+            "chrome",
+            "graphite",
+            "claude-code",
+            "DEPLOY:active,VERSION:0.3.0,RELEASE:stable",
+            "github",
+            "anthropics/claude-code",
+        ),
+        (
+            "strip-state-tests-failing-automata",
+            "automata",
+            "amber",
+            "langflow",
+            "TESTS:failing,COVERAGE:73%,BUILD:warning",
+            "github",
+            "langflow-ai/langflow",
+        ),
+        (
+            "strip-state-coverage-brutalist-light",
+            "brutalist",
+            "archive",
+            "vllm",
+            "COVERAGE:87%,LINT:clean,DEPLOY:pending",
+            "github",
+            "vllm-project/vllm",
+        ),
+    ]
+    for sid, genome, variant, title, value, glyph_slug, subtitle in _strip_variety:
+        kwargs2: dict[str, Any] = {
+            "type": "strip",
+            "genome_id": genome,
+            "variant": variant,
+            "title": title,
+            "value": value,
+        }
+        mcp2: dict[str, Any] = {
+            "type": "strip",
+            "title": title,
+            "value": value,
+            "genome": genome,
+            "variant": variant,
+        }
+        subtitle_q = ""
+        if subtitle:
+            # Three-path parity: direct uses connector_data, HTTP uses
+            # ?subtitle= query param (serve/app.py line 386), MCP uses
+            # connector_data kwarg.
+            kwargs2["connector_data"] = {"repo_slug": subtitle}
+            mcp2["connector_data"] = {"repo_slug": subtitle}
+            subtitle_q = f"&subtitle={_urlquote(subtitle, safe='')}"
+        glyph_q2 = ""
+        if glyph_slug:
+            kwargs2["glyph"] = glyph_slug
+            mcp2["glyph"] = glyph_slug
+            glyph_q2 = f"&glyph={glyph_slug}"
+        specs.append(
+            ParitySpec(
+                spec_id=sid,
+                compose_spec=ComposeSpec(**kwargs2),
+                http_path=f"/v1/strip/{title}/{genome}.static?value={value}&variant={variant}{glyph_q2}{subtitle_q}",
+                mcp_args=mcp2,
+            )
+        )
+
+    return specs
+
+
+# render-only specs that bypass three-path parity. Stats
+# cards and star charts fetch live data on the HTTP endpoint but render
+# with placeholders via the direct path — parity is impossible without
+# harness-level pre-fetched connector_data plumbing. These specs generate
+# ONLY via direct render with pre-fetched data so the visual review
+# surface includes them without false-positive parity failures.
+#
+# Each tuple: (spec_id, frame_type, username_or_owner, repo_or_none,
+# genome, variant, label_for_readme).
+_RENDER_ONLY_SPECS: list[tuple[str, str, str, str, str, str, str]] = [
+    # stat cards exercise REAL individual GitHub accounts
+    # exclusively (still had 2 orgs). One org spec retained
+    # (vllm-project) as a reminder to design org-specific stat card cards
+    # in a future round — orgs aggregate differently and the current
+    # individual-tuned layout shows known overflow with long org names.
+    # Username variety stress-tests the P2 78px header zone overflow fix:
+    # - torvalds (8 chars): no overflow, naturally fits
+    # - karpathy (8 chars): naturally fits
+    # - sindresorhus (12 chars): borderline, may or may not overflow
+    # - juliusBrussee (13 chars): overflows ~82px natural → clamps to 78
+    # - yyx990803 (9 chars, Evan You's handle): mid-length, fits
+    # - vllm-project (12 chars, ORG): retained for org-vs-individual contrast
+    (
+        "stats-torvalds-brutalist-celadon",
+        "stats",
+        "torvalds",
+        "",
+        "brutalist",
+        "celadon",
+        "torvalds (Linus Torvalds, ~227k followers) — brutalist celadon",
+    ),
+    (
+        "stats-sindresorhus-chrome-horizon",
+        "stats",
+        "sindresorhus",
+        "",
+        "chrome",
+        "horizon",
+        "sindresorhus (open-source machine, ~64k followers) — chrome horizon",
+    ),
+    (
+        "stats-karpathy-automata-teal",
+        "stats",
+        "karpathy",
+        "",
+        "automata",
+        "teal",
+        "karpathy (Andrej Karpathy, ML educator) — automata teal",
+    ),
+    (
+        "stats-yyx990803-brutalist-pulse",
+        "stats",
+        "yyx990803",
+        "",
+        "brutalist",
+        "pulse",
+        "yyx990803 (Evan You, Vue.js creator) — brutalist pulse (light)",
+    ),
+    (
+        "stats-juliusbrussee-chrome-moth",
+        "stats",
+        "juliusBrussee",
+        "",
+        "chrome",
+        "moth",
+        "juliusBrussee (caveman creator, 62k stars) — chrome moth",
+    ),
+    (
+        "stats-vllm-automata-bone",
+        "stats",
+        "vllm-project",
+        "",
+        "automata",
+        "bone",
+        "vllm-project (ORG, retained as design reference) — automata bone",
+    ),
+    # Star charts — 3 specs across growth profile + genome variant.
+    (
+        "chart-langflow-chrome-lightning",
+        "chart",
+        "langflow-ai",
+        "langflow",
+        "chrome",
+        "lightning",
+        "High-growth repo (langflow-ai/langflow) — chrome lightning",
+    ),
+    (
+        "chart-hyperweave-brutalist-celadon",
+        "chart",
+        "InnerAura",
+        "hyperweave",
+        "brutalist",
+        "celadon",
+        "Self-growth (InnerAura/hyperweave) — brutalist celadon",
+    ),
+    (
+        "chart-claude-code-automata-teal",
+        "chart",
+        "anthropics",
+        "claude-code",
+        "automata",
+        "teal",
+        "Mid-growth (anthropics/claude-code) — automata teal",
+    ),
+    # additions
+    (
+        "chart-vllm-chrome-abyssal",
+        "chart",
+        "vllm-project",
+        "vllm",
+        "chrome",
+        "abyssal",
+        "High-growth (vllm-project/vllm) — chrome abyssal",
+    ),
+    (
+        "chart-langchain-brutalist-celadon",
+        "chart",
+        "langchain-ai",
+        "langchain",
+        "brutalist",
+        "celadon",
+        "Mature, plateaued (langchain-ai/langchain) — brutalist celadon",
+    ),
+]
+
+
+async def _generate_render_only_specs() -> list[dict[str, Any]]:
+    """Generate stats / star-chart artifacts that skip three-path parity.
+
+    Each spec fetches its live data once, composes via the direct path with
+    pre-resolved ``connector_data``, and writes ``proofset/parity/{spec_id}-
+    direct.svg``. Returned manifest entries are appended to ``manifest.json``
+    after the parity matrix runs so the README Edge Cases section embeds
+    them via the same path pattern as parity specs.
+
+    HTTP and MCP fields are set to None and ``all_match=True`` so the parity
+    summary report doesn't flag these as failures — they're explicitly
+    render-only by design.
+    """
+    from hyperweave.connectors.base import close_client
+    from hyperweave.connectors.github import fetch_stargazer_history, fetch_user_stats
+
+    # Reset httpx client singleton — the prior parity matrix loop closed when
+    # asyncio.run() ended, leaving the client bound to a dead loop. Fresh
+    # client in the current loop avoids "Event loop is closed" on first fetch.
+    await close_client()
+    out_dir = OUT / "proofset" / "parity"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    entries: list[dict[str, Any]] = []
+
+    # Cache fetched data by source so we don't re-fetch for multiple variant specs.
+    stats_cache: dict[str, Any] = {}
+    chart_cache: dict[tuple[str, str], Any] = {}
+
+    for sid, frame_type, owner_or_user, repo, genome, variant, _label in _RENDER_ONLY_SPECS:
+        try:
+            if frame_type == "stats":
+                if owner_or_user not in stats_cache:
+                    try:
+                        stats_cache[owner_or_user] = await fetch_user_stats(owner_or_user)
+                    except Exception as exc:
+                        print(f"  [RENDER-ONLY FETCH FAIL] {sid}: {type(exc).__name__}: {exc}")
+                        stats_cache[owner_or_user] = None
+                svg = _compose_connector(
+                    "stats",
+                    genome,
+                    stats_username=owner_or_user,
+                    connector_data=stats_cache[owner_or_user],
+                    variant=variant,
+                )
+            elif frame_type == "chart":
+                cache_key = (owner_or_user, repo)
+                if cache_key not in chart_cache:
+                    try:
+                        chart_cache[cache_key] = await fetch_stargazer_history(owner_or_user, repo)
+                    except Exception as exc:
+                        print(f"  [RENDER-ONLY FETCH FAIL] {sid}: {type(exc).__name__}: {exc}")
+                        chart_cache[cache_key] = None
+                svg = _compose_connector(
+                    "chart",
+                    genome,
+                    chart_owner=owner_or_user,
+                    chart_repo=repo,
+                    connector_data=chart_cache[cache_key],
+                    variant=variant,
+                )
+            else:
+                continue
+            _write(out_dir / f"{sid}-direct.svg", svg)
+            entries.append(
+                {
+                    "spec_id": sid,
+                    "direct": f"{sid}-direct.svg",
+                    "http": None,
+                    "mcp": None,
+                    "parity_direct_http": None,
+                    "parity_direct_mcp": None,
+                    "parity_http_mcp": None,
+                    "all_match": True,
+                    "render_only": True,
+                }
+            )
+        except Exception as exc:
+            print(f"  [RENDER-ONLY GEN FAIL] {sid}: {type(exc).__name__}: {exc}")
+
+    await close_client()
+    return entries
+
+
+async def generate_parity_matrix() -> tuple[int, int, int]:
+    """Generate the 3-path parity verification matrix.
+
+    Starts a uvicorn subprocess for FastAPI + an in-process MCP client,
+    renders each ParitySpec via direct/http/mcp paths, saves all three
+    SVGs to outputs/proofset/parity/, and asserts byte-equality after
+    normalization. Returns (specs_rendered, parity_passed, parity_failed).
+
+    Cleans up the server subprocess on any error path. Test order is
+    irrelevant (each spec is independent), but the matrix is built once
+    so the same order ships every run.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from proofset_harness import (
+        ParityReport,
+        fastapi_server,
+        load_fixtures,
+        mcp_client,
+        render_and_save_three_paths,
+        save_fixtures,
+    )
+
+    # Pre-fetch every DATA_PROJECTS token (live with fixture cache fallback).
+    # Resolved values feed _build_parity_matrix so all three paths see the
+    # same literal — parity tests path equivalence, not connector flakiness.
+    fixtures = load_fixtures()
+    fixture_count_before = len(fixtures)
+    resolved_data = await _resolve_data_projects(fixtures)
+    if len(fixtures) > fixture_count_before:
+        save_fixtures(fixtures)
+        print(f"  cached {len(fixtures) - fixture_count_before} new connector values")
+
+    specs = _build_parity_matrix(resolved_data)
+    out_dir = OUT / "proofset" / "parity"
+    if out_dir.exists():
+        import shutil
+
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    reports: list[ParityReport] = []
+    with fastapi_server(port=8765) as base_url:
+        async with mcp_client() as mcp:
+            for spec in specs:
+                try:
+                    report = await render_and_save_three_paths(spec, base_url, mcp, out_dir)
+                    reports.append(report)
+                except Exception as exc:
+                    print(f"  [PARITY ERROR] {spec.spec_id}: {type(exc).__name__}: {exc}")
+
+    # Manifest file lists every report so the README emitter can iterate.
+    manifest = [
+        {
+            "spec_id": r.spec_id,
+            "direct": r.direct_path.name,
+            "http": r.http_path.name,
+            "mcp": r.mcp_path.name,
+            "parity_direct_http": r.parity_direct_http,
+            "parity_direct_mcp": r.parity_direct_mcp,
+            "parity_http_mcp": r.parity_http_mcp,
+            "all_match": r.all_match,
+        }
+        for r in reports
+    ]
+    import json
+
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+
+    passed = sum(1 for r in reports if r.all_match)
+    failed = len(reports) - passed
+    return len(reports), passed, failed
+
+
+_EDGE_CASE_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
+    # (group_title, [(spec_id, label), ...]) — order ships verbatim in
+    # outputs/README.md "Edge Cases" section so reviewers can scan
+    # related stress-test axes together. Each row gets a label + the
+    # single direct-render SVG at full width (HTTP / MCP renderings are
+    # byte-equal — verified by the parity summary below this section).
+    (
+        "Value lengths",
+        [
+            ("value-extreme-single-char", "Single character value (`0`)"),
+            ("value-extreme-long-version", "Long version string (`v0.3.9-beta.2+gita1b2c3d4`, 26 chars)"),
+            ("value-extreme-compact-magnitude", "Compact magnitude format (`1.2M`)"),
+            ("value-extreme-fallback-mark", "Fallback indicator (`?` — connector unreachable)"),
+        ],
+    ),
+    (
+        "Label lengths",
+        [
+            ("label-extreme-single-char", "Single character label (`X`)"),
+            ("label-extreme-long-status", "28-character status label (`BUILD-PASSING-WITH-WARNINGS`)"),
+            ("label-extreme-single-letter-v", "Single lowercase letter (`v`)"),
+        ],
+    ),
+    (
+        "Strip metric counts — brutalist",
+        [
+            ("brutalist-strip-1metric-data-only", "1 metric"),
+            ("brutalist-strip-2metric-data-only", "2 metrics"),
+            ("brutalist-strip-3metric-data-only", "3 metrics"),
+            ("brutalist-strip-4metric-data-only", "4 metrics"),
+        ],
+    ),
+    (
+        "Strip metric counts — chrome",
+        [
+            ("chrome-strip-1metric-data-only", "1 metric"),
+            ("chrome-strip-2metric-data-only", "2 metrics"),
+            ("chrome-strip-3metric-data-only", "3 metrics"),
+            ("chrome-strip-4metric-data-only", "4 metrics"),
+        ],
+    ),
+    (
+        "Multi-source strips",
+        [
+            (
+                "vllm-ecosystem-strip",
+                "vllm cross-connector footprint (GitHub stars + PyPI dl + Docker pulls + HF Llama-4 dl)",
+            ),
+        ],
+    ),
+    (
+        "Namespace length — strips",
+        [
+            ("long-namespace-strip-4metric", "Long namespace (`Significant-Gravitas/AutoGPT`) + 4 metrics"),
+            ("short-name-strip-1metric", "Short name (`claude-code`) + 1 metric"),
+            ("gh-autogpt-strip-3metric", "AutoGPT + 3 real-data metrics"),
+            ("gh-claude-code-strip-2metric", "claude-code + 2 real-data metrics"),
+            ("gh-readme-ai-strip-2metric", "readme-ai + 2 real-data metrics (automata.teal)"),
+        ],
+    ),
+    (
+        "Mixed-magnitude strips",
+        [
+            (
+                "mixed-magnitude-strip",
+                "Extreme magnitude variance — synthetic demo (`STARS:999k,FORKS:99,ISSUES:9,PRS:0`)",
+            ),
+        ],
+    ),
+    (
+        "All-state badges — brutalist",
+        [
+            ("state-brutalist-passing", "passing"),
+            ("state-brutalist-warning", "warning"),
+            ("state-brutalist-critical", "critical"),
+            ("state-brutalist-building", "building"),
+            ("state-brutalist-offline", "offline"),
+        ],
+    ),
+    (
+        "All-state badges — chrome.horizon",
+        [
+            ("state-chrome-passing", "passing"),
+            ("state-chrome-warning", "warning"),
+            ("state-chrome-critical", "critical"),
+            ("state-chrome-building", "building"),
+            ("state-chrome-offline", "offline"),
+        ],
+    ),
+    (
+        "All-state badges — automata.teal",
+        [
+            ("state-automata-passing", "passing"),
+            ("state-automata-warning", "warning"),
+            ("state-automata-critical", "critical"),
+            ("state-automata-building", "building"),
+            ("state-automata-offline", "offline"),
+        ],
+    ),
+    (
+        "Numeric format edges",
+        [
+            ("numeric-zero", "Value `0`"),
+            ("numeric-three-digit", "Value `999` (3 digits, no k suffix)"),
+            ("numeric-k-boundary", "Value `1.0k` (k formatting boundary)"),
+            ("numeric-k-max", "Value `999.9k` (max before M)"),
+            ("numeric-m-boundary", "Value `1.0M` (M formatting boundary)"),
+        ],
+    ),
+    (
+        "Special characters in titles",
+        [
+            ("special-char-middot", "Mid-dot character (`STATUS · LIVE`)"),
+            ("special-char-arrow", "Right arrow character (`BUILD → PASS`)"),
+        ],
+    ),
+    # ── stress matrix ──
+    (
+        "Strip identity glyph variety",
+        [
+            ("strip-glyph-github-brutalist", "GitHub glyph in identity (brutalist) — AutoGPT + 3 metrics"),
+            ("strip-glyph-python-chrome", "Python glyph in identity (chrome horizon) — vllm + 2 metrics"),
+            ("strip-glyph-docker-automata", "Docker glyph in identity (automata teal) — ollama + 2 metrics"),
+            ("strip-glyph-npm-brutalist", "npm glyph in identity (brutalist) — n8n version + downloads"),
+            ("strip-glyph-openai-chrome", "OpenAI glyph in identity (chrome moth) — claude-code + 2 metrics"),
+        ],
+    ),
+    (
+        "Marquee stress",
+        [
+            ("marquee-text-only-pipe", "Pipe-separated text items (brutalist)"),
+            ("marquee-data-flavored", "Data-flavored connector tokens (chrome horizon)"),
+            ("marquee-mixed-content", "Mixed text + data + symbols (automata violet-teal)"),
+        ],
+    ),
+    # ── Spatial Matrix ──
+    # Same content (STARS/184.4k or BUILD/passing) rendered across 4 zone
+    # configurations and 3 paradigms. The only variable per row is which
+    # zones are present — directly QAs the layout engine's zone-collapse
+    # behavior. 3-column table layout naturally groups by paradigm
+    # (brutalist | chrome | automata) so each row reads as a paradigm
+    # comparison for one zone config.
+    (
+        "Spatial Matrix — zone configurations across paradigms (algorithm QA)",
+        [
+            ("matrix-label-value-brutalist", "label + value (brutalist celadon)"),
+            ("matrix-label-value-chrome", "label + value (chrome horizon)"),
+            ("matrix-label-value-automata", "label + value (automata teal)"),
+            ("matrix-glyph-label-value-brutalist", "+ glyph (brutalist celadon)"),
+            ("matrix-glyph-label-value-chrome", "+ glyph (chrome horizon)"),
+            ("matrix-glyph-label-value-automata", "+ glyph (automata teal)"),
+            ("matrix-state-brutalist", "+ state indicator (brutalist celadon)"),
+            ("matrix-state-chrome", "+ state indicator (chrome horizon)"),
+            ("matrix-state-automata", "+ state indicator (automata teal)"),
+            ("matrix-glyph-state-brutalist", "all zones (brutalist celadon)"),
+            ("matrix-glyph-state-chrome", "all zones (chrome horizon)"),
+            ("matrix-glyph-state-automata", "all zones (automata teal)"),
+        ],
+    ),
+    # Removed sections (deduped — content covered by Real-data section
+    # real-data table and Spatial Matrix above):
+    #   - "Automata badge variants — solo tones" (real-data section covers tone variety)
+    #   - "Brutalist badge variants — substrate variety" (real-data section covers substrate)
+    #   - "Chrome badge variants — material variety" (real-data section covers materials)
+    # Variant tone showcases live in per-genome README files
+    # (outputs/README_AUTOMATA.md etc).
+    # ── Z.AI GLM-5 cross-provider showcase ──
+    (
+        "Z.AI GLM-5 — same project across three providers",
+        [
+            ("zai-gh-stars-brutalist", "GitHub: zai-org/GLM-5 STARS — brutalist celadon"),
+            ("zai-hf-downloads-chrome", "HuggingFace: zai-org/GLM-5.1 DL — chrome abyssal"),
+            ("zai-arxiv-paper-automata", "arXiv: 2602.15763 paper — automata violet"),
+        ],
+    ),
+    (
+        "Stateful CI/CD badges — state indicator coverage",
+        [
+            ("stateful-build-passing-brutalist-temper", "BUILD passing (brutalist temper)"),
+            ("stateful-deploy-active-chrome-horizon", "DEPLOY active (chrome horizon)"),
+            ("stateful-tests-warning-automata-cobalt", "TESTS warning (automata cobalt)"),
+            ("stateful-security-critical-brutalist-signal", "SECURITY critical (brutalist signal)"),
+        ],
+    ),
+    # ── render-only specs (skip parity, direct render only) ──
+    (
+        "Stats card stress (render-only)",
+        [
+            ("stats-torvalds-brutalist-celadon", "torvalds (Linus Torvalds, ~227k followers) — brutalist celadon"),
+            (
+                "stats-sindresorhus-chrome-horizon",
+                "sindresorhus (open-source machine, ~64k followers) — chrome horizon",
+            ),
+            ("stats-karpathy-automata-teal", "karpathy (Andrej Karpathy, ML educator) — automata teal"),
+            ("stats-yyx990803-brutalist-pulse", "yyx990803 (Evan You, Vue.js creator) — brutalist pulse (light)"),
+            ("stats-juliusbrussee-chrome-moth", "juliusBrussee (caveman creator) — chrome moth"),
+            ("stats-vllm-automata-bone", "vllm-project (ORG, retained as design reference) — automata bone"),
+        ],
+    ),
+    (
+        "Star chart stress (render-only)",
+        [
+            ("chart-langflow-chrome-lightning", "High-growth repo (langflow-ai/langflow) — chrome lightning"),
+            ("chart-hyperweave-brutalist-celadon", "Self-growth (InnerAura/hyperweave) — brutalist celadon"),
+            ("chart-claude-code-automata-teal", "Mid-growth (anthropics/claude-code) — automata teal"),
+            ("chart-vllm-chrome-abyssal", "High-growth (vllm-project/vllm) — chrome abyssal"),
+            ("chart-langchain-brutalist-celadon", "Mature, plateaued (langchain-ai/langchain) — brutalist celadon"),
+        ],
+    ),
+    # ── paired-glyph zone-collapse coverage ──
+    (
+        "Glyph + no-glyph paired badges (zone collapse)",
+        [
+            ("paired-glyph-github-brutalist-with-glyph", "github glyph (brutalist celadon, STARS 184.4k)"),
+            ("paired-glyph-github-brutalist-no-glyph", "same content, NO glyph — zone collapses"),
+            ("paired-glyph-python-chrome-with-glyph", "python glyph (chrome horizon, PYPI v1.3.2)"),
+            ("paired-glyph-python-chrome-no-glyph", "same content, NO glyph"),
+            ("paired-glyph-docker-automata-with-glyph", "docker glyph (automata teal, PULLS 135.9M)"),
+            ("paired-glyph-docker-automata-no-glyph", "same content, NO glyph"),
+            ("paired-glyph-npm-brutalist-with-glyph", "npm glyph (brutalist carbon, VERSION 2.21.5)"),
+            ("paired-glyph-npm-brutalist-no-glyph", "same content, NO glyph"),
+        ],
+    ),
+    # ── strip variety (identity + provider + state) ──
+    (
+        "Strip variety — identity + multi-provider + state-bearing",
+        [
+            ("strip-mixed-magnitude-brutalist", "Mixed magnitude (189k / 0 / version) — brutalist celadon"),
+            ("strip-multi-provider-chrome", "Single strip pulling gh + pypi + docker + hf — chrome horizon"),
+            ("strip-state-bearing-build-brutalist", "State-bearing CI/CD strip — brutalist celadon"),
+            ("strip-5-metric-chrome", "5-metric strip (extreme cell count) — chrome abyssal"),
+            ("strip-1-metric-with-glyph-automata", "1-metric strip with identity glyph — automata violet"),
+        ],
+    ),
+    # ── additional stateful badge titles ──
+    (
+        "Stateful CI/CD — extended title coverage",
+        [
+            ("stateful-ci-failing-chrome-abyssal", "CI failing (chrome abyssal)"),
+            ("stateful-deploy-rollback-automata-magenta", "DEPLOY rollback (automata magenta)"),
+            ("stateful-coverage-passing-brutalist-pulse", "COVERAGE 98% (brutalist pulse light)"),
+            ("stateful-uptime-active-chrome-moth", "UPTIME 99.99 (chrome moth)"),
+        ],
+    ),
+    # ── Real-data badges grouped by provider ────────────
+    # Five provider sub-sections (GitHub / PyPI / npm / Docker / HuggingFace)
+    # replace the prior single flat "Real-data badges" section + the standalone
+    # "Automata compact badges" section. Compact-variant badges are folded
+    # into the provider that supplies their data so each provider zone reads
+    # as a complete sample (default + compact variants together).
+    (
+        "Real-data badges — GitHub",
+        [
+            ("openclaw-brutalist-celadon-glyph", "openclaw STARS + github — brutalist celadon"),
+            ("claude-code-chrome-abyssal", "anthropics/claude-code FORKS — chrome abyssal"),
+            ("vllm-automata-violet-glyph", "vllm-project STARS + github — automata violet"),
+            ("hermes-brutalist-carbon", "NousResearch/hermes-agent STARS — brutalist carbon"),
+            ("langflow-chrome-lightning-glyph", "langflow-ai STARS + github — chrome lightning"),
+            ("dify-automata-teal", "langgenius/dify STARS — automata teal"),
+            ("n8n-brutalist-alloy-glyph", "n8n-io STARS + github — brutalist alloy"),
+            ("autogpt-chrome-graphite", "Significant-Gravitas/AutoGPT FORKS — chrome graphite"),
+            ("ollama-automata-bone-glyph", "ollama STARS + github — automata bone"),
+            ("cline-brutalist-temper", "cline/cline STARS — brutalist temper"),
+            ("mem0-chrome-moth-glyph", "mem0ai/mem0 STARS + github — chrome moth"),
+            ("crewai-automata-steel", "crewAIInc/crewAI STARS — automata steel"),
+            ("langchain-brutalist-pigment-glyph", "langchain-ai/langchain STARS + github — brutalist pigment"),
+            ("metagpt-chrome-horizon", "FoundationAgents/MetaGPT FORKS — chrome horizon"),
+            ("caveman-automata-sulfur-glyph", "JuliusBrussee/caveman STARS + github — automata sulfur"),
+            ("skills-brutalist-ember", "mattpocock/skills STARS — brutalist ember"),
+        ],
+    ),
+    (
+        "Real-data badges — PyPI",
+        [
+            ("pypi-vllm-brutalist-archive-glyph", "pypi:vllm DOWNLOADS + python — brutalist archive (light)"),
+            ("pypi-langchain-chrome-abyssal", "pypi:langchain DOWNLOADS — chrome abyssal"),
+            ("pypi-crewai-automata-amber-glyph", "pypi:crewai DOWNLOADS + python — automata amber"),
+            ("pypi-hyperweave-brutalist-signal", "pypi:hyperweave VERSION — brutalist signal (light)"),
+            ("automata-compact-pypi-vllm-violet", "pypi:vllm compact — automata violet (112x20)"),
+            ("automata-compact-python-version-jade", "PYPI + python glyph compact — automata jade (112x20)"),
+        ],
+    ),
+    (
+        "Real-data badges — npm",
+        [
+            ("npm-anthropic-chrome-lightning-glyph", "npm:@anthropic-ai/sdk NPM + npm glyph — chrome lightning"),
+            ("npm-n8n-automata-indigo", "npm:n8n DOWNLOADS — automata indigo"),
+            ("automata-compact-npm-langgraph-teal", "npm:@langchain/langgraph compact — automata teal (112x20)"),
+        ],
+    ),
+    (
+        "Real-data badges — Docker",
+        [
+            ("docker-ollama-brutalist-pulse-glyph", "docker:ollama PULLS + docker — brutalist pulse (light)"),
+            ("docker-n8n-chrome-graphite", "docker:n8nio/n8n PULLS — chrome graphite"),
+            ("automata-compact-docker-ollama-amber", "docker:ollama PULLS compact — automata amber (112x20)"),
+            ("automata-compact-docker-pulls-cobalt", "DOCKER PULLS + docker glyph compact — automata cobalt (112x20)"),
+        ],
+    ),
+    (
+        "Real-data badges — HuggingFace",
+        [
+            (
+                "hf-llama-automata-burgundy-glyph",
+                "hf:Llama-4-Scout DL + huggingface — automata burgundy",
+            ),
+            ("hf-qwen-brutalist-depth", "hf:Qwen3-235B DL — brutalist depth (light)"),
+            ("automata-compact-hf-llama-steel", "hf:Llama-4-Scout DL compact — automata steel (112x20)"),
+        ],
+    ),
+    # ── arXiv data badges (separate provider sub-section) ──
+    (
+        "Real-data badges — arXiv",
+        [
+            ("arxiv-mistral-brutalist-celadon", "arxiv:2310.06825 Mistral 7B — brutalist celadon"),
+            ("arxiv-deepseek-chrome-abyssal", "arxiv:2501.12948 DeepSeek-R1 — chrome abyssal"),
+        ],
+    ),
+    # ── State badges with real CI/CD titles ──
+    (
+        "State badges — real CI/CD allowlist coverage",
+        [
+            ("state-build-passing", "BUILD passing — brutalist celadon"),
+            ("state-tests-failing", "TESTS failing — chrome abyssal"),
+            ("state-coverage-87", "COVERAGE 87% — automata teal"),
+            ("state-lint-clean", "LINT clean — brutalist pulse (light)"),
+            ("state-deploy-pending", "DEPLOY pending — chrome graphite"),
+            ("state-release-stable", "RELEASE stable — automata amber"),
+        ],
+    ),
+    # ── : Strip coverage additions ──
+    (
+        "Strip variety additions — state, multi-provider, automata subtitle",
+        [
+            ("strip-state-bearing-chrome", "BUILD passing + multi-metric — chrome lightning + GitHub subtitle"),
+            ("strip-2-metric-automata-teal", "2-metric automata strip with GitHub subtitle — teal"),
+            ("strip-multi-provider-brutalist", "3-provider strip (GH + DOCKER + NPM) — brutalist alloy"),
+        ],
+    ),
+    # ── state-bearing strip coverage across paradigms ──
+    (
+        "State-bearing strips — real CI/CD titles across paradigms",
+        [
+            (
+                "strip-state-bearing-build-brutalist",
+                "BUILD passing + STARS — brutalist celadon (canonical pattern)",
+            ),
+            ("strip-state-deploy-active-chrome", "DEPLOY active + VERSION + RELEASE — chrome graphite"),
+            ("strip-state-tests-failing-automata", "TESTS failing + COVERAGE + BUILD warning — automata amber"),
+            ("strip-state-coverage-brutalist-light", "COVERAGE 87% + LINT clean + DEPLOY — brutalist archive (light)"),
+        ],
+    ),
+]
+
+
+def _is_badge_svg(svg_path: Path) -> bool:
+    """Detect whether a proofset SVG renders a badge frame.
+
+    Reads the first 1KB and looks for ``data-hw-type="badge"``. Badge
+    sections render as 3-column tables in outputs/README.md while
+    strips/stats/charts stay one-per-row.
+    """
+    if not svg_path.exists():
+        return False
+    try:
+        head = svg_path.read_text(errors="ignore")[:1024]
+    except OSError:
+        return False
+    return 'data-hw-type="badge"' in head
+
+
+def _svg_genome_and_frame(svg_path: Path) -> tuple[str, str]:
+    """Extract (genome, frame_type) from an SVG's root data-hw-* attributes.
+
+    Returns ("unknown", "unknown") when the file is missing or attributes are
+    absent. Used by the README emitter to group edge-case sections by genome
+    and frame type ().
+    """
+    if not svg_path.exists():
+        return ("unknown", "unknown")
+    try:
+        head = svg_path.read_text(errors="ignore")[:2048]
+    except OSError:
+        return ("unknown", "unknown")
+    import re
+
+    g = re.search(r'data-hw-genome="([^"]+)"', head)
+    f = re.search(r'data-hw-frame="([^"]+)"', head)
+    if not f:
+        f = re.search(r'data-hw-type="([^"]+)"', head)
+    return (g.group(1) if g else "unknown", f.group(1) if f else "unknown")
+
+
+def _emit_edge_cases_readme_section() -> str:
+    """Build the "Edge Cases" section for outputs/README.md.
+
+    organized by genome (brutalist, chrome, automata, mixed)
+    then by frame type (badges, strips, stats, charts) within each genome.
+    Makes visual review systematic — all chrome badges read together, all
+    brutalist strips read together, etc. Each group's primary genome and
+    frame type are inferred from the manifest SVGs' data-hw-genome /
+    data-hw-frame attributes; groups whose specs span multiple genomes go
+    into the "Mixed" bucket.
+
+    Badges render in 3-column tables; strips, stats, charts render
+    full-width one-per-row. Direct render only — HTTP and MCP renderings
+    are byte-equal (verified by the parity summary below).
+    """
+    manifest_path = OUT / "proofset" / "parity" / "manifest.json"
+    if not manifest_path.exists():
+        return ""
+    import json
+
+    manifest = json.loads(manifest_path.read_text())
+    by_id = {e["spec_id"]: e for e in manifest}
+    parity_dir = OUT / "proofset" / "parity"
+
+    # Genome + frame-type ordering for predictable section sequence
+    _GENOME_ORDER = ["brutalist", "chrome", "automata", "mixed"]
+    _FRAME_ORDER = ["badge", "strip", "stats", "chart", "icon", "marquee-horizontal", "divider", "mixed"]
+
+    # Bucket groups by inferred genome + frame_type
+    buckets: dict[str, dict[str, list[tuple[str, list[tuple[str, str]]]]]] = {
+        g: {f: [] for f in _FRAME_ORDER} for g in _GENOME_ORDER
+    }
+    for group_title, entries in _EDGE_CASE_GROUPS:
+        present = [(sid, label) for sid, label in entries if sid in by_id]
+        if not present:
+            continue
+        # Infer primary genome + frame_type from the group's manifest entries
+        genomes = {_svg_genome_and_frame(parity_dir / by_id[sid]["direct"])[0] for sid, _ in present}
+        frames = {_svg_genome_and_frame(parity_dir / by_id[sid]["direct"])[1] for sid, _ in present}
+        group_genome = next(iter(genomes)) if len(genomes) == 1 else "mixed"
+        group_frame = next(iter(frames)) if len(frames) == 1 else "mixed"
+        if group_genome not in _GENOME_ORDER:
+            group_genome = "mixed"
+        if group_frame not in _FRAME_ORDER:
+            group_frame = "mixed"
+        buckets[group_genome][group_frame].append((group_title, present))
+
+    lines: list[str] = [
+        "## Edge Cases",
+        "",
+        "Organized by genome (brutalist → chrome → automata → mixed), then by frame "
+        "type (badges → strips → stats → charts) within each genome. Direct-render "
+        "SVG only — HTTP and MCP renderings are byte-equal (verified by the parity "
+        "summary below). Badges render in 3-column tables; strips, stats, and charts "
+        "render full-width.",
+        "",
+    ]
+
+    def _emit_group(group_title: str, present: list[tuple[str, str]]) -> None:
+        all_badges = all(_is_badge_svg(parity_dir / by_id[sid]["direct"]) for sid, _ in present)
+        # glyph-paired sections render as 2-column tables
+        # (with glyph | without glyph) so the visual comparison reads at a
+        # glance instead of being split across 3-column rows. Detect by
+        # spec_id pattern: paired sections alternate ``-with-glyph`` and
+        # ``-no-glyph`` suffixes.
+        is_paired_glyph = all_badges and all(
+            sid.endswith("-with-glyph") or sid.endswith("-no-glyph") for sid, _ in present
+        )
+        # v0.3.9 Spatial Matrix horizontal layout: when all specs share the
+        # ``matrix-`` prefix, render as a 4-row x 3-column table where rows
+        # are zone configs (label+value / +glyph / +state / all zones) and
+        # columns are paradigms (Brutalist / Chrome / Automata). Reads
+        # left-to-right as a comparison across paradigms for the same zone
+        # config — generic 3-column chunking grouped by index, losing the
+        # row-as-config structure.
+        is_spatial_matrix = all_badges and all(sid.startswith("matrix-") for sid, _ in present)
+        lines.append(f"#### {group_title}")
+        lines.append("")
+        if is_spatial_matrix:
+            _MATRIX_PARADIGMS = ["brutalist", "chrome", "automata"]
+            _MATRIX_CONFIGS = [
+                ("label-value", "label + value"),
+                ("glyph-label-value", "+ glyph"),
+                ("state", "+ state indicator"),
+                ("glyph-state", "all zones"),
+            ]
+            # Index specs by (config_slug, paradigm_slug). spec_id pattern:
+            # ``matrix-{config_slug}-{paradigm_slug}`` where paradigm_slug
+            # is the trailing token (brutalist/chrome/automata).
+            cell_by_key: dict[tuple[str, str], tuple[str, str]] = {}
+            for spec_id, label in present:
+                paradigm_slug = ""
+                for candidate in _MATRIX_PARADIGMS:
+                    if spec_id.endswith(f"-{candidate}"):
+                        paradigm_slug = candidate
+                        break
+                if not paradigm_slug:
+                    continue
+                config_slug = spec_id[len("matrix-") : -(len(paradigm_slug) + 1)]
+                cell_by_key[(config_slug, paradigm_slug)] = (spec_id, label)
+
+            # Header row uses paradigm display names.
+            header = "| Config | " + " | ".join(p.capitalize() for p in _MATRIX_PARADIGMS) + " |"
+            sep = "|---|" + "---|" * len(_MATRIX_PARADIGMS)
+            lines.append(header)
+            lines.append(sep)
+            for config_slug, config_label in _MATRIX_CONFIGS:
+                row_cells: list[str] = [f"**{config_label}**"]
+                for paradigm_slug in _MATRIX_PARADIGMS:
+                    cell = cell_by_key.get((config_slug, paradigm_slug))
+                    if cell is None:
+                        row_cells.append("")
+                        continue
+                    spec_id, _label = cell
+                    entry = by_id[spec_id]
+                    row_cells.append(f"![{spec_id}](proofset/parity/{entry['direct']})<br/>`{spec_id}`")
+                lines.append("| " + " | ".join(row_cells) + " |")
+            lines.append("")
+        elif is_paired_glyph:
+            lines.append("| With glyph | Without glyph |")
+            lines.append("|---|---|")
+            # Pair consecutive specs: with-glyph then no-glyph
+            pair_row: list[str] = []
+            for spec_id, label in present:
+                entry = by_id[spec_id]
+                cell = f"**{label}**<br/>`{spec_id}`<br/>![{spec_id}](proofset/parity/{entry['direct']})"
+                pair_row.append(cell)
+                if len(pair_row) == 2:
+                    lines.append("| " + " | ".join(pair_row) + " |")
+                    pair_row = []
+            if pair_row:
+                pair_row.append("")
+                lines.append("| " + " | ".join(pair_row) + " |")
+            lines.append("")
+        elif all_badges:
+            lines.append("| | | |")
+            lines.append("|---|---|---|")
+            row: list[str] = []
+            for spec_id, label in present:
+                entry = by_id[spec_id]
+                cell = f"**{label}**<br/>`{spec_id}`<br/>![{spec_id}](proofset/parity/{entry['direct']})"
+                row.append(cell)
+                if len(row) == 3:
+                    lines.append("| " + " | ".join(row) + " |")
+                    row = []
+            if row:
+                while len(row) < 3:
+                    row.append("")
+                lines.append("| " + " | ".join(row) + " |")
+            lines.append("")
+        else:
+            for spec_id, label in present:
+                entry = by_id[spec_id]
+                lines.append(f"**{label}** — `{spec_id}`")
+                lines.append("")
+                lines.append(f"![{spec_id}](proofset/parity/{entry['direct']})")
+                lines.append("")
+
+    for genome in _GENOME_ORDER:
+        if not any(buckets[genome][f] for f in _FRAME_ORDER):
+            continue
+        lines.append(f"### {genome.capitalize()}")
+        lines.append("")
+        for frame_type in _FRAME_ORDER:
+            groups = buckets[genome][frame_type]
+            if not groups:
+                continue
+            for group_title, present in groups:
+                _emit_group(group_title, present)
+    return "\n".join(lines)
+
+
+def _emit_parity_readme_section(specs_count: int, passed: int, failed: int) -> str:
+    """Build the parity section embedded in outputs/README.md.
+
+    Compact test-report only — full-width artifact embeds live in the
+    preceding "Edge Cases" section. PASS/FAIL summary list per spec, plus
+    a visual-diff block for any failing spec so divergence between the
+    three rendering paths is immediately inspectable.
+    """
+    if specs_count == 0:
+        return ""
+    manifest_path = OUT / "proofset" / "parity" / "manifest.json"
+    if not manifest_path.exists():
+        return ""
+    import json
+
+    manifest = json.loads(manifest_path.read_text())
+
+    lines: list[str] = [
+        "## CLI / HTTP / MCP Parity (v0.3.9)",
+        "",
+        f"**{specs_count} specs rendered through all three interfaces** — "
+        f"{passed} parity-passed, {failed} parity-failed. Equivalence "
+        "verified after normalization (UIDs, timestamps, version strings, "
+        "and font data scrubbed). Divergence between paths is a parity bug "
+        "per HyperWeave Invariant 9 (CLI/HTTP/MCP feature parity).",
+        "",
+    ]
+
+    failed_entries = [e for e in manifest if not e["all_match"]]
+    passed_entries = [e for e in manifest if e["all_match"]]
+
+    # Pass/fail summary list — terse, scannable.
+    lines.extend(["### Summary", ""])
+    for entry in passed_entries:
+        lines.append(f"- ✓ `{entry['spec_id']}`")
+    for entry in failed_entries:
+        sid = entry["spec_id"]
+        flags = []
+        if not entry["parity_direct_http"]:
+            flags.append("direct≠http")
+        if not entry["parity_direct_mcp"]:
+            flags.append("direct≠mcp")
+        if not entry["parity_http_mcp"]:
+            flags.append("http≠mcp")
+        lines.append(f"- ✗ `{sid}` — {', '.join(flags)}")
+    lines.append("")
+
+    # Failure diffs — when something is broken, show all 3 paths inline
+    # at full width so the divergence is visible.
+    if failed_entries:
+        lines.extend(["### Parity failures (visual diff)", ""])
+        for entry in failed_entries:
+            sid = entry["spec_id"]
+            lines.append(f"**`{sid}`** — direct vs http vs mcp")
+            lines.append("")
+            lines.append(f"![{sid} direct](proofset/parity/{entry['direct']})")
+            lines.append("")
+            lines.append(f"![{sid} http](proofset/parity/{entry['http']})")
+            lines.append("")
+            lines.append(f"![{sid} mcp](proofset/parity/{entry['mcp']})")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate HyperWeave proof set")
     parser.add_argument("--live", action="store_true", help="Include network-dependent artifacts")
@@ -1713,9 +4539,49 @@ def main() -> None:
         live_total = asyncio.run(generate_live())
         print(f"  {live_total} live artifacts")
 
+    # 3-path parity matrix: render every spec via direct/http/mcp and verify
+    # byte-equal output after normalization. Hard-fails the regression net
+    # if CLI/HTTP/MCP feature parity drifts (Invariant 9).
+    print("Generating 3-path parity matrix...")
+    parity_count, parity_passed, parity_failed = asyncio.run(generate_parity_matrix())
+    print(f"  {parity_count} parity specs ({parity_passed} passed, {parity_failed} failed)")
+
+    # render-only stats + star-chart specs (skip parity).
+    print("Generating render-only edge-case specs...")
+    render_only_entries = asyncio.run(_generate_render_only_specs())
+    print(f"  {len(render_only_entries)} render-only artifacts")
+    if render_only_entries:
+        manifest_path = OUT / "proofset" / "parity" / "manifest.json"
+        if manifest_path.exists():
+            import json as _json
+
+            existing = _json.loads(manifest_path.read_text())
+            existing.extend(render_only_entries)
+            manifest_path.write_text(_json.dumps(existing, indent=2))
+
     generate_readme(total, live_total)
-    grand = total + live_total
+    # Append the Edge Cases section + parity summary to the freshly-emitted
+    # README.md. Order matters: edge cases (full-width visual review) FIRST,
+    # parity summary (test report) LAST. The user needs visible artifacts
+    # to inspect, not just a PASS/FAIL list.
+    readme_path = OUT / "README.md"
+    edge_cases_section = _emit_edge_cases_readme_section()
+    parity_section = _emit_parity_readme_section(parity_count, parity_passed, parity_failed)
+    appended = []
+    if edge_cases_section:
+        appended.append(edge_cases_section)
+    if parity_section:
+        appended.append(parity_section)
+    if appended:
+        readme_path.write_text(readme_path.read_text() + "\n" + "\n".join(appended))
+
+    grand = total + live_total + parity_count * 3
     print(f"Wrote {grand} artifacts + README to {OUT}/")
+
+    if parity_failed > 0:
+        print(f"\nPARITY FAILURES: {parity_failed} specs diverged across direct/http/mcp.")
+        print("  See outputs/proofset/parity/manifest.json for details.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

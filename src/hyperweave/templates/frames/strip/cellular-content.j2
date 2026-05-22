@@ -10,7 +10,7 @@
 
 <g clip-path="url(#{{ uid }}-clip)">
   {# 1. Void ground #}
-  <rect width="{{ width }}" height="{{ strip_h }}" fill="{{ surface_0 | default('#04060A') }}"/>
+  <rect width="{{ width }}" height="{{ strip_h }}" fill="{{ surface_0 | default('var(--dna-surface)') }}"/>
 
   {% if has_flanks %}
   {% set fcs = flank_cell_size | default(12) %}
@@ -50,6 +50,6 @@
   {# 4. Content panel — interior between flanks #}
   {% set panel_x = flank_width | default(0) if has_flanks else 0 %}
   {% set panel_w = width - (2 * (flank_width | default(0))) if has_flanks else width %}
-  <rect x="{{ panel_x }}" y="2" width="{{ panel_w }}" height="{{ strip_h - 4 }}" fill="{{ surface_0 | default('#04060A') }}" opacity="0.95"/>
+  <rect x="{{ panel_x }}" y="2" width="{{ panel_w }}" height="{{ strip_h - 4 }}" fill="{{ surface_0 | default('var(--dna-surface)') }}" opacity="0.95"/>
   <rect x="{{ panel_x }}" y="2" width="{{ panel_w }}" height="{{ strip_h - 4 }}" fill="none" stroke="{{ border_tint | default('var(--dna-border-tint)') }}" stroke-width="0.5" opacity="0.28"/>
 </g>

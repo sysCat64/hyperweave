@@ -99,25 +99,6 @@ svg, :root {
   --dna-status-delta-positive: #22C55E;
   --dna-status-delta-negative: #DC2626;
 }
-@media (prefers-color-scheme: light) {
-  svg {
-    --dna-surface: #F8FAFC;
-    --dna-surface-top: #F8FAFC;
-    --dna-surface-alt: #F1F5F9;
-    --dna-surface-deep: #E2E8F0;
-    --dna-bg: #F8FAFC;
-    --dna-bg-alt: #F1F5F9;
-    --dna-ink: #1E293B;
-    --dna-ink-primary: #1E293B;
-    --dna-ink-dark: #1E293B;
-    --dna-ink-muted: #64748B;
-    --dna-ink-sub: #64748B;
-    --dna-ink-ghost: #CBD5E1;
-    --dna-border: #CBD5E1;
-    --dna-border-div: #CBD5E1;
-    --dna-sep: #CBD5E1;
-  }
-}
 /* === HyperWeave Accessibility Layer ===
  * Non-negotiable media queries for motion, color scheme, and forced colors.
  * Included in EVERY artifact.

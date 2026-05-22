@@ -44,9 +44,16 @@
      accent-outer + dark-panel-inner ornament fallback renders. Glyph fill
      uses --dna-signal (accent) for visibility on the dark brand panel. #}
   {% if glyph_path %}
-  <g data-hw-zone="brand-glyph" transform="translate({{ ornament_x }},{{ ornament_y }})">
-    <svg viewBox="{{ glyph_viewbox }}" width="{{ ornament_size }}" height="{{ ornament_size }}">
-      <path d="{{ glyph_path }}" fill="var(--dna-signal)"/>
+  {# v0.3.9 algorithmic strip glyph: identity glyph sized by ``strip_glyph_size``
+     (derived in compose/resolver.py as ``strip_height * strip_glyph_ratio``),
+     distinct from ornament_size which sizes the right bookend. Centers
+     within the ornament's bounding box. #}
+  {% set _idg_size = strip_glyph_size %}
+  {% set _idg_y = ornament_y + (ornament_size - _idg_size) // 2 %}
+  {% set _idg_x = ornament_x + (ornament_size - _idg_size) // 2 %}
+  <g data-hw-zone="brand-glyph" transform="translate({{ _idg_x }},{{ _idg_y }})">
+    <svg viewBox="{{ glyph_viewbox }}" width="{{ _idg_size }}" height="{{ _idg_size }}">
+      <path d="{{ glyph_path }}" fill="var(--dna-glyph-inner, var(--dna-signal))"/>
     </svg>
   </g>
   {% else %}
@@ -61,10 +68,12 @@
   {% endif %}
 
   {# (7) HYPERWEAVE identity text — paper-color (brand_text = surface_0 for
-     light variants) for visibility on the dark gradient panel. #}
+     light variants) for visibility on the dark gradient panel.
+     v0.3.9: textLength + lengthAdjust shrink-to-fit when identity overflows
+     the brand panel (per compute_strip_zones). Attribute lives on <text>. #}
   <text data-hw-zone="identity"
         x="{{ identity_text_x }}" y="{{ identity_text_y }}"
-        class="{{ uid }}-brand-text">{{ identity | upper }}</text>
+        class="{{ uid }}-brand-text"{% if identity_text_length and identity_text_length > 0 %} textLength="{{ identity_text_length }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ identity | upper }}</text>
 
   {# (8) Metric cells — dark ink values on paper substrate. Inter-cell
      divider uses --dna-ink-primary at 0.08 opacity (slightly lower than

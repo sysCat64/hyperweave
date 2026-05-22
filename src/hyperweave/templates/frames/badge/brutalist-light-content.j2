@@ -54,7 +54,7 @@
       font-family="var(--dna-font-mono, 'SF Mono', monospace)"
       font-size="11" font-weight="600"
       fill="var(--dna-label-text)"
-      letter-spacing="0.06em">{{ label_display | default(label | upper) }}</text>
+      letter-spacing="0.06em"{% if label_text_length and label_text_length > 0 %} textLength="{{ label_text_length }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ label_display | default(label | upper) }}</text>
 
 {# Value — dark ink on paper #}
 <text data-hw-zone="value"
@@ -62,7 +62,7 @@
       text-anchor="middle"
       font-family="var(--dna-font-mono, 'SF Mono', monospace)"
       font-size="11" font-weight="700"
-      fill="var(--hw-state-value, var(--dna-brand-text))">{{ value }}</text>
+      fill="var(--hw-state-value, var(--dna-brand-text))"{% if value_text_length and value_text_length > 0 %} textLength="{{ value_text_length }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ value }}</text>
 
 {# v0.3.2 Phase 4: scholar substrate status indicator is a CIRCLE (ring +
    center dot), matching the v0.3.2 brutalist light scholar prototype:116. The

@@ -43,7 +43,7 @@
    tracks surface_0 so the halo blends into the canvas. #}
 <filter id="{{ uid }}-hud" x="-20%" y="-20%" width="140%" height="140%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b"/>
-  <feFlood flood-color="{{ surface_0 | default('#04060A') }}" flood-opacity="0.85" result="c"/>
+  <feFlood flood-color="{{ surface_0 | default('var(--dna-surface)') }}" flood-opacity="0.85" result="c"/>
   <feComposite in="c" in2="b" operator="in" result="s"/>
   <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
 </filter>

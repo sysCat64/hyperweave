@@ -296,8 +296,13 @@ def test_build_milestones_empty_when_no_thresholds(sample_viewport: Viewport) ->
 
 def test_build_milestones_deoverlaps_clustered_crossings(sample_viewport: Viewport) -> None:
     """When multiple thresholds cross on nearly-adjacent x positions, only the
-    first one in each cluster survives — prevents the openclaw-style
-    '500/1K/5K/10K all stacked on top of each other' illegibility."""
+    highest-value crossing survives — prevents the openclaw-style
+    '500/1K/5K/10K all stacked on top of each other' illegibility.
+
+    Milestones are processed value-descending, so high-significance crossings
+    win conflicts. A 10K crossing beats a 500 crossing in the same cluster;
+    the earlier x-position order kept the low-value milestone and dropped the
+    late high-value one."""
     # Two data points very close in x so all crossings cluster in the gap.
     pts = _normalize_points(
         [
@@ -310,9 +315,8 @@ def test_build_milestones_deoverlaps_clustered_crossings(sample_viewport: Viewpo
     out = _build_milestones(pts, projected, sample_viewport, thresholds=thresholds)
     # All 6 crossings happen in one tight cluster; de-overlap keeps ≤ 2 labels.
     assert 1 <= len(out) <= 2
-    # The surviving label(s) must be the first crossing (lowest threshold
-    # value) — we keep oldest, drop the pileup following it.
-    assert out[0]["value"] == 500
+    # Value-descending iteration: the highest threshold wins the cluster.
+    assert out[0]["value"] == 15000
 
 
 def test_build_milestones_keeps_all_when_well_spaced(sample_viewport: Viewport) -> None:
@@ -607,20 +611,23 @@ def test_x_date_labels_empty_points() -> None:
 # overlap assertion catches regressions even if internal helpers drift.
 
 
-# Brutalist's font + letter-spacing produces the widest labels of any
-# paradigm — 9px sans-serif, 0.20em letter-spacing, uppercase transform.
-# Estimating ~7.5px per character gives a worst-case bound that's safe
-# across all paradigms.
-_TEST_CHAR_WIDTH_PX: float = 7.5
+# Width estimate uses real measure_text against the widest milestone CSS
+# (brutalist: JetBrains Mono 9px/800/0.12em) to match production. The
+# previous len * 7.5 estimate over-counted by ~11px on a 12-char label,
+# producing false-positive collisions that suppressed legitimate labels.
+# Keeping the test bound aligned with production keeps
+# the overlap check honest.
 _TEST_EDGE_PADDING_PX: float = 6.0
 
 
 def _bounds_for(label: dict[str, object]) -> tuple[float, float]:
     """Return (left, right) pixel edges of a generated label."""
+    from hyperweave.core.text import measure_text
+
     x = float(label["x"])  # type: ignore[arg-type]
     text = label["text"]
     assert isinstance(text, str)
-    width = len(text) * _TEST_CHAR_WIDTH_PX
+    width = measure_text(text, font_family="JetBrains Mono", font_size=9, font_weight=800, letter_spacing_em=0.12)
     anchor = label.get("anchor", "middle")
     if anchor == "start":
         return (x, x + width)
@@ -697,6 +704,52 @@ def test_x_date_labels_no_visual_overlap_for_one_year_history() -> None:
     labels = _build_x_date_labels(pts, _BRUTALIST_VP)
     assert len(labels) >= 2
     _assert_no_visual_overlap(labels)
+
+
+def test_x_date_labels_quarterly_for_fifteen_month_history() -> None:
+    """15-month histories should use even quarterly labels, not 6mo + endpoint."""
+    pts = _normalize_points(
+        [
+            {"date": "2025-02-01", "count": 1},
+            {"date": "2025-08-01", "count": 50},
+            {"date": "2026-02-01", "count": 200},
+            {"date": "2026-05-01", "count": 400},
+        ]
+    )
+    labels = _build_x_date_labels(pts, Viewport(x=80, y=160, w=750, h=250))
+    assert [label["text"] for label in labels] == [
+        "Feb 2025",
+        "May 2025",
+        "Aug 2025",
+        "Nov 2025",
+        "Feb 2026",
+        "May 2026",
+    ]
+    gaps = [labels[idx + 1]["x"] - labels[idx]["x"] for idx in range(len(labels) - 1)]
+    assert max(gaps) - min(gaps) <= 6
+
+
+def test_x_date_labels_quarterly_even_when_span_starts_mid_month() -> None:
+    """Calendar labels stay evenly spaced when endpoints are not month starts."""
+    pts = _normalize_points(
+        [
+            {"date": "2025-02-24", "count": 1},
+            {"date": "2025-08-10", "count": 50},
+            {"date": "2026-02-12", "count": 200},
+            {"date": "2026-05-21", "count": 400},
+        ]
+    )
+    labels = _build_x_date_labels(pts, Viewport(x=72, y=80, w=580, h=246))
+    assert [label["text"] for label in labels] == [
+        "Feb 2025",
+        "May 2025",
+        "Aug 2025",
+        "Nov 2025",
+        "Feb 2026",
+        "May 2026",
+    ]
+    gaps = [labels[idx + 1]["x"] - labels[idx]["x"] for idx in range(len(labels) - 1)]
+    assert max(gaps) - min(gaps) <= 1
 
 
 def test_x_date_labels_no_visual_overlap_for_two_year_history() -> None:

@@ -12,7 +12,7 @@ reads its ``hmtx`` table via ``fontTools``, and emits a JSON file at
       "font_family": "Orbitron",
       "baseline_size_px": 20,
       "units": "tenths_of_pixels",
-      "bold_expansion_factor": 1.06,
+      "bold_expansion_factor": 1.0,
       "fallback_width": 110,
       "widths": { " ": 78, "A": 145, ... }
     }
@@ -38,7 +38,9 @@ import sys
 from io import BytesIO
 from pathlib import Path
 
+from fontTools.pens.boundsPen import BoundsPen
 from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = Path(__file__).resolve().parent.parent
 FONTS_DIR = ROOT / "src" / "hyperweave" / "data" / "fonts"
@@ -54,28 +56,61 @@ def load_font_from_b64(path: Path) -> TTFont:
     return TTFont(BytesIO(base64.b64decode(raw_b64)))
 
 
-def extract_widths(font: TTFont, baseline_size_px: int) -> dict[str, int]:
-    """Return char -> width-in-tenths-of-pixels-at-baseline dict.
+def extract_widths_and_bearings(font: TTFont, baseline_size_px: int) -> tuple[dict[str, int], dict[str, list[int]]]:
+    """Return per-char (advance_widths, ink_bearings) at the baseline size.
 
-    Uses the font's ``cmap`` to map each supported ASCII codepoint to a
-    glyph name, then reads the glyph's ``hmtx`` advance width in
-    font-design units. Units are converted to pixels at
-    ``baseline_size_px`` via ``units_per_em``, then scaled by 10 to
-    match the ``tenths_of_pixels`` convention in ``inter.json``.
+    Advance widths follow the original schema — tenths-of-pixels at
+    ``baseline_size_px``. Ink bearings are returned as
+    ``{char: [lsb_tenths, rsb_tenths]}`` where:
+
+    * ``lsb`` is the distance from the glyph's origin to the leftmost
+      visible ink (left side bearing in the OpenType sense)
+    * ``rsb`` is the distance from the rightmost visible ink to the
+      advance width (right side bearing)
+
+    These let the text-measurement layer compute *visible-ink width* as
+    ``advance - first_char.lsb - last_char.rsb`` — the corrected width
+    that places downstream cursor work (badge seam placement, stat card
+    bio_x derivation) at the actual visible end of text, not at the
+    advance position which includes invisible trailing side-bearing.
+
+    Whitespace glyphs (no ink) return ``[0, advance]`` so subtracting
+    them produces zero visible width — correct behavior for an
+    all-whitespace string.
     """
     cmap = font.getBestCmap()
     hmtx = font["hmtx"]
+    glyph_set = font.getGlyphSet()
     units_per_em = font["head"].unitsPerEm
+    scale = baseline_size_px / units_per_em
     widths: dict[str, int] = {}
+    bearings: dict[str, list[int]] = {}
     for ch in SUPPORTED_ASCII:
         codepoint = ord(ch)
         if codepoint not in cmap:
             continue
         glyph_name = cmap[codepoint]
-        advance_design_units, _lsb = hmtx[glyph_name]
-        advance_px_at_baseline = advance_design_units * baseline_size_px / units_per_em
-        widths[ch] = round(advance_px_at_baseline * 10)
-    return widths
+        advance_design_units, _lsb_design = hmtx[glyph_name]
+        widths[ch] = round(advance_design_units * scale * 10)
+
+        # Compute visible-ink bounds via BoundsPen. Whitespace glyphs draw
+        # nothing; pen.bounds is None — treat as "no visible ink" so the
+        # entire advance is left+right bearing (rsb consumes the advance).
+        pen = BoundsPen(glyph_set)
+        try:
+            glyph_set[glyph_name].draw(pen)
+        except Exception:
+            # Defensive: a malformed glyph shouldn't crash the extraction.
+            bearings[ch] = [0, widths[ch]]
+            continue
+        if pen.bounds is None:
+            bearings[ch] = [0, widths[ch]]
+            continue
+        xmin, _ymin, xmax, _ymax = pen.bounds
+        lsb_px_at_baseline = xmin * scale  # ink-left from glyph origin
+        rsb_px_at_baseline = (advance_design_units - xmax) * scale  # advance - ink-right
+        bearings[ch] = [round(lsb_px_at_baseline * 10), round(rsb_px_at_baseline * 10)]
+    return widths, bearings
 
 
 def compute_fallback_width(widths: dict[str, int]) -> int:
@@ -94,8 +129,16 @@ def emit_metrics_json(
     aliases: list[str],
     is_monospace: bool = False,
     char_width_px: float = 0.0,
+    bearings: dict[str, list[int]] | None = None,
+    widths_by_weight: dict[str, dict[str, int]] | None = None,
+    bearings_by_weight: dict[str, dict[str, list[int]]] | None = None,
 ) -> dict[str, object]:
-    """Build the JSON dict matching inter.json schema (plus registry fields)."""
+    """Build the JSON dict matching inter.json schema (plus registry fields).
+
+    ``bearings`` is a v0.3.9 addition for per-glyph ink-width measurement
+    (used by ``measure_text_ink_width`` in core/text.py). Optional —
+    loaders that predate the field fall back to advance-width behavior.
+    """
     result: dict[str, object] = {
         "font_family": family,
         "baseline_size_px": baseline_size_px,
@@ -107,21 +150,28 @@ def emit_metrics_json(
         "char_width_px": char_width_px,
         "widths": widths,
     }
+    if bearings:
+        result["bearings"] = bearings
+    if widths_by_weight:
+        result["widths_by_weight"] = widths_by_weight
+    if bearings_by_weight:
+        result["bearings_by_weight"] = bearings_by_weight
     return result
 
 
 # Known font configs. Add entries here to extend.
 FONT_CONFIGS: dict[str, dict[str, object]] = {
     "orbitron": {
-        "variant": "Orbitron",
+        "family": "Orbitron",
         "baseline_size_px": 20,
-        "bold_expansion_factor": 1.06,
+        "bold_expansion_factor": 1.0,
         "aliases": ["orbitron"],
         "is_monospace": False,
         "char_width_px": 0.0,
+        "metric_weights": [400, 700, 800, 900],
     },
     "jetbrains-mono": {
-        "variant": "JetBrains Mono",
+        "family": "JetBrains Mono",
         "baseline_size_px": 11,
         "bold_expansion_factor": 1.0,  # true monospace — no bold width change
         "aliases": ["jetbrains mono", "jetbrains-mono", "sf mono", "menlo", "monospace"],
@@ -130,14 +180,52 @@ FONT_CONFIGS: dict[str, dict[str, object]] = {
         "char_width_px": 0.0,
     },
     "chakra-petch": {
-        "variant": "Chakra Petch",
+        "family": "Chakra Petch",
         "baseline_size_px": 12,  # dominant rendered size in automata badge value text
-        "bold_expansion_factor": 1.04,
+        "bold_expansion_factor": 1.0,
         "aliases": ["chakra petch", "chakra-petch"],
         "is_monospace": False,
         "char_width_px": 0.0,
+        "metric_weights": [400, 700, 900],
+        "metric_weight_sources": {
+            "400": "chakra-petch",
+            "700": "chakra-petch",
+            "900": "chakra-petch",
+        },
+    },
+    "barlow-condensed-900": {
+        "family": "Barlow Condensed",
+        "baseline_size_px": 18,  # dominant rendered size in brutalist strip value text
+        "bold_expansion_factor": 1.0,  # 900 is the heaviest weight shipped; no further expansion
+        "aliases": ["barlow condensed", "barlow-condensed", "barlow condensed 900"],
+        "is_monospace": False,
+        "char_width_px": 0.0,
+        "metric_weights": [400, 700, 900],
+        "metric_weight_sources": {
+            "400": "barlow-condensed-700",
+            "700": "barlow-condensed-700",
+            "900": "barlow-condensed-900",
+        },
     },
 }
+
+
+def load_metric_font_for_weight(slug: str, base_font: TTFont, config: dict[str, object], weight_int: int) -> TTFont:
+    """Return the font face used to extract metrics for ``weight_int``.
+
+    Variable fonts are instantiated by axis value. Static families can declare
+    ``metric_weight_sources`` to map weights to bundled font slugs.
+    """
+    weight_sources = config.get("metric_weight_sources")
+    if isinstance(weight_sources, dict):
+        source_slug = str(weight_sources.get(str(weight_int), slug))
+        source_path = FONTS_DIR / f"{source_slug}.b64"
+        if not source_path.exists():
+            raise FileNotFoundError(f"Missing font source for weight {weight_int}: {source_path}")
+        return load_font_from_b64(source_path)
+    if "fvar" in base_font:
+        return instantiateVariableFont(base_font, {"wght": weight_int}, inplace=False)
+    return base_font
 
 
 def extract_one(slug: str) -> Path:
@@ -151,7 +239,18 @@ def extract_one(slug: str) -> Path:
 
     font = load_font_from_b64(b64_path)
     baseline = int(config["baseline_size_px"])
-    widths = extract_widths(font, baseline)
+    widths, bearings = extract_widths_and_bearings(font, baseline)
+    widths_by_weight: dict[str, dict[str, int]] = {}
+    bearings_by_weight: dict[str, dict[str, list[int]]] = {}
+    metric_weights = config.get("metric_weights")
+    if isinstance(metric_weights, list):
+        for weight in metric_weights:
+            weight_int = int(weight)
+            weight_font = load_metric_font_for_weight(slug, font, config, weight_int)
+            weight_widths, weight_bearings = extract_widths_and_bearings(weight_font, baseline)
+            key = str(weight_int)
+            widths_by_weight[key] = weight_widths
+            bearings_by_weight[key] = weight_bearings
 
     char_width_px = float(config["char_width_px"])
     is_mono = bool(config["is_monospace"])
@@ -161,13 +260,16 @@ def extract_one(slug: str) -> Path:
         char_width_px = advance_tenths / 10.0
 
     data = emit_metrics_json(
-        variant=str(config["family"]),
+        family=str(config["family"]),
         baseline_size_px=baseline,
         widths=widths,
         bold_expansion_factor=float(config["bold_expansion_factor"]),
         aliases=list(config["aliases"]),  # type: ignore[arg-type]
         is_monospace=is_mono,
         char_width_px=char_width_px,
+        bearings=bearings,
+        widths_by_weight=widths_by_weight,
+        bearings_by_weight=bearings_by_weight,
     )
 
     out_path = METRICS_DIR / f"{slug}.json"

@@ -1,9 +1,8 @@
 """Per-(frame, genome) font embedding gate tests.
 
 The CSS module gate at compose/assembler.py:183-226 already gates bridge,
-expression, status, motion, telemetry per frame type. v0.3.0 Round 6
-introduced a per-frame font gate; v0.3.7 evolved it into a per-(frame,
-genome) gate at ``data/font-embedding.yaml`` so the brutalist badge
+expression, status, motion, telemetry per frame type. The font embedding
+gate is per-(frame, genome) via ``data/font-embedding.yaml`` so the brutalist badge
 embeds JetBrains Mono only (saving ~28KB) even though the brutalist
 genome declares Barlow Condensed for its stats/strip/chart frames.
 

@@ -54,7 +54,11 @@ version-refresh:
     @uv run python -c "import hyperweave; print(f'_version.py refreshed to {hyperweave.__version__}')"
 
 tag VERSION MESSAGE:
-    git tag -a {{VERSION}} -m "{{MESSAGE}}"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VER="{{VERSION}}"
+    [[ "$VER" == v* ]] || VER="v$VER"
+    git tag -a "$VER" -m "{{MESSAGE}}"
     just version-refresh
-    @echo ""
-    @echo "Tagged {{VERSION}}. Push with: git push --follow-tags"
+    echo ""
+    echo "Tagged $VER. Push with: git push --follow-tags"
