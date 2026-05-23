@@ -6,7 +6,7 @@
    — so the specimen still renders identically. #}
 
 {# Envelope — genome-declared (required for chrome paradigm). #}
-<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="-0.1" y2="0.9">
+<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="{{ gradient_y_neg_010 }}" y2="{{ gradient_y_090 }}">
 {% for stop in envelope_stops %}
   <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}"/>
 {% endfor %}
@@ -52,7 +52,7 @@
   <stop offset="0%"   stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="35%"  stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="46%"  stop-color="{{ specular_light }}" stop-opacity="0.3"/>
-  <stop offset="50%"  stop-color="#FFFFFF" stop-opacity="0.6"/>
+  <stop offset="50%"  stop-color="var(--dna-specular-core, var(--dna-ink-primary))" stop-opacity="0.6"/>
   <stop offset="54%"  stop-color="{{ specular_light }}" stop-opacity="0.3"/>
   <stop offset="65%"  stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="100%" stop-color="{{ specular_light }}" stop-opacity="0"/>
@@ -67,7 +67,7 @@
    chart bevels match the icon's material discipline. Genomes that
    declare "none" (brutalist, automata) get the plain drop-shadow path. #}
 <filter id="{{ uid }}-bevel" x="-2%" y="-3%" width="104%" height="108%">
-  <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000000" flood-opacity="{{ bevel_shadow_opacity | default('0.5') }}"/>
+  <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="var(--dna-shadow-color, black)" flood-opacity="{{ bevel_shadow_opacity | default('0.5') }}"/>
   {% if material_filter_chain == "specular-bevel" %}
   <feSpecularLighting in="SourceAlpha" surfaceScale="1.6" specularConstant="0.55"
     specularExponent="16" lighting-color="{{ specular_light }}" result="spec">
@@ -88,7 +88,7 @@
    genome's specular_light if provided and fall back to chrome cyan. #}
 <filter id="{{ uid }}-lineglow" x="-15%" y="-50%" width="130%" height="200%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="blur1"/>
-  <feFlood flood-color="#FFFFFF" flood-opacity="0.35"/>
+  <feFlood flood-color="var(--dna-specular-core, {{ specular_light }})" flood-opacity="0.35"/>
   <feComposite in2="blur1" operator="in" result="glow1"/>
   <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur2"/>
   <feFlood flood-color="{{ specular_light }}" flood-opacity="0.55"/>
@@ -110,7 +110,7 @@
 
 <filter id="{{ uid }}-endglow" x="-80%" y="-80%" width="260%" height="260%">
   <feGaussianBlur stdDeviation="5" result="b"/>
-  <feFlood flood-color="#FFFFFF" flood-opacity="0.75"/>
+  <feFlood flood-color="var(--dna-specular-core, {{ specular_light }})" flood-opacity="0.75"/>
   <feComposite in2="b" operator="in" result="g"/>
   <feMerge>
     <feMergeNode in="g"/>
@@ -118,7 +118,10 @@
   </feMerge>
 </filter>
 
-<clipPath id="{{ uid }}-clip"><rect width="{{ width }}" height="{{ height }}" rx="6"/></clipPath>
+<clipPath id="{{ uid }}-clip">
+  <rect width="{{ chart_layout.rects.chrome_clip.w }}" height="{{ chart_layout.rects.chrome_clip.h }}"
+        rx="{{ chart_layout.rects.chrome_clip.rx }}"/>
+</clipPath>
 {{ chart_defs | default("") | safe }}
 
 <style>
@@ -147,8 +150,8 @@
   .hw-chart-milestone-line  { stroke: var(--dna-signal); stroke-width: 0.5; opacity: 0.35; }
   .hw-chart-milestone-label { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em; fill: var(--dna-ink-primary); }
   [data-hw-status="active"], [data-hw-status="passing"] { --hw-core: var(--dna-signal); }
-  [data-hw-status="warning"] { --hw-core: var(--dna-status-warning-core, #F59E0B); }
-  [data-hw-status="critical"], [data-hw-status="failing"] { --hw-core: var(--dna-status-failing-core, #EF4444); }
+  [data-hw-status="warning"] { --hw-core: var(--dna-status-warning-core, var(--dna-signal)); }
+  [data-hw-status="critical"], [data-hw-status="failing"] { --hw-core: var(--dna-status-failing-core, var(--dna-signal)); }
   @keyframes {{ uid }}-breathe       { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
   @keyframes {{ uid }}-horizon-pulse { 0%,100% { opacity: 0.8;  } 50% { opacity: 1; } }
   .{{ uid }}-dia, .{{ uid }}-end, .{{ uid }}-mile { animation: {{ uid }}-breathe 2.618s ease-in-out infinite; will-change: opacity; }

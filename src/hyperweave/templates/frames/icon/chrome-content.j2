@@ -13,22 +13,22 @@
 {% if icon_variant | default('binary-circular') == 'binary-square' %}
 {# ─── Square variant ─── 96×96 rx=6 card at (12, 12) · 6-layer stack
        Layer order (matches v2 spec):
-         1. envelope-fill rect with bevel filter (rx=6, full 96×96)
-         2. 0.7-unit inner hairline (inset 1.5, rx=4.5, stroke #000510)
-         3. 90×90 rx=3.2 icon-well (inset 3 from card edge, radial gradient)
-         4. 6-unit env-rail at (3, 3) · vertical envelope sliver · opacity 0.85
-         5. 76×0.6 top accent at (14, 3) · #6AACC8 milled-edge detail
-         6. 0.9-unit rim-sweep stroke on (1.5, 1.5, 93, 93) rx=4.5 · animated
+         1. envelope-fill rect with bevel filter
+         2. inner hairline from chrome_icon_inner_stroke
+         3. icon-well radial gradient
+         4. env-rail vertical envelope sliver
+         5. top accent from chrome_icon_top_accent
+         6. rim-sweep stroke animated over the inner perimeter
        Glyph inlined at local (30, 30) → canvas (42, 42), 36×36 centered. #}
-<g transform="translate(12, 12)">
-  <rect width="96" height="96" rx="6" fill="url(#{{ uid }}-env)" filter="url(#{{ uid }}-bevel)"/>
-  <rect x="1.5" y="1.5" width="93" height="93" rx="4.5" fill="none" stroke="#000510" stroke-width="0.7"/>
-  <rect x="3" y="3" width="90" height="90" rx="3.2" fill="url(#{{ uid }}-well)"/>
-  <rect x="3" y="3" width="6" height="90" fill="url(#{{ uid }}-env-rail)" opacity="0.85"/>
-  <rect x="14" y="3" width="76" height="0.6" fill="#6AACC8" opacity="0.16"/>
-  <rect x="1.5" y="1.5" width="93" height="93" rx="4.5" fill="none" stroke="url(#{{ uid }}-rim)" stroke-width="0.9"/>
+<g transform="translate({{ icon_geometry.chrome_square_group_x }}, {{ icon_geometry.chrome_square_group_y }})">
+  <rect width="{{ icon_geometry.chrome_square_outer_w }}" height="{{ icon_geometry.chrome_square_outer_h }}" rx="{{ icon_geometry.chrome_square_outer_rx }}" fill="url(#{{ uid }}-env)" filter="url(#{{ uid }}-bevel)"/>
+  <rect x="{{ icon_geometry.chrome_square_inner_x }}" y="{{ icon_geometry.chrome_square_inner_y }}" width="{{ icon_geometry.chrome_square_inner_w }}" height="{{ icon_geometry.chrome_square_inner_h }}" rx="{{ icon_geometry.chrome_square_inner_rx }}" fill="none" stroke="{{ chrome_icon_inner_stroke }}" stroke-width="0.7"/>
+  <rect x="{{ icon_geometry.chrome_square_well_x }}" y="{{ icon_geometry.chrome_square_well_y }}" width="{{ icon_geometry.chrome_square_well_w }}" height="{{ icon_geometry.chrome_square_well_h }}" rx="{{ icon_geometry.chrome_square_well_rx }}" fill="url(#{{ uid }}-well)"/>
+  <rect x="{{ icon_geometry.chrome_square_rail_x }}" y="{{ icon_geometry.chrome_square_rail_y }}" width="{{ icon_geometry.chrome_square_rail_w }}" height="{{ icon_geometry.chrome_square_rail_h }}" fill="url(#{{ uid }}-env-rail)" opacity="0.85"/>
+  <rect x="{{ icon_geometry.chrome_square_accent_x }}" y="{{ icon_geometry.chrome_square_accent_y }}" width="{{ icon_geometry.chrome_square_accent_w }}" height="{{ icon_geometry.chrome_square_accent_h }}" fill="{{ chrome_icon_top_accent }}" opacity="0.16"/>
+  <rect x="{{ icon_geometry.chrome_square_inner_x }}" y="{{ icon_geometry.chrome_square_inner_y }}" width="{{ icon_geometry.chrome_square_inner_w }}" height="{{ icon_geometry.chrome_square_inner_h }}" rx="{{ icon_geometry.chrome_square_inner_rx }}" fill="none" stroke="url(#{{ uid }}-rim)" stroke-width="0.9"/>
 {% if glyph_path %}
-  <svg viewBox="{{ glyph_viewbox }}" width="36" height="36" x="30" y="30" overflow="visible">
+  <svg viewBox="{{ glyph_viewbox }}" width="{{ icon_geometry.chrome_square_glyph_size }}" height="{{ icon_geometry.chrome_square_glyph_size }}" x="{{ icon_geometry.chrome_square_glyph_x }}" y="{{ icon_geometry.chrome_square_glyph_y }}" overflow="visible">
     <path d="{{ glyph_path }}" fill="{{ glyph_fill }}"/>
   </svg>
 {% endif %}
@@ -37,23 +37,20 @@
 {% else %}
 {# ─── Circle variant ─── 92-unit chrome ring centered at (60, 60) · 4-layer stack
        Layer order (matches v2 spec):
-         1. 5-unit envelope-gradient bezel ring at radius 46 (linearGradient
-            carries the metallic sweep — feSpecularLighting was removed because
-            the 5-unit annular geometry is too narrow for the kernel; highlight
-            pixelated as grain at 64px display)
-         2. radial icon-well at radius 42 · dark sky interior
-         3. 0.6-unit dark inner hairline at radius 42 · door-gap between bezel and well
-         4. 1.0-unit travelling rim-stroke at radius 42 · 17.944s phi³ sweep
+         1. envelope-gradient bezel ring
+         2. radial icon-well
+         3. chrome_icon_inner_stroke hairline between bezel and well
+         4. travelling rim-stroke
        Square variant retains the bevel filter (96×96 fill geometry is wide
        enough for the specular kernel to read as smooth metallic surface).
        Glyph inlined at local (-24, -24) → canvas (36, 36), 48×48 centered. #}
-<g transform="translate(60, 60)">
-  <circle r="46" fill="none" stroke="url(#{{ uid }}-env)" stroke-width="5"/>
-  <circle r="42" fill="url(#{{ uid }}-well)"/>
-  <circle r="42" fill="none" stroke="#000510" stroke-width="0.6"/>
-  <circle r="42" fill="none" stroke="url(#{{ uid }}-rim)" stroke-width="1.0"/>
+<g transform="translate({{ icon_geometry.chrome_circle_group_x }}, {{ icon_geometry.chrome_circle_group_y }})">
+  <circle r="{{ icon_geometry.chrome_circle_outer_r }}" fill="none" stroke="url(#{{ uid }}-env)" stroke-width="5"/>
+  <circle r="{{ icon_geometry.chrome_circle_well_r }}" fill="url(#{{ uid }}-well)"/>
+  <circle r="{{ icon_geometry.chrome_circle_well_r }}" fill="none" stroke="{{ chrome_icon_inner_stroke }}" stroke-width="0.6"/>
+  <circle r="{{ icon_geometry.chrome_circle_well_r }}" fill="none" stroke="url(#{{ uid }}-rim)" stroke-width="1.0"/>
 {% if glyph_path %}
-  <svg viewBox="{{ glyph_viewbox }}" width="48" height="48" x="-24" y="-24" overflow="visible">
+  <svg viewBox="{{ glyph_viewbox }}" width="{{ icon_geometry.chrome_circle_glyph_size }}" height="{{ icon_geometry.chrome_circle_glyph_size }}" x="{{ icon_geometry.chrome_circle_glyph_x }}" y="{{ icon_geometry.chrome_circle_glyph_y }}" overflow="visible">
     <path d="{{ glyph_path }}" fill="{{ glyph_fill }}"/>
   </svg>
 {% endif %}

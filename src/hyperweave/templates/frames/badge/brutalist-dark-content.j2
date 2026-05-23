@@ -2,18 +2,18 @@
    v0.3.3 calibrated against tier2/genomes/brutalist/brutalist-v03/
    hw-elegant-mono-badge-matrix-v16.html. Two flat panels (elevated over canvas)
    with a single state-colored separator at the seam; no inset perimeter
-   stroke. Spatial values flow from compose/layout.py (lp_w, right_panel_x,
+   stroke. Spatial values flow from compose/layout.py (left_panel_width, right_panel_x,
    indicator_x, inner_bit_w). The prototype's 158x20 geometry is reproduced
    when label="BUILD" + value="passing" — other labels/values reshape via
    measure_text but the chromatic and geometric contracts stay constant.
 
    Element contract (audited element-by-element against v16 prototype):
 
-     Left panel  : brand_panel_fill (elevated panel tone, celadon #102818).
+     Left panel  : brand_panel_fill (elevated panel tone).
                    Reads from brand_panel_fill JSON field — a badge/strip-
                    semantic field, NOT the genome-wide canvas (surface_0).
                    Decoupling preserves strip/stats canvas integrity.
-     Right panel : surface_0 (canvas/ground tone, celadon #06140C). Same
+     Right panel : surface_0 (canvas/ground tone). Same
                    value the strip/stats/chart use for their substrate.
      Seam gap    : --dna-seam-gap (fallback --dna-surface) fills the
                    geometric gap when resolver computes seam_w > 0; without
@@ -21,14 +21,14 @@
                    background through (white in light MD, dark in dark MD).
      Accent bar  : --dna-signal (chassis tone), 4px at x=0
      Separator   : --hw-state-sep (per-state) → passing=accent, warn=amber,
-                   fail=red. 2px overlay at x=lp_w.
+                   fail=red. 2px overlay at x=left_panel_width.
      Glyph       : currentColor (set via accent_w-anchored translate)
      Label       : --dna-ink-primary (cream/ink-bright per variant, celadon
-                   #D8F0E0), weight 700, ls 0.06em. Distinct from --dna-
+                   genome ink role), weight 700, ls 0.06em. Distinct from --dna-
                    label-text (which carries the strip's muted accent — same
                    semantic role, different per-frame tonal needs).
      Value       : --hw-state-value (per-state) → passing=ink_secondary,
-                   warn=#FDE68A, fail=#FCA5A5. Weight 700, ls 0.04em.
+                   warn/fail state roles. Weight 700, ls 0.04em.
      Indicator   : --hw-state-ring stroke (1.5px) + --dna-status-color bit
                    (10x10 outer, 6x6 inner at offset 2).
 
@@ -37,13 +37,13 @@
 #}
 
 <g clip-path="url(#{{ uid }}-clip)">
-  <rect width="{{ lp_w }}" height="{{ h }}" fill="var(--dna-brand-panel-fill)"/>
-  <rect x="{{ right_panel_x - 1 }}" width="{{ right_panel_w + 1 }}" height="{{ h }}" fill="var(--dna-surface)"/>
+  <rect width="{{ left_panel_width }}" height="{{ h }}" fill="var(--dna-brand-panel-fill)"/>
+  <rect x="{{ right_panel_draw_x }}" width="{{ right_panel_draw_w }}" height="{{ h }}" fill="var(--dna-surface)"/>
 </g>
-<rect x="0" y="0" width="{{ accent_w }}" height="{{ h }}" fill="var(--dna-signal)" data-hw-zone="accent-bar"/>
-<rect x="{{ lp_w }}" y="0" width="{{ sep_w_val }}" height="{{ h }}" fill="var(--hw-state-sep, var(--dna-signal))"/>
-{% if seam_w_val > 0 %}
-<rect x="{{ lp_w + sep_w_val }}" y="0" width="{{ seam_w_val }}" height="{{ h }}" fill="var(--dna-seam-gap, var(--dna-surface))"/>
+<rect x="{{ badge_origin_x }}" y="{{ badge_origin_y }}" width="{{ accent_w }}" height="{{ h }}" fill="var(--dna-signal)" data-hw-zone="accent-bar"/>
+<rect x="{{ left_panel_width }}" y="{{ badge_origin_y }}" width="{{ sep_width }}" height="{{ h }}" fill="var(--hw-state-sep, var(--dna-signal))"/>
+{% if seam_width > 0 %}
+<rect x="{{ seam_gap_x }}" y="{{ badge_origin_y }}" width="{{ seam_width }}" height="{{ h }}" fill="var(--dna-seam-gap, var(--dna-surface))"/>
 {% endif %}
 
 {# Glyph #}
@@ -82,9 +82,8 @@
    brutalist v0.3.3 ships 1.5 / 6 (0.6 ratio), matching the v16
    prototype's translate(138,5) → 10x10 ring + 6x6 bit at offset 2. #}
 {% if show_indicator %}
-{% set ind_y = (h - ind_size) // 2 %}
-<g data-hw-zone="status" transform="translate({{ indicator_x }},{{ ind_y }})">
-  <rect fill="none" stroke="var(--hw-state-ring, var(--dna-signal))" stroke-width="{{ indicator_stroke_width | default('1.2') }}" width="{{ ind_size }}" height="{{ ind_size }}"/>
+<g data-hw-zone="status" transform="translate({{ indicator_x }},{{ indicator_y }})">
+  <rect fill="none" stroke="var(--hw-state-ring, var(--dna-signal))" stroke-width="{{ indicator_stroke_width | default('1.2') }}" width="{{ indicator_size }}" height="{{ indicator_size }}"/>
   <rect class="hw-logic-bit" x="{{ inner_bit_offset }}" y="{{ inner_bit_offset }}" width="{{ inner_bit_w }}" height="{{ inner_bit_w }}"
         fill="var(--dna-status-color, var(--dna-signal))"/>
 </g>

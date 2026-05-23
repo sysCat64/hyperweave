@@ -183,17 +183,6 @@ _TEXT_FIELDS_BY_FRAME: dict[str, tuple[str, ...]] = {
         "profile_label",
         "stages",
     ),
-    "master-card": (
-        "mc_title",
-        "mc_subtitle",
-        "mc_total_tokens",
-        "mc_total_cost",
-        "mc_sessions",
-        "mc_skills",
-        "session_entries",
-        "footer_left",
-        "footer_right",
-    ),
     "catalog": (
         "catalog_title",
         "catalog_subtitle",
@@ -279,7 +268,6 @@ def build_context(
         FrameType.MARQUEE_HORIZONTAL: _ctx_marquee,
         FrameType.RECEIPT: _ctx_receipt,
         FrameType.RHYTHM_STRIP: _ctx_rhythm_strip,
-        FrameType.MASTER_CARD: _ctx_master_card,
         FrameType.CATALOG: _ctx_catalog,
         FrameType.STATS: _ctx_stats,
         FrameType.CHART: _ctx_chart,
@@ -325,6 +313,9 @@ def _base_context(
     css_assembled = css_debug + "\n" + "\n".join(p for p in css_parts if p)
 
     profile = resolved.profile
+    glyph_viewbox = resolved.glyph_viewbox or "0 0 640 640"
+    glyph_render_viewbox = str(resolved.frame_context.get("glyph_render_viewbox") or glyph_viewbox)
+    glyph_viewbox_cx, glyph_viewbox_cy = _viewbox_center(glyph_viewbox)
 
     ctx: dict[str, Any] = {
         # Identity
@@ -363,6 +354,7 @@ def _base_context(
         # Dimensions
         "width": resolved.width,
         "height": resolved.height,
+        "spatial_aspect_ratio": f"{resolved.width / resolved.height:.2f}" if resolved.height else "0.00",
         # CSS
         "css": css_assembled,
         # Content
@@ -387,7 +379,10 @@ def _base_context(
         # Glyph
         "glyph_id": resolved.glyph_id,
         "glyph_path": resolved.glyph_path,
-        "glyph_viewbox": resolved.glyph_viewbox or "0 0 640 640",
+        "glyph_viewbox": glyph_viewbox,
+        "glyph_render_viewbox": glyph_render_viewbox,
+        "glyph_viewbox_cx": glyph_viewbox_cx,
+        "glyph_viewbox_cy": glyph_viewbox_cy,
         "glyph_mode": spec.glyph_mode,
         "has_glyph": bool(resolved.glyph_id),
         "glyph_svg": _build_glyph_svg(
@@ -399,6 +394,7 @@ def _base_context(
             # preserves the v16 prototype. Previously the inline template
             # hardcoded 14 and ignored paradigm config.
             int(resolved.frame_context.get("glyph_render_size") or resolved.frame_context.get("glyph_size") or 14),
+            glyph_render_viewbox,
         ),
         # Metadata / accessibility
         "title_text": _aria_title(spec),
@@ -406,6 +402,14 @@ def _base_context(
         # Document-level attributes (used by document.svg.j2 base template)
         "terminal_id": "",
         "rule_id": "",
+        # Chrome material gradients intentionally overrun the SVG extent.
+        "gradient_y_neg_010": -0.1,
+        "gradient_y_090": 0.9,
+        "gradient_y_neg_005": -0.05,
+        "gradient_y_095": 0.95,
+        "gradient_c_mid": 0.5,
+        "gradient_cy_upper": 0.4,
+        "gradient_r_medium": 0.6,
         # Motion SVG placeholders
         "motion_svg": "",
         "motion_border_defs": "",
@@ -540,6 +544,18 @@ def _ctx_marquee(spec: ComposeSpec, resolved: ResolvedArtifact, css: dict[str, s
     ctx["separator_size"] = 6
     ctx["separator_glyph"] = "■"
     ctx["separator_color"] = "var(--dna-border)"
+    ctx["separator_fill"] = "var(--dna-signal, var(--dna-border))"
+    ctx["marquee_baseline_y"] = 20
+    ctx["separator_rect_y"] = 17
+    ctx["marquee_perimeter_w"] = 799
+    ctx["marquee_perimeter_h"] = 39
+    ctx["chrome_well_w"] = 792
+    ctx["chrome_well_h"] = 32
+    ctx["chrome_inner_w"] = 798
+    ctx["chrome_inner_h"] = 38
+    ctx["chrome_rail_h"] = 32
+    ctx["chrome_top_accent_w"] = 752
+    ctx["cellular_bottom_hairline_y"] = 39.5
     ctx["text_fill_mode"] = "per_item"
     ctx["text_fill_gradient_id"] = ""
     ctx["clip_x"] = 0
@@ -591,32 +607,6 @@ def _ctx_rhythm_strip(spec: ComposeSpec, resolved: ResolvedArtifact, css: dict[s
     ctx["loop_label"] = "NOMINAL"
     ctx["loop_detail"] = "no loop"
     ctx["profile_label"] = ""
-    ctx.update(resolved.frame_context)
-    return ctx
-
-
-def _ctx_master_card(spec: ComposeSpec, resolved: ResolvedArtifact, css: dict[str, str]) -> dict[str, Any]:
-    ctx, _uid, _aid = _base_context(spec, resolved, css)
-    ctx["mc_title"] = "Session Summary"
-    ctx["mc_subtitle"] = ""
-    ctx["mc_total_tokens"] = ""
-    ctx["mc_total_cost"] = ""
-    ctx["mc_session_count"] = 0
-    ctx["mc_sessions"] = []
-    ctx["mc_sparkline_points"] = ""
-    ctx["mc_skills"] = []
-    ctx["mc_heatmap"] = []
-    ctx["session_entries"] = []
-    ctx["history_svg"] = ""
-    ctx["burn_svg"] = ""
-    ctx["heatmap_svg"] = ""
-    ctx["tools"] = []
-    ctx["stages"] = []
-    ctx["loop_detected"] = False
-    ctx["loop_elevated"] = False
-    ctx["velocity"] = {}
-    ctx["footer_left"] = ""
-    ctx["footer_right"] = ""
     ctx.update(resolved.frame_context)
     return ctx
 
@@ -761,10 +751,11 @@ def _build_glyph_svg(
     glyph_mode: str = "fill",
     glyph_fill_color: str = "var(--dna-signal)",
     glyph_size: int = 14,
+    glyph_viewbox: str = "",
 ) -> str:
     if not resolved.glyph_path:
         return ""
-    vb = resolved.glyph_viewbox or "0 0 640 640"
+    vb = glyph_viewbox or resolved.glyph_viewbox or "0 0 640 640"
     from hyperweave.render.templates import render_template
 
     return render_template(
@@ -777,6 +768,16 @@ def _build_glyph_svg(
             "glyph_size": glyph_size,
         },
     )
+
+
+def _viewbox_center(viewbox: str) -> tuple[float, float]:
+    parts = viewbox.split()
+    if len(parts) < 4:
+        return (320.0, 320.0)
+    try:
+        return (float(parts[2]) / 2.0, float(parts[3]) / 2.0)
+    except ValueError:
+        return (320.0, 320.0)
 
 
 def _aria_title(spec: ComposeSpec) -> str:

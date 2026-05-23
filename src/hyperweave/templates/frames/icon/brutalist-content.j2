@@ -8,10 +8,10 @@
    BRUTALIST CIRCULAR -- single ring, glyph-dominant, no label
    Specimen: brutalist-icon-frames/brutalist-circular-v2.svg
    ================================================================ #}
-<circle cx="32" cy="32" r="28" fill="var(--dna-surface)"/>
-<circle cx="32" cy="32" r="28" fill="none" stroke="var(--dna-signal)" stroke-width="2.5"/>
+<circle cx="{{ icon_geometry.brutalist_circle_cx }}" cy="{{ icon_geometry.brutalist_circle_cy }}" r="{{ icon_geometry.brutalist_circle_r }}" fill="var(--dna-surface)"/>
+<circle cx="{{ icon_geometry.brutalist_circle_cx }}" cy="{{ icon_geometry.brutalist_circle_cy }}" r="{{ icon_geometry.brutalist_circle_r }}" fill="none" stroke="var(--dna-signal)" stroke-width="2.5"/>
 {% if glyph_path %}
-<svg x="18" y="18" width="28" height="28" viewBox="{{ glyph_viewbox }}">
+<svg x="{{ icon_geometry.brutalist_circle_glyph_x }}" y="{{ icon_geometry.brutalist_circle_glyph_y }}" width="{{ icon_geometry.brutalist_circle_glyph_size }}" height="{{ icon_geometry.brutalist_circle_glyph_size }}" viewBox="{{ glyph_viewbox }}">
   <path d="{{ glyph_path }}" fill="var(--dna-signal-dim)" stroke="none"/>
 </svg>
 {% endif %}
@@ -21,11 +21,11 @@
    BRUTALIST SQUARE -- accent bar, heavy border, no label
    Specimen: brutalist-icon-frames/brutalist-square-v2.svg
    ================================================================ #}
-<rect x="2" y="2" width="60" height="60" fill="var(--dna-surface)"/>
-<rect x="1.25" y="1.25" width="61.5" height="61.5" fill="none" stroke="var(--dna-signal)" stroke-width="2.5"/>
-<rect x="2" y="2" width="60" height="3" fill="var(--dna-signal)"/>
+<rect x="{{ icon_geometry.brutalist_square_x }}" y="{{ icon_geometry.brutalist_square_y }}" width="{{ icon_geometry.brutalist_square_w }}" height="{{ icon_geometry.brutalist_square_h }}" fill="var(--dna-surface)"/>
+<rect x="{{ icon_geometry.brutalist_square_border_x }}" y="{{ icon_geometry.brutalist_square_border_y }}" width="{{ icon_geometry.brutalist_square_border_w }}" height="{{ icon_geometry.brutalist_square_border_h }}" fill="none" stroke="var(--dna-signal)" stroke-width="2.5"/>
+<rect x="{{ icon_geometry.brutalist_square_x }}" y="{{ icon_geometry.brutalist_square_y }}" width="{{ icon_geometry.brutalist_square_w }}" height="{{ icon_geometry.brutalist_square_accent_h }}" fill="var(--dna-signal)"/>
 {% if glyph_path %}
-<svg x="18" y="20" width="28" height="28" viewBox="{{ glyph_viewbox }}">
+<svg x="{{ icon_geometry.brutalist_square_glyph_x }}" y="{{ icon_geometry.brutalist_square_glyph_y }}" width="{{ icon_geometry.brutalist_square_glyph_size }}" height="{{ icon_geometry.brutalist_square_glyph_size }}" viewBox="{{ glyph_viewbox }}">
   <path d="{{ glyph_path }}" fill="var(--dna-signal-dim)" stroke="none"/>
 </svg>
 {% endif %}

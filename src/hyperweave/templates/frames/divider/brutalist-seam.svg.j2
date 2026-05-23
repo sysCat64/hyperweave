@@ -11,7 +11,7 @@
    (pulse/archive/depth/signal/afterimage/primer) deliberately inherit
    accent_signal from the base genome's emerald per the chromatic coverage
    contract carve-out (see compose/validate_paradigms.py:38), so the joints
-   rendered #059669 mint-green across every light variant regardless of
+   rendered base-passing green across every light variant regardless of
    palette. accent_complement is the variant-tonal-pair structural mate and
    IS overridden per variant — the right register for rebar-in-concrete.
 
@@ -29,21 +29,13 @@
 {% endblock %}
 
 {% block content %}
-{# Five horizontal rule segments at y=8. Segment x-ranges:
-   0-152 · 168-312 · 328-472 · 488-632 · 648-800 (16-px gaps). #}
-<line x1="0"   y1="8" x2="152" y2="8" stroke="{{ accent }}" stroke-width="1.5" opacity="0.6"/>
-<line x1="168" y1="8" x2="312" y2="8" stroke="{{ accent }}" stroke-width="1.5" opacity="0.6"/>
-<line x1="328" y1="8" x2="472" y2="8" stroke="{{ accent }}" stroke-width="1.5" opacity="0.6"/>
-<line x1="488" y1="8" x2="632" y2="8" stroke="{{ accent }}" stroke-width="1.5" opacity="0.6"/>
-<line x1="648" y1="8" x2="800" y2="8" stroke="{{ accent }}" stroke-width="1.5" opacity="0.6"/>
+{# Horizontal rule segments are computed by the divider resolver. #}
+{% for segment in seam_segments %}
+<line x1="{{ segment.x1 }}" y1="{{ segment.y }}" x2="{{ segment.x2 }}" y2="{{ segment.y }}" stroke="{{ accent }}" stroke-width="1.5" opacity="0.6"/>
+{% endfor %}
 
 {# Joint faces — perpendicular marks at the four gap edges (8 verticals total). #}
-<line x1="152" y1="4" x2="152" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="168" y1="4" x2="168" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="312" y1="4" x2="312" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="328" y1="4" x2="328" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="472" y1="4" x2="472" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="488" y1="4" x2="488" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="632" y1="4" x2="632" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
-<line x1="648" y1="4" x2="648" y2="12" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
+{% for joint in seam_joints %}
+<line x1="{{ joint.x }}" y1="{{ joint.y1 }}" x2="{{ joint.x }}" y2="{{ joint.y2 }}" stroke="{{ accent_complement }}" stroke-width="1.2" opacity="0.65"/>
+{% endfor %}
 {% endblock %}

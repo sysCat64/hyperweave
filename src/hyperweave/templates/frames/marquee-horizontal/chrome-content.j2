@@ -8,6 +8,6 @@
    then visually scrolls UNDER them at the edges instead of over them.
 #}
 <g filter="url(#{{ uid }}-bevel)">
-  <rect width="{{ mw }}" height="{{ mh }}" rx="4" fill="url(#{{ uid }}-envelope)"/>
+  <rect width="{{ mw }}" height="{{ mh }}" rx="{{ marquee_geom.chrome_outer_rx }}" fill="url(#{{ uid }}-envelope)"/>
 </g>
-<rect x="4" y="4" width="{{ mw - 8 }}" height="{{ mh - 8 }}" rx="2.6" fill="url(#{{ uid }}-well)"/>
+<rect x="{{ marquee_geom.chrome_well_x }}" y="{{ marquee_geom.chrome_well_y }}" width="{{ chrome_well_w }}" height="{{ chrome_well_h }}" rx="{{ marquee_geom.chrome_well_rx }}" fill="url(#{{ uid }}-well)"/>

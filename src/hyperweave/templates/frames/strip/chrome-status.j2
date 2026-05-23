@@ -5,9 +5,15 @@
    tonal recession sourced from per-variant diamond_housing / diamond_stroke
    fields in chrome.json. Single-responsibility vars eliminate the
    --dna-signal-dim aliasing that bled accent_complement into the stroke. #}
-<rect x="-4.2" y="-4.2" width="8.4" height="8.4" rx="0.7"
-      transform="rotate(45)" fill="var(--dna-diamond-housing, #040C14)"/>
-<rect x="-4.2" y="-4.2" width="8.4" height="8.4" rx="0.7"
-      transform="rotate(45)" fill="none" stroke="var(--dna-diamond-stroke, #1A3550)" stroke-width="0.5"/>
-<rect class="hw-logic-bit" x="-2.2" y="-2.2" width="4.4" height="4.4" rx="0.3"
+<rect x="{{ strip_zones.status.chrome_outer_x }}" y="{{ strip_zones.status.chrome_outer_y }}"
+      width="{{ strip_zones.status.chrome_outer_size }}" height="{{ strip_zones.status.chrome_outer_size }}"
+      rx="{{ strip_zones.status.chrome_outer_rx }}"
+      transform="rotate(45)" fill="var(--dna-diamond-housing, var(--dna-surface-deep))"/>
+<rect x="{{ strip_zones.status.chrome_outer_x }}" y="{{ strip_zones.status.chrome_outer_y }}"
+      width="{{ strip_zones.status.chrome_outer_size }}" height="{{ strip_zones.status.chrome_outer_size }}"
+      rx="{{ strip_zones.status.chrome_outer_rx }}"
+      transform="rotate(45)" fill="none" stroke="var(--dna-diamond-stroke, var(--dna-border))" stroke-width="0.5"/>
+<rect class="hw-logic-bit" x="{{ strip_zones.status.chrome_inner_x }}" y="{{ strip_zones.status.chrome_inner_y }}"
+      width="{{ strip_zones.status.chrome_inner_size }}" height="{{ strip_zones.status.chrome_inner_size }}"
+      rx="{{ strip_zones.status.chrome_inner_rx }}"
       transform="rotate(45)" fill="var(--dna-status-color, var(--dna-status-passing-core))"/>

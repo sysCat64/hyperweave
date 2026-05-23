@@ -33,7 +33,7 @@
   <stop offset="100%" stop-color="{{ seam_anchor }}" stop-opacity="0"/>
 </linearGradient>
 <filter id="{{ uid }}-lift" x="-4%" y="-12%" width="108%" height="130%">
-  <feDropShadow dx="0" dy="{{ 0.4 if compact else 0.5 }}" stdDeviation="{{ 0.4 if compact else 0.6 }}" flood-color="#000000" flood-opacity="0.32"/>
+  <feDropShadow dx="0" dy="{{ 0.4 if compact else 0.5 }}" stdDeviation="{{ 0.4 if compact else 0.6 }}" flood-color="var(--dna-shadow-color, black)" flood-opacity="0.32"/>
 </filter>
 <style>{{ font_faces | safe }}
 .cz1{animation:czp {{ cellular_pulse_base_duration }} ease-in-out infinite;will-change:opacity}

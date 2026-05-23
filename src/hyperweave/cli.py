@@ -259,7 +259,7 @@ def kit(
 
 @app.command()
 def render(
-    template: Annotated[str, typer.Option("--template", help="Template name: receipt, rhythm-strip, master-card")],
+    template: Annotated[str, typer.Option("--template", help="Template name: receipt, rhythm-strip")],
     data: Annotated[Path, typer.Option("--data", help="Data contract JSON file")],
     output: Annotated[Path | None, typer.Option("--output", "-o")] = None,
 ) -> None:

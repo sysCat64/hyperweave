@@ -1,7 +1,7 @@
 {# Chrome badge defs: satin envelope, shadow filter, well gradient, separator gradient.
    Guard on data presence (envelope_stops), not profile identity. #}
 {# ── Satin chrome envelope (animated y1/y2) ── #}
-<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="-0.1" y2="0.9">
+<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="{{ gradient_y_neg_010 }}" y2="{{ gradient_y_090 }}">
 {% for stop in envelope_stops | default([]) %}
   <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}"/>
 {% endfor %}
@@ -12,7 +12,7 @@
 </linearGradient>
 {# ── Product-weight shadow (no specular at badge scale) ── #}
 <filter id="{{ uid }}-sh" x="-3%" y="-4%" width="106%" height="112%">
-  <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000" flood-opacity="{{ bevel_shadow_opacity | default('0.35') }}"/>
+  <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="var(--dna-shadow-color, black)" flood-opacity="{{ bevel_shadow_opacity | default('0.35') }}"/>
 </filter>
 {# ── Well gradient — genome-declared (required for chrome paradigm). ── #}
 <linearGradient id="{{ uid }}-well" x1="0" x2="0" y1="0" y2="1">

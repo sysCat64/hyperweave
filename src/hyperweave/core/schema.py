@@ -219,6 +219,14 @@ class GenomeSpec(BaseModel):
         default="",
         description="Icon-specific well gradient bottom color. Empty falls back to well_bottom.",
     )
+    chrome_icon_inner_stroke: str = Field(
+        default="",
+        description="Chrome icon inner hairline color separating the envelope bezel from the well.",
+    )
+    chrome_icon_top_accent: str = Field(
+        default="",
+        description="Chrome square-icon top accent hairline color.",
+    )
     highlight_color: str = Field(default="", description="Top highlight line color")
     highlight_opacity: str = Field(default="0.08", description="Top highlight opacity")
     chrome_text_gradient: list[dict[str, str]] = Field(

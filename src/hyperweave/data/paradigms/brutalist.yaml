@@ -112,10 +112,35 @@ chart:
   viewport_y: 140
   viewport_w: 767
   viewport_h: 248
+  y_tick_target: 4
+  label_collision_font_family: JetBrains Mono
+  label_collision_font_size: 9
+  label_collision_font_weight: 800
+  label_collision_letter_spacing_em: 0.12
+  axis_y_label_x_offset: -8
+  axis_y_label_y_offset: 4
+  x_axis_label_y: 420
+  milestone_label_y_offset: -10
 
 stats:
   card_height: 280
   embeds_chart: false
+  metric_layout_mode: brutalist_grid
+  metric_value_font_family: JetBrains Mono
+  metric_value_font_size: 20
+  metric_value_font_weight: 700
+  metric_value_letter_spacing_em: 0.0
+  metric_value_budget: 112
+  activity_bar_baseline_y: 246
+  activity_bar_max_h: 26
+  activity_bar_min_h: 4
+  activity_bar_w: 7
+  activity_bar_start_x: 22
+  activity_bar_stride: 9
+  activity_bar_opacity_min: 0.43
+  activity_bar_opacity_max: 0.93
+  activity_bar_opacity_min_light: 0.28
+  activity_bar_opacity_max_light: 0.75
   # Username header layout. ``identity_zone_width`` is derived as
   # ``bio_x - identity_x - identity_padding = 134 - 44 - 20 = 70`` instead
   # of carried as an independent magic number. bio_x includes breathing

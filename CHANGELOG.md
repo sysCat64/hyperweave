@@ -5,6 +5,40 @@ All notable changes to HyperWeave are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10] - 2026-05-22
+
+v0.3.10 finishes the layout hardening started in v0.3.9. Badges, strips, stats cards, charts, and older frame templates now place their content from measured layout values instead of template-side math. The visible result is tighter automata badges, cleaner headers, and more consistent glyph alignment.
+
+### Added
+
+- **Stats and chart layout modules** &mdash; Stats cards and star charts now compute their frame, header, axis, metric, and footer positions before rendering.
+- **Glyph measurement** &mdash; Provider glyphs are measured from their SVG paths and scaled by visible ink, so sparse marks like Docker no longer look smaller than dense marks like GitHub.
+- **Inter font metrics** &mdash; Inter now includes generated width, bearing, and vertical-bound data for more accurate text measurement.
+- **Template safeguards** &mdash; Automated checks now prevent coordinate math, hardcoded geometry, and literal colors from returning to templates.
+
+### Changed
+
+- **Badges** &mdash; Automata bookends, glyphs, labels, separators, values, and trailing edges now use balanced visible spacing.
+- **Glyph alignment** &mdash; Badge glyphs align to measured text centers where text uses a normal baseline, while chrome keeps its centered-baseline alignment.
+- **Stats cards** &mdash; Identity text, bio text, metric slots, activity bars, language bars, and footer positions now share the same measured layout path.
+- **Star charts** &mdash; Header labels, project/provider titles, axes, milestones, and chart labels now come from chart layout data instead of template constants.
+- **Strips** &mdash; Strip layout is split into named groups for core content, chrome details, cellular details, status marks, and bookends.
+- **Other frames** &mdash; Receipt, rhythm-strip, icon, marquee, divider, catalog, and motion-border templates now consume precomputed geometry.
+- **Gradients** &mdash; Standard SVG gradient endpoints are literal SVG values again; only material-specific chrome offsets remain configurable.
+
+### Fixed
+
+- **Automata stat headers** &mdash; Usernames and bio summaries keep visible breathing room.
+- **Automata badges** &mdash; Compact badges no longer leave extra empty space between the cellular bookend, glyph, label, value, and right edge.
+- **Badge text spacing** &mdash; Text bearings and visible ink widths now drive separator and edge spacing.
+- **Chart headers** &mdash; Header labels are generated from the project and provider instead of a hardcoded `HYPERWEAVE · GITHUB` string.
+- **Brutalist charts** &mdash; Prototype number labels no longer render in star charts.
+- **Template colors** &mdash; Specimen colors now flow through named context values or CSS roles instead of literal template hex values.
+
+### Removed
+
+- **Master-card** &mdash; The unused master-card render path was removed instead of migrated.
+
 ## [0.3.9] - 2026-05-22
 
 Badge, strip, stat card, and star chart frames now measure rendered content before placing text, glyphs, seams, and markers. Chrome, brutalist, and automata outputs share more consistent typography, spacing, and variant colors across frame types.
@@ -116,7 +150,7 @@ Receipt hero reads `token volume · $cost` with a four-cell decomposition strip 
 
 - 1198 tests pass.
 
-## [0.3.4] - 2026-05-13
+## [0.3.4] - 2026-05-16
 
 `install-hook` now detects Claude Code and Codex automatically. A new `hyperweave doctor` command shows hook status, transcripts, and recent receipts at a glance.
 

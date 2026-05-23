@@ -98,6 +98,12 @@ class TreemapCell:
     """``"top"`` (v0.2.21 risograph) or ``"left"`` (v9 codex specimen)."""
     is_hero: bool
     """True for tier-1 cells; drives the hero percentage rendering in the template."""
+    hero_error_group_x: int
+    """Hero-cell error badge group x."""
+    hero_error_group_y: int
+    """Hero-cell error badge group y."""
+    inline_error_x: int
+    """Non-hero inline error text x."""
 
 
 # ── Per-tier typography ──
@@ -294,6 +300,9 @@ def _make_cell(
         accent_h=accent_h_val,
         accent_position=accent_position,
         is_hero=(tier == 1),
+        hero_error_group_x=w - 8,
+        hero_error_group_y=14,
+        inline_error_x=w - 8,
     )
 
 
@@ -382,6 +391,9 @@ def _layout_tier3(
                 accent_h=ov_accent_h,
                 accent_position=accent_position,
                 is_hero=False,
+                hero_error_group_x=cell_w - 8,
+                hero_error_group_y=14,
+                inline_error_x=cell_w - 8,
             ),
         )
 

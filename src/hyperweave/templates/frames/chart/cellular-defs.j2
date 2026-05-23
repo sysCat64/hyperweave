@@ -19,7 +19,10 @@
 {# Outer clipPath — rounds the chart frame's corners (rx=10) so background +
    header band + footer all clip to the rounded shape. The chart reads as a
    deliberate artifact with curvature rather than a flat rectangle. #}
-<clipPath id="{{ uid }}-clip"><rect width="{{ width }}" height="{{ height }}" rx="10"/></clipPath>
+<clipPath id="{{ uid }}-clip">
+  <rect width="{{ chart_layout.rects.cellular_clip.w }}" height="{{ chart_layout.rects.cellular_clip.h }}"
+        rx="{{ chart_layout.rects.cellular_clip.rx }}"/>
+</clipPath>
 {# Header gradient — canvas_top -> canvas_bottom mirrors the stat card's
    top-grad so both frames render their header zone with the same material
    language: a vertical gradient that blends into the canvas instead of the
@@ -78,7 +81,7 @@ text{font-family:'JetBrains Mono',monospace;shape-rendering:geometricPrecision}
 {# v2 polyline: 3px white core with double drop-shadow glow — tinted info_accent
    outer halo (10px) + tight white inner glow (3px). The white core dominates;
    the tinted halo carries variant chromatic identity around it. #}
-.hw-chart-line{stroke:#FFFFFF;stroke-width:3;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 10px {{ chart_info_accent }}) drop-shadow(0 0 3px #FFF)}
+.hw-chart-line{stroke:var(--dna-chart-line-core, var(--dna-ink-primary));stroke-width:3;stroke-linejoin:round;stroke-linecap:round;filter:drop-shadow(0 0 10px {{ chart_info_accent }}) drop-shadow(0 0 3px var(--dna-chart-line-core, var(--dna-ink-primary)))}
 .hw-chart-line-draw{animation:hw-line-draw 2.618s cubic-bezier(.25,.85,.35,1) forwards;will-change:stroke-dashoffset}
 @keyframes hw-line-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
 .hw-chart-milestone-line{stroke:{{ chart_info_accent }};stroke-width:0.5;opacity:0.18;stroke-dasharray:3 3}

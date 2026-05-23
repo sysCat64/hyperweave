@@ -3,10 +3,10 @@
   Context: {x, y, s1..s3, h1..h3}.
 #}
 <g data-hw-zone="endpoint" shape-rendering="crispEdges">
-  <rect class="hw-chart-endpoint" x="{{ m.x - m.h1 }}" y="{{ m.y - m.h1 }}"
+  <rect class="hw-chart-endpoint" x="{{ m.x1 }}" y="{{ m.y1 }}"
         width="{{ m.s1 }}" height="{{ m.s1 }}" fill="var(--dna-signal)"/>
-  <rect x="{{ m.x - m.h2 }}" y="{{ m.y - m.h2 }}" width="{{ m.s2 }}" height="{{ m.s2 }}"
+  <rect x="{{ m.x2 }}" y="{{ m.y2 }}" width="{{ m.s2 }}" height="{{ m.s2 }}"
         fill="var(--dna-surface)"/>
-  <rect x="{{ m.x - m.h3 }}" y="{{ m.y - m.h3 }}" width="{{ m.s3 }}" height="{{ m.s3 }}"
-        fill="var(--dna-ink-primary,#D1FAE5)"/>
+  <rect x="{{ m.x3 }}" y="{{ m.y3 }}" width="{{ m.s3 }}" height="{{ m.s3 }}"
+        fill="var(--dna-ink-primary)"/>
 </g>

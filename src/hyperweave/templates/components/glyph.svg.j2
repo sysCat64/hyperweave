@@ -4,9 +4,8 @@
             glyph_cx, glyph_cy (center point) #}
 {% set mode = glyph_mode | default('auto') %}
 {% set vb = glyph_viewbox | default('0 0 640 640') %}
-{% set vb_parts = vb.split(' ') %}
-{% set vb_cx = vb_parts[2] | float / 2 %}
-{% set vb_cy = vb_parts[3] | float / 2 %}
+{% set vb_cx = glyph_viewbox_cx | default(320) %}
+{% set vb_cy = glyph_viewbox_cy | default(320) %}
 {% set scale = glyph_scale | default(0.0219) %}
 <g data-hw-zone="glyph" transform="translate({{ glyph_cx }},{{ glyph_cy }})">
 {% if mode == 'wire' %}

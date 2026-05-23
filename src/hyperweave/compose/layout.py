@@ -116,6 +116,8 @@ class BadgeZones:
     """SVG ``textLength`` attribute value. 0.0 = no shrink-to-fit."""
     seam_x: float
     """x of the seam midline (left_panel_w + sep_w/2)."""
+    seam_right_x: float
+    """Right edge of the rendered seam/separator band."""
     value_x: float
     """SVG x for value ``<text>`` center."""
     value_w: float
@@ -186,8 +188,19 @@ def compute_badge_zones(
     seam_specular_offset: float = 0.0,
     label_end_bearing: float = 0.0,
     value_end_bearing: float = 0.0,
+    measured_label_ink_w: float = 0.0,
+    measured_value_ink_w: float = 0.0,
+    label_start_bearing: float = 0.0,
+    value_start_bearing: float = 0.0,
     glyph_y_offset: float = 0.0,
     text_visual_center_offset_em: float = 0.3,
+    text_ink_center_offset_y: float = 0.0,
+    center_glyph_on_text_ink: bool = False,
+    glyph_visual_w: float = 0.0,
+    left_adornment_width: float = 0.0,
+    left_adornment_gap: float = 0.0,
+    glyph_label_gap: float = 0.0,
+    visual_gap: float = 0.0,
 ) -> BadgeZones:
     """Compute badge zone layout under the unified additive algorithm.
 
@@ -198,11 +211,13 @@ def compute_badge_zones(
     through config (``text_anchor``, ``seam_render_w``, ``seam_specular_offset``,
     ``pad``).
 
-    Cursor walks left to right. Starts at ``accent_w + glyph_left_offset + pad``
-    (structural frame). For each PRESENT zone, the cursor advances by the
-    zone's content width plus ``pad``. Absent zones (no glyph, no state
-    indicator) are skipped entirely — the cursor never advances into a
-    reserved slot.
+    Cursor walks left to right. By default it starts at
+    ``accent_w + glyph_left_offset + pad`` (structural frame). Paradigms with
+    a left adornment, such as cellular's pattern bookend, may instead declare
+    the adornment's right edge and the post-adornment gap directly. For each
+    PRESENT zone, the cursor advances by the zone's content width plus
+    ``pad``. Absent zones (no glyph, no state indicator) are skipped entirely
+    — the cursor never advances into a reserved slot.
 
     Panel separator handling (two orthogonal modes):
 
@@ -231,44 +246,77 @@ def compute_badge_zones(
     """
     # Clamp label and value to shrink-to-fit ceilings before geometry.
     label_w = measured_label_w
+    label_ink_w = measured_label_ink_w if measured_label_ink_w > 0 else measured_label_w
     label_text_length = 0.0
     if max_label_w > 0 and measured_label_w > max_label_w:
+        scale = max_label_w / measured_label_w if measured_label_w > 0 else 1.0
         label_w = max_label_w
+        label_ink_w *= scale
+        label_start_bearing *= scale
+        label_end_bearing *= scale
         label_text_length = max_label_w
 
     value_w = measured_value_w
+    value_ink_w = measured_value_ink_w if measured_value_ink_w > 0 else measured_value_w
     value_text_length = 0.0
     if max_value_w > 0 and measured_value_w > max_value_w:
+        scale = max_value_w / measured_value_w if measured_value_w > 0 else 1.0
         value_w = max_value_w
+        value_ink_w *= scale
+        value_start_bearing *= scale
+        value_end_bearing *= scale
         value_text_length = max_value_w
 
     # Text baseline (label + value share the same y for consistent reading line).
     text_y = round(height * text_y_factor, 1)
 
-    # Structural frame ends at accent + paradigm-specific left-decoration
-    # offset (cellular pattern strip at x=2..~20 sets glyph_left_offset=18).
-    structural_left = accent_w + glyph_left_offset
+    # Structural frame ends at accent + legacy left-decoration offset, unless
+    # a paradigm supplies the rendered left adornment boundary explicitly.
+    # Cellular does this for its pattern bookend so compact badges can use a
+    # tight bookend→glyph gap without distorting the rest of the pad rhythm.
+    structural_left = left_adornment_width if left_adornment_width > 0 else accent_w + glyph_left_offset
 
-    # Cursor starts at structural_left + pad — that's the equal-spacing
-    # gap between left edge and the first content zone (glyph or label).
-    cursor = float(structural_left + pad)
+    # Cursor starts after the structural edge. Most paradigms use pad for the
+    # whole walk. Centered-text paradigms can opt into visual_gap so rendered
+    # ink edges, not advance boxes, define the repeated rhythm.
+    visual_gap_active = visual_gap > 0 and text_anchor == "middle" and seam_render_w <= 0
+    resolved_visual_gap = visual_gap if visual_gap_active else 0.0
+    first_gap = left_adornment_gap if left_adornment_width > 0 else pad
+    if visual_gap_active:
+        first_gap = resolved_visual_gap
+    cursor = float(structural_left + first_gap)
 
     # Glyph zone (skip if absent — collapse entirely, no phantom gap).
+    glyph_visible_w = glyph_visual_w if glyph_visual_w > 0 else float(glyph_size)
     if has_glyph:
-        glyph_x = cursor
+        glyph_x = cursor + (glyph_visible_w - glyph_size) / 2.0 if visual_gap_active else cursor
         # Align the glyph box to the label's visual center, not the frame's
-        # geometric center. Alphabetic-baseline text sits roughly 0.3em above
-        # its baseline; dominant-baseline=central text declares a zero offset.
-        text_visual_center = text_y - label_font_size * text_visual_center_offset_em
+        # geometric center. Prefer real font ink metrics when supplied; older
+        # callers retain the 0.3em heuristic.
+        if center_glyph_on_text_ink:
+            text_visual_center = text_y + text_ink_center_offset_y
+        else:
+            text_visual_center = text_y - label_font_size * text_visual_center_offset_em
         glyph_y = round(text_visual_center - glyph_size / 2 + glyph_y_offset, 1)
-        cursor = glyph_x + glyph_size + pad
+        next_gap = resolved_visual_gap if visual_gap_active else (glyph_label_gap if glyph_label_gap > 0 else pad)
+        if visual_gap_active:
+            cursor += glyph_visible_w + next_gap
+        else:
+            cursor = glyph_x + glyph_size + next_gap
     else:
         glyph_x = 0.0
         glyph_y = 0.0
 
     # Label zone: cursor at first char.
-    label_first_x = cursor
-    label_x = round(label_first_x, 1) if text_anchor == "start" else round(label_first_x + label_w / 2, 1)
+    if visual_gap_active:
+        label_ink_left = cursor
+        label_first_x = label_ink_left - label_start_bearing
+        label_x = round(label_first_x + label_w / 2, 1)
+        label_visual_right = label_ink_left + label_ink_w
+    else:
+        label_first_x = cursor
+        label_x = round(label_first_x, 1) if text_anchor == "start" else round(label_first_x + label_w / 2, 1)
+        label_visual_right = label_first_x + label_w - label_end_bearing
     # Algorithmic bearing correction: subtract the font's trailing
     # side-bearing from the cursor advance so the seam (placed at
     # cursor + pad/2) sits at ``visible_ink_end + pad/2`` instead of
@@ -277,16 +325,18 @@ def compute_badge_zones(
     # case. Centered paradigms (text_anchor=middle) pass 0.0 because their
     # text balances bearing across both edges; only text_anchor=start
     # accumulates the bearing on the right side.
-    cursor = label_first_x + label_w - label_end_bearing
+    cursor = label_visual_right
 
     # Panel separator: two orthogonal modes (etched seam OR structural separator).
     seam_left_x = 0.0
     seam_specular_x = 0.0
+    seam_right_x = 0.0
     if seam_render_w > 0:
         # Chrome etched seam: half-gaps on each side, two-hairline rendering.
         cursor += pad / 2.0
         seam_left_x = cursor
         seam_specular_x = cursor + seam_specular_offset
+        seam_right_x = seam_left_x + seam_render_w
         cursor += seam_render_w + pad / 2.0
         # Synthetic left_panel / right_panel boundary for template backward-compat.
         seam_center_x = seam_left_x + seam_render_w / 2.0
@@ -296,19 +346,27 @@ def compute_badge_zones(
     else:
         # Brutalist/cellular: structural separator (sep_w stroke + seam_w mark).
         # Full pad after label, then sep+seam, then full pad before value.
-        cursor += pad
+        cursor += resolved_visual_gap if visual_gap_active else pad
         left_panel_w = max(round(cursor), label_w_floor)
         seam_x = left_panel_w + sep_w / 2.0
         right_panel_x = left_panel_w + sep_w + seam_w
-        cursor = float(right_panel_x + pad)
+        seam_right_x = float(right_panel_x)
+        cursor = float(right_panel_x + (resolved_visual_gap if visual_gap_active else pad))
 
     # Value zone: cursor at first char.
-    value_first_x = cursor
-    value_x = round(value_first_x, 1) if text_anchor == "start" else round(value_first_x + value_w / 2, 1)
+    if visual_gap_active:
+        value_ink_left = cursor
+        value_first_x = value_ink_left - value_start_bearing
+        value_x = round(value_first_x + value_w / 2, 1)
+        value_visual_right = value_ink_left + value_ink_w
+    else:
+        value_first_x = cursor
+        value_x = round(value_first_x, 1) if text_anchor == "start" else round(value_first_x + value_w / 2, 1)
+        value_visual_right = value_first_x + value_w - value_end_bearing
     # v0.3.9 algorithmic bearing correction (mirror of label): subtract
     # value-text trailing bearing before the trailing pad so the right edge
     # sits at ``visible_ink_end + pad`` instead of ``advance_end + pad``.
-    cursor = value_first_x + value_w - value_end_bearing + pad
+    cursor = value_visual_right + (resolved_visual_gap if visual_gap_active else pad)
 
     # Optional state-indicator zone. Every gap including the final one
     # (last content zone → right edge) is ``pad``. The cursor walk advances
@@ -316,7 +374,7 @@ def compute_badge_zones(
     # after the last zone is the right-edge gap itself.
     if has_state_indicator:
         indicator_x = cursor  # cursor sits at start of state-indicator slot (pad already added after value)
-        cursor = indicator_x + indicator_size + pad  # trailing pad after state
+        cursor = indicator_x + indicator_size + (resolved_visual_gap if visual_gap_active else pad)
     else:
         indicator_x = 0.0
 
@@ -346,12 +404,19 @@ def compute_badge_zones(
     # still reference these). Chrome: starts at synthetic right_panel_x (the
     # etched-seam half-gap already accounted for spacing). Brutalist/cellular:
     # right_panel_x + pad (full pad gutter after the structural separator).
-    value_zone_left = float(right_panel_x) if seam_render_w > 0 else float(right_panel_x + pad)
+    value_zone_left = (
+        float(right_panel_x)
+        if seam_render_w > 0
+        else float(right_panel_x + (resolved_visual_gap if visual_gap_active else pad))
+    )
     # Trailing pad is part of the right-edge gap. When
     # state indicator is present, value zone ends one pad before it. When
     # absent, value zone ends one pad before the right edge (= total_w -
     # right_canvas_inset - pad).
-    value_zone_right = float(indicator_x - pad) if has_state_indicator else float(total_w - right_canvas_inset - pad)
+    trailing_gap = resolved_visual_gap if visual_gap_active else pad
+    value_zone_right = (
+        float(indicator_x - trailing_gap) if has_state_indicator else float(total_w - right_canvas_inset - trailing_gap)
+    )
     value_zone_width = value_zone_right - value_zone_left
 
     return BadgeZones(
@@ -364,6 +429,7 @@ def compute_badge_zones(
         label_w=label_w,
         label_text_length=label_text_length,
         seam_x=seam_x,
+        seam_right_x=round(seam_right_x, 1),
         value_x=value_x,
         value_w=value_w,
         value_text_length=value_text_length,
@@ -392,85 +458,439 @@ def compute_badge_zones(
 
 
 @dataclass(frozen=True, slots=True)
-class StripZones:
-    """Resolved zone layout for a strip frame.
-
-    Templates consume these directly via ``{{ width }}``, ``{{ identity_x }}``,
-    ``{{ first_divider_x }}``, ``{{ seam_positions }}``, etc. — zero
-    template-side arithmetic.
-
-    Two paradigm modes handled by one dataclass:
-
-    * **Adaptive paradigms** (chrome, cellular, default): identity zone width
-      grows to fit content; bookend_x = 0; cells march from first_divider_x.
-    * **Owns_strip paradigms** (brutalist): brand panel is fixed-width;
-      identity_text_length emits ``textLength`` attribute when measured
-      identity exceeds the available panel space; bookend_x snaps dynamically
-      to the right edge of the last cell + ``bookend_gap``.
-    """
+class StripCoreZones:
+    """Resolved strip-wide geometry shared by every paradigm."""
 
     width: int
     height: int
+    content_width: int
     glyph_zone_width: int
-    """Width reserved for identity glyph (icon-box or bare). 0 when no glyph."""
     glyph_zone_x_offset: float
-    """Additional x-shift for the glyph when bifamily flanks push everything right."""
     icon_box_x: float
-    """Left edge of the optional icon box. 0.0 when absent."""
     icon_box_y: float
-    """Top edge of the optional icon box. 0.0 when absent."""
     glyph_cx: float
-    """Glyph center x in the template coordinate frame. 0.0 when absent."""
     glyph_cy: float
-    """Glyph center y in the template coordinate frame. 0.0 when absent."""
     glyph_size: int
-    """Rendered identity glyph size. 0 when absent."""
+    glyph_svg_x: float
+    glyph_svg_y: float
     identity_x: float
-    """Left edge of the identity text zone (or fixed brand-panel coordinate for owns_strip)."""
     identity_text_length: float
-    """SVG ``textLength`` attribute value for identity ``<text>``. 0.0 = no shrink-to-fit.
-    Non-zero only on ``owns_strip`` paradigms when identity exceeds brand panel."""
     identity_zone_width: float
-    """Measured content width of identity zone (= max(identity_w, subtitle_w))."""
     subtitle_text: str
-    """Raw subtitle string for templates that gate on ``show_subtitle``. Empty when absent."""
     first_divider_x: int
-    """x of the first vertical divider (where the metric grid begins)."""
     cell_widths: list[int]
-    """Per-cell pitch (one int per metric)."""
-    cell_layouts_records: list[dict]  # type: ignore[type-arg]
-    """One ``CellLayout`` per metric, serialized as dict for template consumption."""
+    cell_layouts_records: list[dict[str, object]]
     seam_positions: list[float]
-    """Cumulative seam x-coordinates: first_divider_x, then one per cell trailing edge."""
     status_x: float
-    """Left edge of status indicator. 0 when no status indicator."""
     status_zone_width: int
-    """Width of the status indicator zone (pre_gap + indicator + post_gap). 0 when absent."""
     content_right: int
-    """Right edge of the content panel (= width - flank_width when flanked)."""
     bookend_x: int
-    """Bookend ornament x for ``owns_strip`` paradigms. 0 for adaptive paradigms."""
     metric_pitch: int
-    """Widest-cell scalar (fallback for consumers wanting uniform pitch)."""
     metrics_zone_width: int
-    """Sum of all cell_widths (or n * metric_pitch when no cells)."""
-    content_width: int = 0
-    """Width where visible strip content ends. ``width`` may exceed this when
-    ``strip_min_width`` clamps the SVG viewBox — chrome templates render
-    envelope/well/rail at ``content_width`` so trailing pixels stay transparent."""
-    # Content-driven owns_strip overrides. Resolver consumes these
-    # in place of the YAML constants when owns_strip=True. brand_panel_width is a
-    # MAX ceiling; the panel shrinks to content for short identities (N8N, 3
-    # chars), and triple_divider_x / brand_divider_x follow the panel's right
-    # edge. For adaptive paradigms these stay 0 — the resolver ignores them.
-    brand_panel_x: int = 0
-    """Brand panel left edge (owns_strip only; 0 otherwise). Mirrors YAML constant."""
-    brand_panel_w: int = 0
-    """Content-driven brand panel width (owns_strip only). ≤ YAML brand_panel_width."""
-    triple_divider_x: int = 0
-    """Triple-divider left edge (= brand_panel_x + brand_panel_w for owns_strip)."""
-    brand_divider_x: int = 0
-    """First metric cell seam (= triple_divider_x + 2*bar_w + void_w for owns_strip)."""
+    perimeter_w: float
+    perimeter_h: float
+    half_h: float
+    metric_rule_y1: float
+    metric_rule_y2: float
+    brand_panel_x: int
+    brand_panel_w: int
+    triple_divider_x: int
+    triple_divider_void_x: int
+    triple_divider_right_x: int
+    brand_divider_x: int
+
+
+@dataclass(frozen=True, slots=True)
+class StripChromeGeometry:
+    """Chrome strip material geometry."""
+
+    inner_w: int
+    inner_h: int
+    well_w: int
+    well_h: int
+    accent_h: int
+    highlight_w: int
+
+
+@dataclass(frozen=True, slots=True)
+class StripCellularGeometry:
+    """Cellular strip flank and panel geometry."""
+
+    left_flank_cells: list[dict[str, object]]
+    right_flank_cells: list[dict[str, object]]
+    panel_x: int
+    panel_w: int
+    panel_h: int
+    pattern_opacity: float
+
+
+@dataclass(frozen=True, slots=True)
+class StripStatusGeometry:
+    """Status indicator geometry for all strip paradigms."""
+
+    outer_x: float
+    outer_y: float
+    inner_x: float
+    inner_y: float
+    inner_w: float
+    inner_h: float
+    cellular_inner_x: float
+    cellular_inner_y: float
+    cellular_inner_w: float
+    cellular_inner_h: float
+    chrome_outer_x: float
+    chrome_outer_y: float
+    chrome_outer_size: float
+    chrome_outer_rx: float
+    chrome_inner_x: float
+    chrome_inner_y: float
+    chrome_inner_size: float
+    chrome_inner_rx: float
+
+
+@dataclass(frozen=True, slots=True)
+class StripBookendGeometry:
+    """Bookend and brand-glyph ornament geometry."""
+
+    identity_glyph_x: float
+    identity_glyph_y: float
+    ornament_inner_x: int
+    ornament_inner_y: int
+    ornament_inner_w: int
+    ornament_inner_h: int
+    outer_x: float
+    outer_y: float
+    inner_x: float
+    inner_y: float
+    inner_w: int
+    inner_h: int
+
+
+@dataclass(frozen=True, slots=True)
+class StripZones:
+    """Resolved zone layout for a strip frame, grouped by responsibility."""
+
+    core: StripCoreZones
+    chrome: StripChromeGeometry
+    cellular: StripCellularGeometry
+    status: StripStatusGeometry
+    bookend: StripBookendGeometry
+
+    @property
+    def width(self) -> int:
+        return self.core.width
+
+    @property
+    def height(self) -> int:
+        return self.core.height
+
+    @property
+    def content_width(self) -> int:
+        return self.core.content_width
+
+    @property
+    def glyph_zone_width(self) -> int:
+        return self.core.glyph_zone_width
+
+    @property
+    def glyph_zone_x_offset(self) -> float:
+        return self.core.glyph_zone_x_offset
+
+    @property
+    def icon_box_x(self) -> float:
+        return self.core.icon_box_x
+
+    @property
+    def icon_box_y(self) -> float:
+        return self.core.icon_box_y
+
+    @property
+    def glyph_cx(self) -> float:
+        return self.core.glyph_cx
+
+    @property
+    def glyph_cy(self) -> float:
+        return self.core.glyph_cy
+
+    @property
+    def glyph_size(self) -> int:
+        return self.core.glyph_size
+
+    @property
+    def glyph_svg_x(self) -> float:
+        return self.core.glyph_svg_x
+
+    @property
+    def glyph_svg_y(self) -> float:
+        return self.core.glyph_svg_y
+
+    @property
+    def identity_x(self) -> float:
+        return self.core.identity_x
+
+    @property
+    def identity_text_length(self) -> float:
+        return self.core.identity_text_length
+
+    @property
+    def identity_zone_width(self) -> float:
+        return self.core.identity_zone_width
+
+    @property
+    def subtitle_text(self) -> str:
+        return self.core.subtitle_text
+
+    @property
+    def first_divider_x(self) -> int:
+        return self.core.first_divider_x
+
+    @property
+    def cell_widths(self) -> list[int]:
+        return self.core.cell_widths
+
+    @property
+    def cell_layouts_records(self) -> list[dict[str, object]]:
+        return self.core.cell_layouts_records
+
+    @property
+    def seam_positions(self) -> list[float]:
+        return self.core.seam_positions
+
+    @property
+    def status_x(self) -> float:
+        return self.core.status_x
+
+    @property
+    def status_zone_width(self) -> int:
+        return self.core.status_zone_width
+
+    @property
+    def content_right(self) -> int:
+        return self.core.content_right
+
+    @property
+    def bookend_x(self) -> int:
+        return self.core.bookend_x
+
+    @property
+    def metric_pitch(self) -> int:
+        return self.core.metric_pitch
+
+    @property
+    def metrics_zone_width(self) -> int:
+        return self.core.metrics_zone_width
+
+    @property
+    def perimeter_w(self) -> float:
+        return self.core.perimeter_w
+
+    @property
+    def perimeter_h(self) -> float:
+        return self.core.perimeter_h
+
+    @property
+    def half_h(self) -> float:
+        return self.core.half_h
+
+    @property
+    def metric_rule_y1(self) -> float:
+        return self.core.metric_rule_y1
+
+    @property
+    def metric_rule_y2(self) -> float:
+        return self.core.metric_rule_y2
+
+    @property
+    def brand_panel_x(self) -> int:
+        return self.core.brand_panel_x
+
+    @property
+    def brand_panel_w(self) -> int:
+        return self.core.brand_panel_w
+
+    @property
+    def triple_divider_x(self) -> int:
+        return self.core.triple_divider_x
+
+    @property
+    def triple_divider_void_x(self) -> int:
+        return self.core.triple_divider_void_x
+
+    @property
+    def triple_divider_right_x(self) -> int:
+        return self.core.triple_divider_right_x
+
+    @property
+    def brand_divider_x(self) -> int:
+        return self.core.brand_divider_x
+
+    @property
+    def chrome_inner_w(self) -> int:
+        return self.chrome.inner_w
+
+    @property
+    def chrome_inner_h(self) -> int:
+        return self.chrome.inner_h
+
+    @property
+    def chrome_well_w(self) -> int:
+        return self.chrome.well_w
+
+    @property
+    def chrome_well_h(self) -> int:
+        return self.chrome.well_h
+
+    @property
+    def chrome_accent_h(self) -> int:
+        return self.chrome.accent_h
+
+    @property
+    def chrome_highlight_w(self) -> int:
+        return self.chrome.highlight_w
+
+    @property
+    def cellular_left_flank_cells(self) -> list[dict[str, object]]:
+        return self.cellular.left_flank_cells
+
+    @property
+    def cellular_right_flank_cells(self) -> list[dict[str, object]]:
+        return self.cellular.right_flank_cells
+
+    @property
+    def cellular_panel_x(self) -> int:
+        return self.cellular.panel_x
+
+    @property
+    def cellular_panel_w(self) -> int:
+        return self.cellular.panel_w
+
+    @property
+    def cellular_panel_h(self) -> int:
+        return self.cellular.panel_h
+
+    @property
+    def cellular_pattern_opacity(self) -> float:
+        return self.cellular.pattern_opacity
+
+    @property
+    def status_outer_x(self) -> float:
+        return self.status.outer_x
+
+    @property
+    def status_outer_y(self) -> float:
+        return self.status.outer_y
+
+    @property
+    def status_inner_x(self) -> float:
+        return self.status.inner_x
+
+    @property
+    def status_inner_y(self) -> float:
+        return self.status.inner_y
+
+    @property
+    def status_inner_w(self) -> float:
+        return self.status.inner_w
+
+    @property
+    def status_inner_h(self) -> float:
+        return self.status.inner_h
+
+    @property
+    def status_cellular_inner_x(self) -> float:
+        return self.status.cellular_inner_x
+
+    @property
+    def status_cellular_inner_y(self) -> float:
+        return self.status.cellular_inner_y
+
+    @property
+    def status_cellular_inner_w(self) -> float:
+        return self.status.cellular_inner_w
+
+    @property
+    def status_cellular_inner_h(self) -> float:
+        return self.status.cellular_inner_h
+
+    @property
+    def status_chrome_outer_x(self) -> float:
+        return self.status.chrome_outer_x
+
+    @property
+    def status_chrome_outer_y(self) -> float:
+        return self.status.chrome_outer_y
+
+    @property
+    def status_chrome_outer_size(self) -> float:
+        return self.status.chrome_outer_size
+
+    @property
+    def status_chrome_outer_rx(self) -> float:
+        return self.status.chrome_outer_rx
+
+    @property
+    def status_chrome_inner_x(self) -> float:
+        return self.status.chrome_inner_x
+
+    @property
+    def status_chrome_inner_y(self) -> float:
+        return self.status.chrome_inner_y
+
+    @property
+    def status_chrome_inner_size(self) -> float:
+        return self.status.chrome_inner_size
+
+    @property
+    def status_chrome_inner_rx(self) -> float:
+        return self.status.chrome_inner_rx
+
+    @property
+    def identity_glyph_x(self) -> float:
+        return self.bookend.identity_glyph_x
+
+    @property
+    def identity_glyph_y(self) -> float:
+        return self.bookend.identity_glyph_y
+
+    @property
+    def ornament_inner_x(self) -> int:
+        return self.bookend.ornament_inner_x
+
+    @property
+    def ornament_inner_y(self) -> int:
+        return self.bookend.ornament_inner_y
+
+    @property
+    def ornament_inner_w(self) -> int:
+        return self.bookend.ornament_inner_w
+
+    @property
+    def ornament_inner_h(self) -> int:
+        return self.bookend.ornament_inner_h
+
+    @property
+    def bookend_outer_x(self) -> float:
+        return self.bookend.outer_x
+
+    @property
+    def bookend_outer_y(self) -> float:
+        return self.bookend.outer_y
+
+    @property
+    def bookend_inner_x(self) -> float:
+        return self.bookend.inner_x
+
+    @property
+    def bookend_inner_y(self) -> float:
+        return self.bookend.inner_y
+
+    @property
+    def bookend_inner_w(self) -> int:
+        return self.bookend.inner_w
+
+    @property
+    def bookend_inner_h(self) -> int:
+        return self.bookend.inner_h
 
 
 def compute_strip_zones(
@@ -493,6 +913,10 @@ def compute_strip_zones(
     triple_divider_bar_width: int = 3,
     triple_divider_void_width: int = 2,
     bookend_x_fallback: int = 0,
+    ornament_x: int = 0,
+    ornament_y: int = 0,
+    ornament_size: int = 14,
+    ornament_inner_inset: int = 3,
     bookend_gap: int = 16,
     bookend_pad_right: int = 40,
     identity_panel_pad: int = 8,
@@ -511,6 +935,7 @@ def compute_strip_zones(
     status_indicator_post_gap: int = 4,
     # Bifamily flank widths (automata strips).
     flank_width: int = 0,
+    flank_cell_size: int = 12,
     # Strip-min-width clamp (chrome's 320).
     strip_min_width: int = 0,
     # Identity-zone right padding (adaptive paradigms — gap after identity content).
@@ -715,35 +1140,180 @@ def compute_strip_zones(
     # templates consume — identity, dividers, cells all in the same frame).
     first_divider_x_shifted = first_divider_x + seam_offset
 
+    # Attach absolute cell origins and trailing seams directly to each record.
+    # Templates can render cell groups from these named fields without a local
+    # running namespace.
+    def _pixel_number(value: float) -> int | float:
+        return int(value) if value.is_integer() else round(value, 1)
+
+    resolved_cell_layouts = []
+    for index, record in enumerate(cell_layouts_records):
+        resolved = dict(record)
+        cell_x_value = seams[index] if index < len(seams) else float(cell_start)
+        trailing_x_value = seams[index + 1] if index + 1 < len(seams) else float(cell_x_value + resolved["cell_w"])
+        resolved["cell_x"] = _pixel_number(cell_x_value)
+        resolved["trailing_x"] = _pixel_number(trailing_x_value)
+        resolved["show_leading_rule"] = index > 0
+        resolved_cell_layouts.append(resolved)
+
+    # Secondary geometry derived from the primary zone outputs. These values
+    # used to be recomputed piecemeal in strip templates.
+    perimeter_w = width - 1
+    perimeter_h = height - 1
+    half_h = height // 2
+    glyph_svg_x = -(glyph_size_resolved / 2.0) if has_identity_glyph else 0.0
+    glyph_svg_y = glyph_svg_x
+    triple_divider_void_x = triple_divider_x_resolved + triple_divider_bar_width
+    triple_divider_right_x = triple_divider_void_x + triple_divider_void_width
+    ornament_inner_w = max(0, ornament_size - 2 * ornament_inner_inset)
+    ornament_inner_h = ornament_inner_w
+    identity_glyph_x = ornament_x + (ornament_size - strip_glyph_size) / 2.0 if owns_strip else 0.0
+    identity_glyph_y = ornament_y + (ornament_size - strip_glyph_size) / 2.0 if owns_strip else 0.0
+    bookend_outer_x = -(ornament_size / 2.0)
+    bookend_outer_y = bookend_outer_x
+    bookend_inner_x = bookend_outer_x + ornament_inner_inset
+    bookend_inner_y = bookend_outer_y + ornament_inner_inset
+    bookend_inner_w = ornament_inner_w
+    bookend_inner_h = ornament_inner_h
+    metric_rule_y1 = 2.0
+    metric_rule_y2 = float(height - 2)
+    chrome_inner_w = max(0, content_width - 2)
+    chrome_inner_h = max(0, height - 2)
+    chrome_well_w = max(0, content_width - 4)
+    chrome_well_h = max(0, height - 4)
+    chrome_accent_h = chrome_well_h
+    chrome_highlight_w = max(0, content_width - 16)
+    cellular_panel_x = flank_width if has_flanks else 0
+    cellular_panel_w = width - (2 * flank_width) if has_flanks else width
+    cellular_panel_h = max(0, height - 4)
+
+    cellular_left_flank_cells: list[dict] = []  # type: ignore[type-arg]
+    cellular_right_flank_cells: list[dict] = []  # type: ignore[type-arg]
+    if has_flanks and flank_cell_size > 0:
+        n_rows = height // flank_cell_size
+        n_cols = flank_width // flank_cell_size
+        left_classes = ("cz1", "cz2", "cz3", "cz4", "czf")
+        right_classes = ("cz2", "cz3", "cz4", "cz1", "czf")
+        right_flank_x = width - flank_width
+        for col in range(n_cols):
+            for row in range(n_rows):
+                color_idx = (col + row * 2) % 3
+                class_idx = (col * 3 + row) % 5
+                cellular_left_flank_cells.append(
+                    {
+                        "x": col * flank_cell_size,
+                        "y": row * flank_cell_size,
+                        "size": flank_cell_size,
+                        "color_idx": color_idx,
+                        "class_name": left_classes[class_idx],
+                    }
+                )
+                cellular_right_flank_cells.append(
+                    {
+                        "x": right_flank_x + col * flank_cell_size,
+                        "y": row * flank_cell_size,
+                        "size": flank_cell_size,
+                        "color_idx": color_idx,
+                        "class_name": right_classes[class_idx],
+                    }
+                )
+
+    status_outer_x = -(status_indicator_size / 2.0)
+    status_outer_y = status_outer_x
+    status_inner_size = max(0.0, status_indicator_size - 6.0)
+    status_inner_x = status_outer_x + 3.0
+    status_inner_y = status_inner_x
+
     return StripZones(
-        width=width,
-        height=height,
-        glyph_zone_width=glyph_zone_width,
-        glyph_zone_x_offset=glyph_zone_x_offset,
-        icon_box_x=round(icon_box_x, 1),
-        icon_box_y=round(icon_box_y, 1),
-        glyph_cx=round(glyph_cx, 1),
-        glyph_cy=round(glyph_cy, 1),
-        glyph_size=glyph_size_resolved if has_identity_glyph else 0,
-        identity_x=identity_x_for_template,
-        identity_text_length=identity_text_length,
-        identity_zone_width=identity_zone_width,
-        subtitle_text=subtitle_text,
-        first_divider_x=first_divider_x_shifted,
-        cell_widths=cell_widths,
-        cell_layouts_records=cell_layouts_records,
-        seam_positions=seams,
-        status_x=status_x,
-        status_zone_width=status_zone_width,
-        content_right=content_right,
-        bookend_x=bookend_x,
-        metric_pitch=metric_pitch,
-        metrics_zone_width=metrics_zone_width,
-        brand_panel_x=brand_panel_x_resolved,
-        brand_panel_w=brand_panel_w_resolved,
-        triple_divider_x=triple_divider_x_resolved,
-        brand_divider_x=brand_divider_x_resolved,
-        content_width=content_width,
+        core=StripCoreZones(
+            width=width,
+            height=height,
+            content_width=content_width,
+            glyph_zone_width=glyph_zone_width,
+            glyph_zone_x_offset=glyph_zone_x_offset,
+            icon_box_x=round(icon_box_x, 1),
+            icon_box_y=round(icon_box_y, 1),
+            glyph_cx=round(glyph_cx, 1),
+            glyph_cy=round(glyph_cy, 1),
+            glyph_size=glyph_size_resolved if has_identity_glyph else 0,
+            glyph_svg_x=round(glyph_svg_x, 1),
+            glyph_svg_y=round(glyph_svg_y, 1),
+            identity_x=identity_x_for_template,
+            identity_text_length=identity_text_length,
+            identity_zone_width=identity_zone_width,
+            subtitle_text=subtitle_text,
+            first_divider_x=first_divider_x_shifted,
+            cell_widths=cell_widths,
+            cell_layouts_records=resolved_cell_layouts,
+            seam_positions=seams,
+            status_x=status_x,
+            status_zone_width=status_zone_width,
+            content_right=content_right,
+            bookend_x=bookend_x,
+            metric_pitch=metric_pitch,
+            metrics_zone_width=metrics_zone_width,
+            perimeter_w=perimeter_w,
+            perimeter_h=perimeter_h,
+            half_h=half_h,
+            metric_rule_y1=metric_rule_y1,
+            metric_rule_y2=metric_rule_y2,
+            brand_panel_x=brand_panel_x_resolved,
+            brand_panel_w=brand_panel_w_resolved,
+            triple_divider_x=triple_divider_x_resolved,
+            triple_divider_void_x=triple_divider_void_x,
+            triple_divider_right_x=triple_divider_right_x,
+            brand_divider_x=brand_divider_x_resolved,
+        ),
+        chrome=StripChromeGeometry(
+            inner_w=chrome_inner_w,
+            inner_h=chrome_inner_h,
+            well_w=chrome_well_w,
+            well_h=chrome_well_h,
+            accent_h=chrome_accent_h,
+            highlight_w=chrome_highlight_w,
+        ),
+        cellular=StripCellularGeometry(
+            left_flank_cells=cellular_left_flank_cells,
+            right_flank_cells=cellular_right_flank_cells,
+            panel_x=cellular_panel_x,
+            panel_w=cellular_panel_w,
+            panel_h=cellular_panel_h,
+            pattern_opacity=0.7,
+        ),
+        status=StripStatusGeometry(
+            outer_x=status_outer_x,
+            outer_y=status_outer_y,
+            inner_x=status_inner_x,
+            inner_y=status_inner_y,
+            inner_w=status_inner_size,
+            inner_h=status_inner_size,
+            cellular_inner_x=4.0,
+            cellular_inner_y=status_outer_y + 4.0,
+            cellular_inner_w=6.0,
+            cellular_inner_h=6.0,
+            chrome_outer_x=-4.2,
+            chrome_outer_y=-4.2,
+            chrome_outer_size=8.4,
+            chrome_outer_rx=0.7,
+            chrome_inner_x=-2.2,
+            chrome_inner_y=-2.2,
+            chrome_inner_size=4.4,
+            chrome_inner_rx=0.3,
+        ),
+        bookend=StripBookendGeometry(
+            identity_glyph_x=identity_glyph_x,
+            identity_glyph_y=identity_glyph_y,
+            ornament_inner_x=ornament_x + ornament_inner_inset,
+            ornament_inner_y=ornament_y + ornament_inner_inset,
+            ornament_inner_w=ornament_inner_w,
+            ornament_inner_h=ornament_inner_h,
+            outer_x=bookend_outer_x,
+            outer_y=bookend_outer_y,
+            inner_x=bookend_inner_x,
+            inner_y=bookend_inner_y,
+            inner_w=bookend_inner_w,
+            inner_h=bookend_inner_h,
+        ),
     )
 
 

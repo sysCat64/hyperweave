@@ -18,7 +18,10 @@
    from paradigm config as named template variables — never raw hex in the
    template, so the variant-blind hex gate stays effective. #}
 <clipPath id="{{ uid }}-clip"><rect width="{{ width }}" height="{{ height }}"/></clipPath>
-<clipPath id="{{ uid }}-card-clip"><rect width="{{ width }}" height="{{ height }}" rx="8"/></clipPath>
+<clipPath id="{{ uid }}-card-clip">
+  <rect width="{{ stats_layout.rects.cellular_clip.w }}" height="{{ stats_layout.rects.cellular_clip.h }}"
+        rx="{{ stats_layout.rects.cellular_clip.rx }}"/>
+</clipPath>
 <linearGradient id="{{ uid }}-top-grad" x1="0" y1="0" x2="0" y2="1">
   <stop offset="0%" stop-color="{{ cellular_palette.primary.canvas_top }}"/>
   <stop offset="100%" stop-color="{{ cellular_palette.primary.canvas_bottom }}"/>

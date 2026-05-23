@@ -18,6 +18,7 @@ next process start (or after :func:`hyperweave.core.font_metrics.reset_registry`
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hyperweave.core.font_metrics import get_registry
@@ -26,6 +27,22 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from hyperweave.core.font_metrics import FontMetrics
+
+
+@dataclass(frozen=True, slots=True)
+class TextInkMetrics:
+    """Advance and visible-ink bounds for a measured text run."""
+
+    advance_width: float
+    ink_width: float
+    leading_bearing: float
+    trailing_bearing: float
+    ink_top_offset_y: float = 0.0
+    """SVG y offset from baseline to the run's visible top edge."""
+    ink_bottom_offset_y: float = 0.0
+    """SVG y offset from baseline to the run's visible bottom edge."""
+    ink_center_offset_y: float = 0.0
+    """SVG y offset from baseline to the run's visible vertical center."""
 
 
 def _nearest_weight_key(weighted: Mapping[str, object], font_weight: int) -> str | None:
@@ -58,6 +75,14 @@ def _bearings_for_weight(metrics: FontMetrics, font_weight: int) -> dict[str, li
     if key is None:
         return metrics.bearings
     return metrics.bearings_by_weight[key]
+
+
+def _vertical_bounds_for_weight(metrics: FontMetrics, font_weight: int) -> dict[str, list[int]]:
+    """Return weight-specific vertical ink bounds when available."""
+    key = _nearest_weight_key(metrics.vertical_bounds_by_weight, font_weight)
+    if key is None:
+        return metrics.vertical_bounds
+    return metrics.vertical_bounds_by_weight[key]
 
 
 def measure_text(
@@ -127,15 +152,38 @@ def measure_text_ink_width(
     last-glyph RSB which is the correct correction for cursor-walk
     placement at the text's right side.
 
-    Fallback: when the font's LUT lacks the optional ``bearings`` map
-    (e.g., Inter, which predates v0.3.9 extraction), returns the same
-    value as :func:`measure_text`. New fonts extracted via
+    Fallback: when a legacy font LUT lacks the optional ``bearings`` map,
+    returns the same value as :func:`measure_text`. Fonts extracted via
     ``scripts/extract_font_metrics.py`` carry bearings by default.
 
     Whitespace-only strings return 0 (no visible ink).
     """
+    return measure_text_ink_metrics(
+        text,
+        font_family=font_family,
+        font_size=font_size,
+        font_weight=font_weight,
+        letter_spacing_em=letter_spacing_em,
+    ).ink_width
+
+
+def measure_text_ink_metrics(
+    text: str,
+    *,
+    font_family: str = "Inter",
+    font_size: float = 11.0,
+    font_weight: int = 400,
+    letter_spacing_em: float = 0.0,
+) -> TextInkMetrics:
+    """Return advance width plus first/last side bearings for visual layout.
+
+    SVG ``text-anchor="middle"`` centers the advance box, not the ink box.
+    Layout code that needs visually balanced gaps must therefore know the
+    first glyph's left side bearing and the last glyph's right side bearing,
+    not just the total advance width.
+    """
     if not text:
-        return 0.0
+        return TextInkMetrics(advance_width=0.0, ink_width=0.0, leading_bearing=0.0, trailing_bearing=0.0)
 
     advance = measure_text(
         text,
@@ -144,23 +192,51 @@ def measure_text_ink_width(
         font_weight=font_weight,
         letter_spacing_em=letter_spacing_em,
     )
-
     metrics = get_registry().get(font_family)
-    bearings = _bearings_for_weight(metrics, font_weight)
-    if not bearings:
-        return advance
-
     baseline = metrics.baseline_size_px
     scale = font_size / baseline
-    first_char = text[0]
-    last_char = text[-1]
-    # bearings stored as tenths-of-pixels at baseline_size_px; scale to
-    # the requested font_size and back to pixels.
-    first_lsb_tenths, _first_rsb = bearings.get(first_char, [0, 0])
-    _last_lsb, last_rsb_tenths = bearings.get(last_char, [0, 0])
-    lsb_px = (first_lsb_tenths / 10.0) * scale
-    rsb_px = (last_rsb_tenths / 10.0) * scale
-    return max(0.0, advance - lsb_px - rsb_px)
+    bearings = _bearings_for_weight(metrics, font_weight)
+    lsb_px = 0.0
+    rsb_px = 0.0
+    if bearings:
+        first_char = text[0]
+        last_char = text[-1]
+        # bearings stored as tenths-of-pixels at baseline_size_px; scale to
+        # the requested font_size and back to pixels.
+        first_lsb_tenths, _first_rsb = bearings.get(first_char, [0, 0])
+        _last_lsb, last_rsb_tenths = bearings.get(last_char, [0, 0])
+        lsb_px = (first_lsb_tenths / 10.0) * scale
+        rsb_px = (last_rsb_tenths / 10.0) * scale
+
+    vertical_bounds = _vertical_bounds_for_weight(metrics, font_weight)
+    top_offset_y = 0.0
+    bottom_offset_y = 0.0
+    center_offset_y = 0.0
+    if vertical_bounds:
+        ymin_values: list[int] = []
+        ymax_values: list[int] = []
+        for ch in text:
+            bounds = vertical_bounds.get(ch)
+            if bounds is None:
+                continue
+            ymin_values.append(bounds[0])
+            ymax_values.append(bounds[1])
+        if ymin_values and ymax_values:
+            ymin_px = (min(ymin_values) / 10.0) * scale
+            ymax_px = (max(ymax_values) / 10.0) * scale
+            top_offset_y = -ymax_px
+            bottom_offset_y = -ymin_px
+            center_offset_y = (top_offset_y + bottom_offset_y) / 2.0
+
+    return TextInkMetrics(
+        advance_width=advance,
+        ink_width=max(0.0, advance - lsb_px - rsb_px),
+        leading_bearing=lsb_px,
+        trailing_bearing=rsb_px,
+        ink_top_offset_y=top_offset_y,
+        ink_bottom_offset_y=bottom_offset_y,
+        ink_center_offset_y=center_offset_y,
+    )
 
 
 def measure_text_trailing_bearing(
@@ -180,17 +256,13 @@ def measure_text_trailing_bearing(
     all labels regardless of last-glyph identity (S, K, I all corrected
     appropriately by their own RSB, not a paradigm-wide scalar).
 
-    Returns 0.0 when the font's LUT lacks bearings (Inter fallback) or
-    when text is empty.
+    Returns 0.0 when the font's LUT lacks bearings or when text is empty.
     """
     if not text:
         return 0.0
-    metrics = get_registry().get(font_family)
-    bearings = _bearings_for_weight(metrics, font_weight)
-    if not bearings:
-        return 0.0
-    baseline = metrics.baseline_size_px
-    scale = font_size / baseline
-    last_char = text[-1]
-    _last_lsb, last_rsb_tenths = bearings.get(last_char, [0, 0])
-    return (last_rsb_tenths / 10.0) * scale
+    return measure_text_ink_metrics(
+        text,
+        font_family=font_family,
+        font_size=font_size,
+        font_weight=font_weight,
+    ).trailing_bearing

@@ -258,6 +258,7 @@ class TestRenderFunctions:
             "rule_x1": 10,
             "rule_x2": 200,
             "rule_y": 30,
+            "rule_bar_h": 4,
         }
         result = render_template("components/rule.svg.j2", ctx)
         assert isinstance(result, str)

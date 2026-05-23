@@ -354,7 +354,7 @@ def genome_to_css(genome: dict[str, Any], frame_type: str = "") -> str:
 
     lines.append("}")
 
-    # Telemetry typography utility classes — used by receipt + rhythm-strip + master-card
+    # Telemetry typography utility classes — used by receipt + rhythm-strip
     # templates (class="s ink1", "m ink2", etc.). Gated by the same telemetry-skin
     # presence check so badge/strip/icon don't carry these unused selectors.
     if any(genome.get(f) for f in _TELEMETRY_GENOME_FIELDS):

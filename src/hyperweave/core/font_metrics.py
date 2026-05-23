@@ -55,6 +55,11 @@ class FontMetrics(FrozenModel):
     ``measure_text_ink_width`` falls back to advance-width behavior
     (equivalent to ``measure_text``). Populated by
     ``scripts/extract_font_metrics.py`` via fonttools BoundsPen."""
+    vertical_bounds: dict[str, list[int]] = Field(default_factory=dict)
+    """Per-glyph ``[ymin, ymax]`` in tenths-of-pixels at ``baseline_size_px``.
+    Values use font coordinates (positive y is above the baseline). The text
+    measurement layer converts them into SVG y offsets so layout can align
+    glyph ink centers to text ink centers instead of baseline heuristics."""
     widths_by_weight: dict[str, dict[str, int]] = Field(default_factory=dict)
     """Optional per-weight advance widths for variable fonts.
 
@@ -64,6 +69,8 @@ class FontMetrics(FrozenModel):
     outlines."""
     bearings_by_weight: dict[str, dict[str, list[int]]] = Field(default_factory=dict)
     """Optional per-weight bearings matching ``widths_by_weight``."""
+    vertical_bounds_by_weight: dict[str, dict[str, list[int]]] = Field(default_factory=dict)
+    """Optional per-weight vertical bounds matching ``widths_by_weight``."""
 
 
 class FontRegistry:

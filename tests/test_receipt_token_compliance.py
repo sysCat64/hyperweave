@@ -29,7 +29,9 @@ from pathlib import Path
 import pytest
 
 from hyperweave.compose.assembler import genome_to_css
+from hyperweave.compose.engine import compose
 from hyperweave.compose.treemap import compute_treemap_layout
+from hyperweave.core.models import ComposeSpec
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _RECEIPT_TEMPLATE = _REPO_ROOT / "src/hyperweave/templates/frames/receipt.svg.j2"
@@ -141,7 +143,7 @@ def test_receipt_template_defines_card_shape_clippath() -> None:
 
 
 def test_receipt_substrate_has_rounded_corners() -> None:
-    """receipt.svg.j2 substrate must have rx="5.5" to match the card border.
+    """The rendered receipt substrate must have rx="5.5" to match the card border.
 
     Without rx on the substrate, its square corners protrude past the card
     border's rounded shape (rx=5.5), creating the "outside square that boxes
@@ -149,13 +151,20 @@ def test_receipt_substrate_has_rounded_corners() -> None:
     bg blends) but glaring on cream / claude-code paper substrates.
     """
     body = _RECEIPT_TEMPLATE.read_text()
-    # Substrate is the first <rect> after {% block content %}, fills with --dna-surface.
+    assert 'rx="{{ receipt_geom.card_rx }}" ry="{{ receipt_geom.card_rx }}"' in body
+    svg = compose(
+        ComposeSpec(
+            type="receipt",
+            genome_id="telemetry-voltage",
+            telemetry_data={"session": {}, "profile": {}, "tools": {}, "stages": []},
+        )
+    ).svg
     substrate_pattern = (
-        r'<rect width="\{\{ width \}\}" height="\{\{ height \}\}" '
+        r'<rect width="800" height="500" '
         r'rx="5\.5" ry="5\.5" fill="var\(--dna-surface\)"'
     )
-    assert re.search(substrate_pattern, body), (
-        "receipt.svg.j2 substrate must use rx='5.5' ry='5.5' to match card border"
+    assert re.search(substrate_pattern, svg), (
+        "rendered receipt substrate must use rx='5.5' ry='5.5' to match card border"
     )
 
 

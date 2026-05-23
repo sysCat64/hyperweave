@@ -7,7 +7,7 @@
              values="var(--dna-signal);var(--dna-status-failing-core);var(--dna-signal)"
              dur="2s" repeatCount="indefinite"/>
   </stop>
-  <stop offset="50%" stop-color="#FFFFFF" stop-opacity="1">
+  <stop offset="50%" stop-color="var(--dna-ink-primary)" stop-opacity="1">
     <animate attributeName="stop-opacity"
              values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
   </stop>
@@ -19,18 +19,18 @@
 </linearGradient>
 {% endset %}
 {% set overlay %}
-<rect x=".5" y=".5" width="{{ w - 1 }}" height="{{ h - 1 }}" rx="{{ rx }}"
+<rect x="{{ border_rect_x }}" y="{{ border_rect_y }}" width="{{ border_rect_w }}" height="{{ border_rect_h }}" rx="{{ rx }}"
       fill="none" stroke="url(#{{ uid }}-entangle)" stroke-width="2"
       stroke-dasharray="{{ dash }}">
   <animate attributeName="stroke-dashoffset"
-           values="0;-{{ half }}" dur="2s" repeatCount="indefinite"/>
+           values="0;{{ neg_half }}" dur="2s" repeatCount="indefinite"/>
 </rect>
-<rect x=".5" y=".5" width="{{ w - 1 }}" height="{{ h - 1 }}" rx="{{ rx }}"
+<rect x="{{ border_rect_x }}" y="{{ border_rect_y }}" width="{{ border_rect_w }}" height="{{ border_rect_h }}" rx="{{ rx }}"
       fill="none" stroke="url(#{{ uid }}-entangle)" stroke-width="2"
       opacity="0.7" stroke-dasharray="{{ dash }}"
-      stroke-dashoffset="-{{ quarter }}">
+      stroke-dashoffset="{{ neg_quarter }}">
   <animate attributeName="stroke-dashoffset"
-           values="-{{ quarter }};-{{ quarter + half }}" dur="2s"
+           values="{{ neg_quarter }};{{ neg_quarter_plus_half }}" dur="2s"
            repeatCount="indefinite"/>
 </rect>
 {% endset %}

@@ -158,13 +158,6 @@ def test_rhythm_strip_honors_explicit_genome_pin() -> None:
     assert _resolve_telemetry_genome(spec, _tel("claude-code")) == "telemetry-cream"
 
 
-def test_master_card_propagates_skin_from_runtime() -> None:
-    """Master-card flows through the same precedence chain as receipt + rhythm-strip."""
-    spec = _spec("master-card")
-    assert _resolve_telemetry_genome(spec, _tel("claude-code")) == "telemetry-claude-code"
-    assert _resolve_telemetry_genome(spec, _tel("")) == "telemetry-voltage"
-
-
 # --------------------------------------------------------------------------- #
 # CLI slug normalization (install-hook + session ergonomics)                  #
 # --------------------------------------------------------------------------- #

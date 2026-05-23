@@ -42,8 +42,9 @@ BRUTALIST_INPUTS = dict(
 
 # Cellular-paradigm constants reflecting data/paradigms/cellular.yaml (pad=8).
 # sep_w=1 (overrides profile default of 2); right_canvas_inset=2 (inner-canvas
-# inset shrinks the effective value slab right edge by 2px). Verified at
-# ParadigmBadgeConfig loaded via ConfigLoader smoke test.
+# inset shrinks the effective value slab right edge by 2px). Cellular's left
+# adornment geometry starts the first content zone from the rendered bookend
+# edge rather than from a reverse-engineered glyph offset.
 CELLULAR_INPUTS = dict(
     height=32,
     pad=8,
@@ -51,7 +52,11 @@ CELLULAR_INPUTS = dict(
     has_state_indicator=True,
     accent_w=4,
     glyph_size=12,
-    glyph_left_offset=18,
+    glyph_left_offset=0,
+    left_adornment_width=20,
+    left_adornment_gap=4,
+    glyph_label_gap=4,
+    visual_gap=4,
     sep_w=1,
     seam_w=3,
     indicator_size=8,
@@ -63,8 +68,9 @@ CELLULAR_INPUTS = dict(
 CELLULAR_COMPACT_INPUTS = {
     **CELLULAR_INPUTS,
     "height": 20,
-    "glyph_size": 12,
-    "glyph_left_offset": 12,
+    "glyph_size": 10,
+    "left_adornment_width": 14,
+    "left_adornment_gap": 4,
 }
 
 
@@ -303,13 +309,40 @@ def test_cellular_compact_centers() -> None:
     _assert_value_x_at_zone_center(zones)
 
 
+def test_cellular_left_adornment_gap_keeps_large_badge_spacing() -> None:
+    zones = compute_badge_zones(
+        measured_label_w=33.0,
+        measured_value_w=22.0,
+        **{**CELLULAR_INPUTS, "has_glyph": True},
+    )
+    bookend_gap = zones.glyph_x - CELLULAR_INPUTS["left_adornment_width"]
+    label_left = zones.label_x - zones.label_w / 2
+    glyph_label_gap = label_left - (zones.glyph_x + zones.glyph_size)
+    assert abs(bookend_gap - 4) < 0.1
+    assert abs(glyph_label_gap - 4) < 0.1
+    assert abs(bookend_gap - glyph_label_gap) <= 2
+
+
+def test_cellular_badge_left_identity_cluster_is_symmetric() -> None:
+    zones = compute_badge_zones(
+        measured_label_w=33.0,
+        measured_value_w=22.0,
+        **{**CELLULAR_COMPACT_INPUTS, "has_glyph": True},
+    )
+    bookend_gap = zones.glyph_x - CELLULAR_COMPACT_INPUTS["left_adornment_width"]
+    label_left = zones.label_x - zones.label_w / 2
+    glyph_label_gap = label_left - (zones.glyph_x + zones.glyph_size)
+    assert abs(bookend_gap - 4) < 0.1
+    assert abs(glyph_label_gap - 4) < 0.1
+    assert abs(bookend_gap - glyph_label_gap) <= 2
+
+
 def test_cellular_stateless_zone_collapses_with_canvas_inset() -> None:
     """Cellular's 2px canvas inset shrinks the value zone right edge below
-    total_w. value_zone_right is total_w - right_canvas_inset - pad
-    (right-edge gap is pad)."""
+    total_w. visual_gap replaces pad for the visible trailing gap."""
     zones = _zones_cellular(label_w=44.0, value_w=22.0, has_state_indicator=False)
     _assert_value_x_at_zone_center(zones)
-    expected_right = zones.width - CELLULAR_INPUTS["right_canvas_inset"] - CELLULAR_INPUTS["pad"]
+    expected_right = zones.width - CELLULAR_INPUTS["right_canvas_inset"] - CELLULAR_INPUTS["visual_gap"]
     assert zones.value_zone_right == expected_right
 
 

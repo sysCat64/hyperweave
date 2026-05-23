@@ -791,7 +791,6 @@ _FRAME_URL_GRAMMAR: dict[str, dict[str, Any]] = {
     },
     "receipt": {"pattern": "POST /v1/compose", "query_params": []},
     "rhythm-strip": {"pattern": "POST /v1/compose", "query_params": []},
-    "master-card": {"pattern": "POST /v1/compose", "query_params": []},
     "catalog": {"pattern": "POST /v1/compose", "query_params": []},
 }
 
@@ -1213,6 +1212,75 @@ def _categorized_specimens(registry: dict[str, Any]) -> dict[str, dict[str, Any]
     return {k: v for k, v in registry.items() if isinstance(v, dict)}
 
 
+def _error_badge_palette() -> dict[str, Any]:
+    """Return the SMPTE fallback palette outside the Jinja stencil."""
+    return {
+        "error_viewbox": "0 0 192 32",
+        "error_w": 192,
+        "error_h": 32,
+        "error_rects": {
+            "bars_clip": {"x": 2, "y": 2, "w": 117, "h": 28},
+            "frame": {"w": 192, "h": 32},
+            "inner_stroke": {"x": 1, "y": 1, "w": 190, "h": 30},
+            "body": {"x": 2, "y": 2, "w": 188, "h": 28},
+            "top_highlight": {"x": 22, "y": 2, "w": 166, "h": 1},
+            "bottom_shadow": {"x": 22, "y": 29.5, "w": 166, "h": 0.5},
+            "noise_1": {"x": 2, "y": 8, "w": 117, "h": 0.5},
+            "noise_2": {"x": 2, "y": 20, "w": 117, "h": 0.5},
+            "scan": {"x": 2, "y": 2, "w": 117, "h": 0.8},
+            "banner": {"x": 14, "y": 9, "w": 93, "h": 14},
+            "seam": {"x": 119, "y": 2, "w": 1, "h": 28},
+            "seam_gap": {"x": 120, "y": 2, "w": 2, "h": 28},
+            "value": {"x": 122, "y": 2, "w": 68, "h": 28},
+        },
+        "error_texts": {
+            "signal": {"x": 60.5, "y": 20},
+            "value": {"x": 156, "y": 21},
+        },
+        "error_rim_stops": [
+            {"offset": "0%", "color": "#E8E8E8"},
+            {"offset": "10%", "color": "#B8B8B8"},
+            {"offset": "28%", "color": "#787878"},
+            {"offset": "48%", "color": "#3A3A3A"},
+            {"offset": "72%", "color": "#1A1A1A"},
+            {"offset": "90%", "color": "#0A0A0A"},
+            {"offset": "100%", "color": "#020202"},
+        ],
+        "error_value_stops": [
+            {"offset": "0%", "color": "#0C0C12"},
+            {"offset": "100%", "color": "#040408"},
+        ],
+        "error_seam_stops": [
+            {"offset": "0%", "color": "#FF0040", "opacity": "0"},
+            {"offset": "18%", "color": "#FF0040", "opacity": "0.55"},
+            {"offset": "50%", "color": "#00E0FF", "opacity": "0.82"},
+            {"offset": "82%", "color": "#FF0040", "opacity": "0.55"},
+            {"offset": "100%", "color": "#FF0040", "opacity": "0"},
+        ],
+        "error_bar_colors": [
+            {"x": 2, "y": 2, "width": 17, "height": 28, "color": "#C0C0C0"},
+            {"x": 19, "y": 2, "width": 17, "height": 28, "color": "#C0C000"},
+            {"x": 36, "y": 2, "width": 17, "height": 28, "color": "#00C0C0"},
+            {"x": 53, "y": 2, "width": 17, "height": 28, "color": "#00C000"},
+            {"x": 70, "y": 2, "width": 17, "height": 28, "color": "#C000C0"},
+            {"x": 87, "y": 2, "width": 17, "height": 28, "color": "#C00000"},
+            {"x": 104, "y": 2, "width": 15, "height": 28, "color": "#0000C0"},
+        ],
+        "error_shadow_color": "#000000",
+        "error_pulse_color": "#FF3858",
+        "error_inner_stroke": "#000510",
+        "error_body_fill": "#040408",
+        "error_top_highlight": "#E8E8E8",
+        "error_bottom_shadow": "#020202",
+        "error_noise_fill": "#FFFFFF",
+        "error_banner_fill": "#000000",
+        "error_banner_stroke": "#FFFFFF",
+        "error_seam_gap_fill": "#020308",
+        "error_signal_text": "#FFFFFF",
+        "error_value_text": "#FF6B7E",
+    }
+
+
 def _error_badge(message: str, status_code: int = 500) -> str:
     """Render the universal SMPTE NO SIGNAL fallback SVG.
 
@@ -1233,6 +1301,7 @@ def _error_badge(message: str, status_code: int = 500) -> str:
             "message": truncated,
             "uid": uid,
             "font_faces": font_faces,
+            **_error_badge_palette(),
         },
     )
 

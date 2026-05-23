@@ -42,97 +42,97 @@
    then translucent substrate so atmosphere bleeds through. Other skins fall
    through to the original solid substrate paint. #}
 {% if atmosphere_stops %}
-<rect width="{{ sw }}" height="{{ sh }}" rx="5" fill="url(#{{ uid }}-atmosphere)"/>
+<rect width="{{ sw }}" height="{{ sh }}" rx="{{ rhythm_strip_geom.card_rx }}" fill="url(#{{ uid }}-atmosphere)"/>
 {% for bloom in atmosphere_blooms %}
-<rect width="{{ sw }}" height="{{ sh }}" rx="5" fill="url(#{{ uid }}-{{ bloom.id }})"/>
+<rect width="{{ sw }}" height="{{ sh }}" rx="{{ rhythm_strip_geom.card_rx }}" fill="url(#{{ uid }}-{{ bloom.id }})"/>
 {% endfor %}
-<rect width="{{ sw }}" height="{{ sh }}" rx="5" fill="var(--dna-surface)"/>
+<rect width="{{ sw }}" height="{{ sh }}" rx="{{ rhythm_strip_geom.card_rx }}" fill="var(--dna-surface)"/>
 {% else %}
-<rect width="{{ sw }}" height="{{ sh }}" rx="5" fill="var(--dna-surface)"/>
+<rect width="{{ sw }}" height="{{ sh }}" rx="{{ rhythm_strip_geom.card_rx }}" fill="var(--dna-surface)"/>
 {% endif %}
 
 {# ═══ ZONE 1: IDENTITY (16-190px) ═══ #}
-<g transform="translate(16, 0)" data-hw-zone="identity">
-  <text class="s ink1" font-size="12" font-weight="700" y="22" letter-spacing="-0.01em">session {{ session_id_short }}</text>
-  <text class="m ink3" font-size="9" y="38">call {{ call_number }} · {{ duration_label }} · {{ stage_count }} stages</text>
-  <text class="m ink3" font-size="9" y="52">{{ token_total_label }} tok · {{ cost_label }}</text>
+<g transform="translate({{ rhythm_strip_geom.identity_x }}, {{ rhythm_strip_geom.identity_y }})" data-hw-zone="identity">
+  <text class="s ink1" font-size="12" font-weight="700" y="{{ rhythm_strip_geom.identity_title_y }}" letter-spacing="-0.01em">session {{ session_id_short }}</text>
+  <text class="m ink3" font-size="9" y="{{ rhythm_strip_geom.identity_info_y }}">call {{ call_number }} · {{ duration_label }} · {{ stage_count }} stages</text>
+  <text class="m ink3" font-size="9" y="{{ rhythm_strip_geom.identity_token_y }}">{{ token_total_label }} tok · {{ cost_label }}</text>
   {# 4-chip tool legend at y=60 — fixed positions matching specimen #}
   <g transform="translate(0, 60)" data-hw-field="tool-chips">
 {% for chip in identity_chips | default([]) %}
-    <rect x="{{ chip.x }}" y="0" width="6" height="6" rx="1" fill="var(--dna-tool-{{ chip.tool_class }})"/>
-    <text class="m ink3" font-size="6" x="{{ chip.x + 8 }}" y="5.5">{{ chip.label }}</text>
+    <rect x="{{ chip.x }}" y="{{ rhythm_strip_geom.chip_y }}" width="{{ rhythm_strip_geom.chip_w }}" height="{{ rhythm_strip_geom.chip_h }}" rx="{{ rhythm_strip_geom.chip_rx }}" fill="var(--dna-tool-{{ chip.tool_class }})"/>
+    <text class="m ink3" font-size="6" x="{{ chip.text_x }}" y="{{ rhythm_strip_geom.chip_text_y }}">{{ chip.label }}</text>
 {% endfor %}
   </g>
 </g>
 
 {# Vertical divider between IDENTITY and VELOCITY #}
-<line x1="190" y1="14" x2="190" y2="78" stroke="var(--dna-border)" stroke-width="0.5"/>
+<line x1="{{ rhythm_strip_geom.identity_divider_x }}" y1="{{ rhythm_strip_geom.divider_y1 }}" x2="{{ rhythm_strip_geom.identity_divider_x }}" y2="{{ rhythm_strip_geom.divider_y2 }}" stroke="var(--dna-border)" stroke-width="0.5"/>
 
 {# ═══ ZONE 2: VELOCITY (200-264px) ═══ #}
-<g transform="translate(200, 0)" data-hw-zone="velocity">
-  <text class="m ink3" font-size="6.5" font-weight="700" letter-spacing="0.22em" x="10" y="18">VEL</text>
-  <text class="s ink1" font-size="16" font-weight="800" x="10" y="38" letter-spacing="-0.02em">{{ velocity_label }}</text>
-  <text class="m ink3" font-size="7" x="10" y="49" letter-spacing="0.06em">tok/min</text>
+<g transform="translate({{ rhythm_strip_geom.velocity_x }}, {{ rhythm_strip_geom.velocity_y }})" data-hw-zone="velocity">
+  <text class="m ink3" font-size="6.5" font-weight="700" letter-spacing="0.22em" x="{{ rhythm_strip_geom.velocity_text_x }}" y="{{ rhythm_strip_geom.velocity_label_y }}">VEL</text>
+  <text class="s ink1" font-size="16" font-weight="800" x="{{ rhythm_strip_geom.velocity_text_x }}" y="{{ rhythm_strip_geom.velocity_value_y }}" letter-spacing="-0.02em">{{ velocity_label }}</text>
+  <text class="m ink3" font-size="7" x="{{ rhythm_strip_geom.velocity_text_x }}" y="{{ rhythm_strip_geom.velocity_unit_y }}" letter-spacing="0.06em">tok/min</text>
 </g>
 
 {# Sparkline — fill area below + stroke line above + endpoint dots #}
 <g data-hw-zone="velocity-sparkline">
   <path d="{{ sparkline_fill_path }}" fill="url(#{{ uid }}-spk-fill)" stroke="none"/>
   <path d="{{ sparkline_stroke_path }}" fill="none" stroke="var(--dna-signal)" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" opacity="0.7"/>
-{% if sparkline_points %}
-  <circle cx="{{ sparkline_points[0][0] }}" cy="{{ sparkline_points[0][1] }}" r="1.5" fill="var(--dna-signal)" opacity="0.5"/>
-  <circle cx="{{ sparkline_points[-1][0] }}" cy="{{ sparkline_points[-1][1] }}" r="1.5" fill="var(--dna-signal)" opacity="0.5"/>
+{% if sparkline_start_point %}
+  <circle cx="{{ sparkline_start_point[0] }}" cy="{{ sparkline_start_point[1] }}" r="{{ rhythm_strip_geom.sparkline_dot_r }}" fill="var(--dna-signal)" opacity="0.5"/>
+  <circle cx="{{ sparkline_end_point[0] }}" cy="{{ sparkline_end_point[1] }}" r="{{ rhythm_strip_geom.sparkline_dot_r }}" fill="var(--dna-signal)" opacity="0.5"/>
 {% endif %}
-  <text class="m ink3" font-size="5" x="210" y="76" letter-spacing="0.06em">{{ sparkline_label_left }}</text>
-  <text class="m ink3" font-size="5" x="256" y="76" text-anchor="end" letter-spacing="0.06em">{{ sparkline_label_right }}</text>
+  <text class="m ink3" font-size="5" x="{{ rhythm_strip_geom.sparkline_label_left_x }}" y="{{ rhythm_strip_geom.sparkline_label_y }}" letter-spacing="0.06em">{{ sparkline_label_left }}</text>
+  <text class="m ink3" font-size="5" x="{{ rhythm_strip_geom.sparkline_label_right_x }}" y="{{ rhythm_strip_geom.sparkline_label_y }}" text-anchor="end" letter-spacing="0.06em">{{ sparkline_label_right }}</text>
 </g>
 
 {# Vertical divider between VELOCITY and RHYTHM #}
-<line x1="264" y1="14" x2="264" y2="78" stroke="var(--dna-border)" stroke-width="0.5"/>
+<line x1="{{ rhythm_strip_geom.velocity_divider_x }}" y1="{{ rhythm_strip_geom.divider_y1 }}" x2="{{ rhythm_strip_geom.velocity_divider_x }}" y2="{{ rhythm_strip_geom.divider_y2 }}" stroke="var(--dna-border)" stroke-width="0.5"/>
 
 {# ═══ ZONE 3: RHYTHM (268-510px) ═══ #}
-<g transform="translate(268, 0)" data-hw-zone="rhythm">
-  <text class="m ink3" font-size="6" font-weight="700" letter-spacing="0.18em" x="0" y="46">RHYTHM</text>
+<g transform="translate({{ rhythm_strip_geom.rhythm_x }}, {{ rhythm_strip_geom.rhythm_y }})" data-hw-zone="rhythm">
+  <text class="m ink3" font-size="6" font-weight="700" letter-spacing="0.18em" x="{{ rhythm_strip_geom.rhythm_title_x }}" y="{{ rhythm_strip_geom.rhythm_title_y }}">RHYTHM</text>
   {# Baseline at y=78 (strip-relative) — bars baseline-aligned to it #}
-  <line x1="0" y1="78" x2="{{ 510 - 268 }}" y2="78" stroke="var(--dna-border)" stroke-width="0.3" opacity="0.5"/>
+  <line x1="{{ rhythm_strip_geom.rhythm_baseline_x1 }}" y1="{{ rhythm_strip_geom.rhythm_baseline_y }}" x2="{{ rhythm_axis_w }}" y2="{{ rhythm_strip_geom.rhythm_baseline_y }}" stroke="var(--dna-border)" stroke-width="0.3" opacity="0.5"/>
   {# Variable-height bars #}
   <g data-hw-field="bars">
 {% for bar in rhythm_bars | default([]) %}
-    <rect x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.w }}" height="{{ bar.h }}" fill="var(--dna-tool-{{ bar.tool_class }})" opacity="{{ bar.opacity }}" rx="0.3"/>
+    <rect x="{{ bar.x }}" y="{{ bar.y }}" width="{{ bar.w }}" height="{{ bar.h }}" fill="var(--dna-tool-{{ bar.tool_class }})" opacity="{{ bar.opacity }}" rx="{{ rhythm_strip_geom.bar_rx }}"/>
 {% endfor %}
   </g>
   {# Peak marker — horizontal signal-color line spanning the peak bar's width with vertical brackets #}
 {% if rhythm_peak_marker %}
-  <line x1="{{ rhythm_peak_marker.x }}" y1="{{ rhythm_peak_marker.y - 1 }}" x2="{{ rhythm_peak_marker.x + rhythm_peak_marker.w }}" y2="{{ rhythm_peak_marker.y - 1 }}" stroke="var(--dna-signal)" stroke-width="0.8" opacity="0.8"/>
-  <line x1="{{ rhythm_peak_marker.x }}" y1="{{ rhythm_peak_marker.y - 2 }}" x2="{{ rhythm_peak_marker.x }}" y2="{{ rhythm_peak_marker.y + 1 }}" stroke="var(--dna-signal)" stroke-width="0.6" opacity="0.6"/>
-  <line x1="{{ rhythm_peak_marker.x + rhythm_peak_marker.w }}" y1="{{ rhythm_peak_marker.y - 2 }}" x2="{{ rhythm_peak_marker.x + rhythm_peak_marker.w }}" y2="{{ rhythm_peak_marker.y + 1 }}" stroke="var(--dna-signal)" stroke-width="0.6" opacity="0.6"/>
-  <text class="m" font-size="5" x="{{ rhythm_peak_marker.x + rhythm_peak_marker.w // 2 }}" y="{{ rhythm_peak_marker.y - 4 }}" text-anchor="middle" fill="var(--dna-signal)" opacity="0.7" letter-spacing="0.08em">{{ rhythm_peak_label }}</text>
+  <line x1="{{ rhythm_peak_marker.x }}" y1="{{ rhythm_peak_marker.top_line_y }}" x2="{{ rhythm_peak_marker.right_tick_x }}" y2="{{ rhythm_peak_marker.top_line_y }}" stroke="var(--dna-signal)" stroke-width="0.8" opacity="0.8"/>
+  <line x1="{{ rhythm_peak_marker.x }}" y1="{{ rhythm_peak_marker.left_tick_y1 }}" x2="{{ rhythm_peak_marker.x }}" y2="{{ rhythm_peak_marker.left_tick_y2 }}" stroke="var(--dna-signal)" stroke-width="0.6" opacity="0.6"/>
+  <line x1="{{ rhythm_peak_marker.right_tick_x }}" y1="{{ rhythm_peak_marker.right_tick_y1 }}" x2="{{ rhythm_peak_marker.right_tick_x }}" y2="{{ rhythm_peak_marker.right_tick_y2 }}" stroke="var(--dna-signal)" stroke-width="0.6" opacity="0.6"/>
+  <text class="m" font-size="5" x="{{ rhythm_peak_marker.label_x }}" y="{{ rhythm_peak_marker.label_y }}" text-anchor="middle" fill="var(--dna-signal)" opacity="0.7" letter-spacing="0.08em">{{ rhythm_peak_label }}</text>
 {% endif %}
   {# Time axis labels at strip bottom #}
-  <text class="m ink3" font-size="5.5" x="0" y="87" letter-spacing="0.06em">{{ rhythm_label_left }}</text>
-  <text class="m ink3" font-size="5.5" x="{{ 510 - 268 }}" y="87" text-anchor="end" letter-spacing="0.06em">{{ rhythm_label_right }}</text>
+  <text class="m ink3" font-size="5.5" x="{{ rhythm_strip_geom.time_label_x }}" y="{{ rhythm_strip_geom.time_label_y }}" letter-spacing="0.06em">{{ rhythm_label_left }}</text>
+  <text class="m ink3" font-size="5.5" x="{{ rhythm_axis_w }}" y="{{ rhythm_strip_geom.time_label_y }}" text-anchor="end" letter-spacing="0.06em">{{ rhythm_label_right }}</text>
   {# Density axis hint — rotated -90° at zone left edge #}
-  <text class="m ink3" font-size="4.5" x="-2" y="52" text-anchor="end" letter-spacing="0.04em" transform="rotate(-90, -2, 52)">density</text>
+  <text class="m ink3" font-size="4.5" x="{{ rhythm_strip_geom.density_x }}" y="{{ rhythm_strip_geom.density_y }}" text-anchor="end" letter-spacing="0.04em" transform="{{ rhythm_strip_geom.density_transform }}">density</text>
 </g>
 
 {# Vertical divider between RHYTHM and STATUS #}
-<line x1="510" y1="14" x2="510" y2="78" stroke="var(--dna-border)" stroke-width="0.5"/>
+<line x1="{{ rhythm_strip_geom.status_divider_x }}" y1="{{ rhythm_strip_geom.divider_y1 }}" x2="{{ rhythm_strip_geom.status_divider_x }}" y2="{{ rhythm_strip_geom.divider_y2 }}" stroke="var(--dna-border)" stroke-width="0.5"/>
 
 {# ═══ ZONE 4: STATUS (522-600px) ═══ #}
-<g transform="translate(522, 0)" data-hw-zone="status">
-  <circle cx="6" cy="20" r="3.5" fill="var({{ status_color_var }})" opacity="0.85" data-hw-status="{{ status_severity }}"/>
-  <text class="m" font-size="9" font-weight="700" x="14" y="23" fill="var({{ status_color_var }})" letter-spacing="0.1em">{{ status_word }}</text>
-  <text class="m ink3" font-size="7.5" y="38">{{ n_errors }} err</text>
-  <text class="m ink3" font-size="5.5" font-weight="700" letter-spacing="0.15em" y="54">DOMINANT</text>
+<g transform="translate({{ rhythm_strip_geom.status_x }}, {{ rhythm_strip_geom.status_y }})" data-hw-zone="status">
+  <circle cx="{{ rhythm_strip_geom.status_dot_cx }}" cy="{{ rhythm_strip_geom.status_dot_cy }}" r="{{ rhythm_strip_geom.status_dot_r }}" fill="var({{ status_color_var }})" opacity="0.85" data-hw-status="{{ status_severity }}"/>
+  <text class="m" font-size="9" font-weight="700" x="{{ rhythm_strip_geom.status_word_x }}" y="{{ rhythm_strip_geom.status_word_y }}" fill="var({{ status_color_var }})" letter-spacing="0.1em">{{ status_word }}</text>
+  <text class="m ink3" font-size="7.5" y="{{ rhythm_strip_geom.status_errors_y }}">{{ n_errors }} err</text>
+  <text class="m ink3" font-size="5.5" font-weight="700" letter-spacing="0.15em" y="{{ rhythm_strip_geom.status_dominant_label_y }}">DOMINANT</text>
 {% if dominant_label %}
-  <text class="m" font-size="9" font-weight="700" y="67" fill="var(--dna-tool-{{ dominant_tool_class }})" letter-spacing="0.08em">{{ dominant_label }}</text>
-  <text class="m ink3" font-size="7" y="79">{{ dominant_pct_time }}% time</text>
+  <text class="m" font-size="9" font-weight="700" y="{{ rhythm_strip_geom.status_dominant_y }}" fill="var(--dna-tool-{{ dominant_tool_class }})" letter-spacing="0.08em">{{ dominant_label }}</text>
+  <text class="m ink3" font-size="7" y="{{ rhythm_strip_geom.status_pct_y }}">{{ dominant_pct_time }}% time</text>
 {% endif %}
 </g>
 
 {# Edge finish #}
-<rect x="1" y="0" width="{{ sw - 2 }}" height="0.8" fill="var(--dna-ink-primary)" opacity="0.06"/>
-<rect x="1" y="{{ sh - 0.8 }}" width="{{ sw - 2 }}" height="0.8" fill="var(--dna-surface-deep)" opacity="0.45"/>
+<rect x="{{ rhythm_strip_geom.edge_x }}" y="{{ rhythm_strip_geom.edge_top_y }}" width="{{ rhythm_strip_inner_w }}" height="{{ rhythm_strip_geom.edge_h }}" fill="var(--dna-ink-primary)" opacity="0.06"/>
+<rect x="{{ rhythm_strip_geom.edge_x }}" y="{{ rhythm_strip_bottom_highlight_y }}" width="{{ rhythm_strip_inner_w }}" height="{{ rhythm_strip_geom.edge_h }}" fill="var(--dna-surface-deep)" opacity="0.45"/>
 {# Card border #}
-<rect x="0.5" y="0.5" width="{{ sw - 1 }}" height="{{ sh - 1 }}" rx="4.5" fill="none" stroke="var(--dna-border)" stroke-width="1"/>
+<rect x="{{ rhythm_strip_geom.border_x }}" y="{{ rhythm_strip_geom.border_y }}" width="{{ rhythm_strip_inner_w }}" height="{{ rhythm_strip_inner_h }}" rx="{{ rhythm_strip_geom.border_rx }}" fill="none" stroke="var(--dna-border)" stroke-width="1"/>
 {% endblock %}

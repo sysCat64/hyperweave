@@ -1,7 +1,7 @@
 {# Cellular badge content — dynamic rim + pattern strip + slabs.
 
    Geometry derives from the resolver-supplied width (measure_text-driven),
-   lp_w, sep_w_val, seam_w_val, ind_size. Pattern grid is 3 columns × 4 rows;
+   left_panel_width, sep_width, seam_width, indicator_size. Pattern grid is 3 columns × 4 rows;
    per-cell size scales from compact (4×4 at 4px pitch) to default (6×7 at
    6px pitch). Family resolution: ComposeSpec.variant or cellular paradigm's
    frame_variant_defaults.badge (= "blue").
@@ -21,54 +21,30 @@
 {% set top_highlight = cellular_palette.primary.rim_stops[0].color %}
 {% set dark_lip = cellular_palette.primary.rim_stops[-1].color %}
 
-{# Pattern grid geometry: 3 columns × 4 rows. Sizes compact ↔ default. #}
-{% set cell_w = 4 if compact else 6 %}
-{% set cell_h = 4 if compact else 7 %}
-{% set pattern_cols = 3 %}
-{% set pattern_rows = 4 %}
-{% set pattern_start_x = 2 %}
-{% set pattern_start_y = 2 %}
-
-{# Per-cell pulse class mapping (3×4 = 12 cells) — asymmetric phi offsets. #}
-{% set cell_class_grid = [
-  ["cz1","czd","cz3","czf"],
-  ["cz2","cz4","czd","cz1"],
-  ["czd","czf","cz2","czd"]
-] %}
-{% set cell_color_grid = [
-  [0,2,1,0],
-  [1,0,2,1],
-  [2,1,0,2]
-] %}
-
 <g clip-path="url(#{{ uid }}-clip)">
   {# 1. Metallic rim — full viewBox, drop-shadow-lifted #}
   <rect width="{{ width }}" height="{{ height }}" fill="url(#{{ uid }}-rim)" filter="url(#{{ uid }}-lift)"/>
   {# 2. Dark lip — 1px inset stroke #}
-  <rect x="1" y="1" width="{{ width - 2 }}" height="{{ height - 2 }}" fill="none" stroke="{{ dark_lip }}" stroke-width="{{ 0.5 if compact else 0.7 }}"/>
+  <rect x="{{ cellular_inner_inset }}" y="{{ cellular_inner_inset }}" width="{{ cellular_inner_stroke_w }}" height="{{ cellular_inner_stroke_h }}" fill="none" stroke="{{ dark_lip }}" stroke-width="{{ cellular_inner_stroke_width }}"/>
   {# 3. Inner canvas #}
-  <rect x="2" y="2" width="{{ width - 4 }}" height="{{ height - 4 }}" fill="{{ pattern_cells_trio[2] }}"/>
+  <rect x="{{ cellular_canvas_inset }}" y="{{ cellular_canvas_inset }}" width="{{ cellular_canvas_w }}" height="{{ cellular_canvas_h }}" fill="{{ pattern_cells_trio[2] }}"/>
   {# 4. Top highlight hairline (bright edge of rim) #}
-  <rect x="{{ pattern_cols * cell_w + 6 }}" y="2" width="{{ width - (pattern_cols * cell_w + 6) - 4 }}" height="1" fill="{{ top_highlight }}" opacity="0.22"/>
+  <rect x="{{ cellular_content_start_x }}" y="{{ cellular_canvas_inset }}" width="{{ cellular_content_w }}" height="{{ cellular_top_highlight_h }}" fill="{{ top_highlight }}" opacity="0.22"/>
   {# 5. Bottom ambient occlusion #}
-  <rect x="{{ pattern_cols * cell_w + 6 }}" y="{{ height - 2.5 }}" width="{{ width - (pattern_cols * cell_w + 6) - 4 }}" height="0.5" fill="{{ dark_lip }}" opacity="0.55"/>
-  {# 6. Label slab — family-colored deep fill. Starts at pattern_end (x=20)
-     with no gap: pattern_cols * cell_w + pattern_start_x = 3*6 + 2 = 20.
-     Earlier iterations used +4 which left a 2px dark canvas strip visible
-     on the left side that had no mirror on the right, producing asymmetric
-     gutters. Flush-to-pattern now matches production target. #}
-  <rect x="{{ pattern_cols * cell_w + 2 }}" y="2" width="{{ lp_w - (pattern_cols * cell_w + 2) }}" height="{{ height - 4 }}" fill="{{ label_slab_fill }}"/>
+  <rect x="{{ cellular_content_start_x }}" y="{{ cellular_bottom_y }}" width="{{ cellular_content_w }}" height="{{ cellular_bottom_highlight_h }}" fill="{{ dark_lip }}" opacity="0.55"/>
+  {# 6. Label slab — family-colored deep fill. Starts at the resolver-supplied
+     pattern edge so the layout engine owns bookend geometry and compact
+     spacing. #}
+  <rect x="{{ cellular_label_slab_x }}" y="{{ cellular_canvas_inset }}" width="{{ cellular_label_slab_w }}" height="{{ cellular_canvas_h }}" fill="{{ label_slab_fill }}"/>
   {# 7. Refined seam — 1px gradient + 2px shadow #}
-  <rect x="{{ lp_w }}" y="2" width="1" height="{{ height - 4 }}" fill="url(#{{ uid }}-seam)"/>
-  <rect x="{{ lp_w + 1 }}" y="2" width="{{ seam_w_val }}" height="{{ height - 4 }}" fill="#020308"/>
+  <rect x="{{ left_panel_width }}" y="{{ cellular_canvas_inset }}" width="{{ cellular_seam_w }}" height="{{ cellular_canvas_h }}" fill="url(#{{ uid }}-seam)"/>
+  <rect x="{{ cellular_seam_shadow_x }}" y="{{ cellular_canvas_inset }}" width="{{ seam_width }}" height="{{ cellular_canvas_h }}" fill="var(--dna-surface-deep)"/>
   {# 8. Value slab — gradient canvas #}
-  <rect x="{{ lp_w + 1 + seam_w_val }}" y="2" width="{{ width - (lp_w + 1 + seam_w_val) - 2 }}" height="{{ height - 4 }}" fill="url(#{{ uid }}-vb)"/>
+  <rect x="{{ cellular_value_slab_x }}" y="{{ cellular_canvas_inset }}" width="{{ cellular_value_slab_w }}" height="{{ cellular_canvas_h }}" fill="url(#{{ uid }}-vb)"/>
   {# 9. Pattern strip — 3 × 4 living substrate on left edge #}
   <g opacity="{{ cellular_pattern_opacity }}">
-  {% for col in range(pattern_cols) %}
-    {% for row in range(pattern_rows) %}
-    <rect x="{{ pattern_start_x + col * cell_w }}" y="{{ pattern_start_y + row * cell_h }}" width="{{ cell_w }}" height="{{ cell_h }}" fill="{{ pattern_cells_trio[cell_color_grid[col][row]] }}" class="{{ cell_class_grid[col][row] }}"/>
-    {% endfor %}
+  {% for cell in cellular_pattern_cells %}
+    <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.w }}" height="{{ cell.h }}" fill="{{ pattern_cells_trio[cell.color_index] }}" class="{{ cell.css_class }}"/>
   {% endfor %}
   </g>
 </g>
@@ -81,7 +57,7 @@
 {% set variant_glyph_fill = cellular_palette.primary.seam_mid %}
 {% if has_glyph and glyph_path %}
 <g data-hw-zone="glyph" transform="translate({{ glyph_x }},{{ glyph_y }})">
-  <svg width="{{ glyph_render_size }}" height="{{ glyph_render_size }}" viewBox="{{ glyph_viewbox }}">
+  <svg width="{{ glyph_render_size }}" height="{{ glyph_render_size }}" viewBox="{{ glyph_render_viewbox | default(glyph_viewbox) }}" overflow="visible">
     <path d="{{ glyph_path }}" fill="{{ variant_glyph_fill }}"/>
   </svg>
 </g>
@@ -91,8 +67,8 @@
 <text data-hw-zone="label"
       x="{{ label_x }}" y="{{ text_y }}"
       text-anchor="middle"
-      font-family="'Orbitron',sans-serif"
-      font-size="{{ 7 if compact else 9 }}" font-weight="700"
+      font-family="{{ label_font_family }}"
+      font-size="{{ badge_label_font_size }}" font-weight="700"
       fill="{{ label_text_fill }}"
       letter-spacing="0.1em"{% if label_text_length and label_text_length > 0 %} textLength="{{ label_text_length }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ label_display | default(label | upper) }}</text>
 
@@ -101,8 +77,8 @@
 <text data-hw-zone="value"
       x="{{ value_x }}" y="{{ text_y }}"
       text-anchor="middle"
-      font-family="'Chakra Petch',sans-serif"
-      font-size="{{ 9 if compact else 12 }}" font-weight="700"
+      font-family="{{ value_font_family }}"
+      font-size="{{ badge_value_font_size }}" font-weight="700"
       {% if is_state_badge %}class="hw-value-text" fill="var(--hw-state-value, {{ value_text_fill }})"{% else %}fill="{{ value_text_fill }}"{% endif %}{% if value_text_length and value_text_length > 0 %} textLength="{{ value_text_length }}" lengthAdjust="spacingAndGlyphs"{% endif %}>{{ value }}</text>
 
 {# 13. State indicator (ring + bit) — gated on resolver-supplied show_indicator
@@ -111,7 +87,7 @@
       same engine — no template-side arithmetic (Invariant 6). #}
 {% if show_indicator %}
 <g data-hw-zone="status" transform="translate({{ indicator_x }},{{ indicator_y }})">
-  <rect class="hw-ring" fill="none" stroke="var(--hw-state-signal, {{ label_text_fill }})" stroke-width="1.2" width="{{ ind_size }}" height="{{ ind_size }}"/>
+  <rect class="hw-ring" fill="none" stroke="var(--hw-state-signal, {{ label_text_fill }})" stroke-width="1.2" width="{{ indicator_size }}" height="{{ indicator_size }}"/>
   <rect class="hw-bit" x="{{ inner_bit_offset }}" y="{{ inner_bit_offset }}" width="{{ inner_bit_w }}" height="{{ inner_bit_w }}"
         fill="var(--hw-state-signal, {{ label_text_fill }})"/>
 </g>

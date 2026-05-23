@@ -12,26 +12,26 @@
    pixels stay transparent. #}
 <g clip-path="url(#{{ uid }}-clip)">
   {# Outer rim: full-size rect filled with animated chrome env-map + shadow filter #}
-  <rect width="{{ content_width | default(width) }}" height="{{ strip_h }}" rx="{{ chrome_corner }}"
+  <rect width="{{ strip_zones.core.content_width }}" height="{{ strip_h }}" rx="{{ chrome_corner }}"
         fill="url(#{{ uid }}-envelope)" filter="url(#{{ uid }}-bevel)"/>
 
   {# Thin inset stroke (badge parity: 0.6px interior shading line) #}
-  <rect x="1" y="1" width="{{ (content_width | default(width)) - 2 }}" height="{{ strip_h - 2 }}"
+  <rect x="{{ strip_chrome_inner_inset }}" y="{{ strip_chrome_inner_inset }}" width="{{ strip_zones.chrome.inner_w }}" height="{{ strip_zones.chrome.inner_h }}"
         rx="{{ chrome_corner }}" fill="none"
-        stroke="#000510" stroke-width="0.6"/>
+        stroke="var(--dna-chrome-inner-stroke, var(--dna-surface-deep))" stroke-width="0.6"/>
 
   {# Inner well: dark recessed content area. 2px inset matches badge's well inset
      ratio (2/22 ≈ 0.09 on badge → ~4.7px on strip; we use 2 for crisper edges). #}
-  <rect x="2" y="2" width="{{ (content_width | default(width)) - 4 }}" height="{{ strip_h - 4 }}"
-        rx="2" fill="url(#{{ uid }}-well)"/>
+  <rect x="{{ strip_chrome_well_inset }}" y="{{ strip_chrome_well_inset }}" width="{{ strip_zones.chrome.well_w }}" height="{{ strip_zones.chrome.well_h }}"
+        rx="{{ strip_chrome_well_rx }}" fill="url(#{{ uid }}-well)"/>
 
   {# Chrome accent bar: 4px wide at 0.7 opacity — identical to badge line 11 #}
-  <rect x="2" y="2" width="{{ accent_w }}" height="{{ strip_h - 4 }}"
+  <rect x="{{ strip_chrome_well_inset }}" y="{{ strip_chrome_well_inset }}" width="{{ accent_w }}" height="{{ strip_zones.chrome.accent_h }}"
         fill="url(#{{ uid }}-envelope)" opacity="0.7"/>
 </g>
 
 {# Top highlight — hairline specular line, badge parity.
    Fully vector (no filter), so it stays pixel-crisp on mobile. #}
-<rect x="8" y="2" width="{{ (content_width | default(width)) - 16 }}" height="0.5" rx="0.25"
+<rect x="{{ strip_chrome_highlight_x }}" y="{{ strip_chrome_highlight_y }}" width="{{ strip_zones.chrome.highlight_w }}" height="{{ strip_chrome_highlight_h }}" rx="{{ strip_chrome_highlight_rx }}"
       fill="{{ specular_light }}"
       opacity="{{ highlight_opacity | default('0.1') }}"/>

@@ -4,8 +4,10 @@
             status_size (outer dimension, default 8) #}
 {% set shape = status_shape | default('circle') %}
 {% set sz = status_size | default(8) %}
-{% set inner = sz * 0.5 %}
-{% set offset = (sz - inner) / 2 %}
+{% set inner = status_inner_size | default(4) %}
+{% set offset = status_inner_offset | default(2) %}
+{% set center = status_center | default(4) %}
+{% set inner_radius = status_inner_radius | default(2) %}
 <g data-hw-zone="status" transform="translate({{ status_x }},{{ status_y }})">
 {% if shape == 'square' %}
   <rect fill="none" stroke="var(--hw-state-ring, var(--dna-signal))"
@@ -15,9 +17,9 @@
         fill="var(--hw-state-core, var(--dna-signal))"/>
 {% else %}
   <circle fill="none" stroke="var(--hw-state-ring, var(--dna-signal))"
-          stroke-width="1.2" cx="{{ sz / 2 }}" cy="{{ sz / 2 }}" r="{{ sz / 2 }}"/>
+          stroke-width="1.2" cx="{{ center }}" cy="{{ center }}" r="{{ center }}"/>
   <circle class="hw-logic-bit"
-          cx="{{ sz / 2 }}" cy="{{ sz / 2 }}" r="{{ inner / 2 }}"
+          cx="{{ center }}" cy="{{ center }}" r="{{ inner_radius }}"
           fill="var(--hw-state-core, var(--dna-signal))"/>
 {% endif %}
 </g>

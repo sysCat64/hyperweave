@@ -64,6 +64,28 @@ class ParadigmChartConfig(FrozenModel):
     """Font weight for the chart header identity slot."""
     identity_letter_spacing_em: float = 0.06
     """CSS letter-spacing for the chart header identity slot."""
+    y_tick_target: int = 4
+    """Target number of Y-axis tick intervals. Cellular uses a denser target."""
+    label_collision_font_family: str = "JetBrains Mono"
+    """Font family used when chart_engine measures milestone/x-axis label collisions."""
+    label_collision_font_size: float = 9
+    """Font size used for collision measurement."""
+    label_collision_font_weight: int = 800
+    """Font weight used for collision measurement."""
+    label_collision_letter_spacing_em: float = 0.12
+    """Letter spacing used for collision measurement."""
+    axis_y_label_x_offset: int = -8
+    """Y-axis label x offset relative to viewport_x."""
+    axis_y_label_y_offset: int = 4
+    """Y-axis label baseline offset relative to the tick y."""
+    x_axis_label_y: int = 420
+    """Standalone chart x-axis label baseline."""
+    milestone_label_y_offset: int = -24
+    """Generic milestone label offset from the crossing point."""
+    header_identity_gap: int = 12
+    """Minimum breathing gap between same-row header identity/description text."""
+    header_identity_max_right_margin: int = 24
+    """Right margin for header identity text when it is right anchored."""
 
 
 class ParadigmStatsConfig(FrozenModel):
@@ -137,8 +159,10 @@ class ParadigmStatsConfig(FrozenModel):
     LUT extraction). Short usernames snap bio close (tight visual); when
     the identity gets clamped via textLength, the same formula with
     ``identity_zone_w`` substituted reproduces the v0.3.8 fixed bio_x
-    automatically. Brutalist: 8 (reproduces v0.3.8 bio_x=122 for clamped
-    identities, gives tight snap for short like ELI64S). Cellular: 4."""
+    automatically. StatsLayout enforces an 8px visible-gap floor so header
+    identity and bio text cannot visually collide. Brutalist: 8 (reproduces
+    v0.3.8 bio_x=122 for clamped identities, gives tight snap for short like
+    ELI64S). Cellular: 8."""
     bio_collision_clamp: bool = False
     """When True, the resolver measures the bio's natural rendered width and
     emits ``bio_text_length`` so the template applies SVG ``textLength``
@@ -169,6 +193,58 @@ class ParadigmStatsConfig(FrozenModel):
     """Text transform applied by the stats template before render. The resolver
     must measure the transformed text, otherwise lower-case connector data
     underestimates templates that render ``{{ stats_username | upper }}``."""
+    metric_layout_mode: Literal["brutalist_grid", "chrome_columns", "cellular_inline"] = "brutalist_grid"
+    """Stats metric slot layout algorithm selected by config, never by paradigm slug."""
+    metric_value_font_family: str = "Inter"
+    metric_value_font_size: float = 20
+    metric_value_font_weight: int = 700
+    metric_value_letter_spacing_em: float = 0.0
+    metric_value_budget: float = 112.0
+    """Shrink-to-fit budget for centered stat metric values."""
+    metric_label_font_family: str = "JetBrains Mono"
+    metric_label_font_size: float = 6.5
+    metric_label_font_weight: int = 500
+    metric_label_letter_spacing_em: float = 0.22
+    cellular_metric_value_font_family: str = "Chakra Petch"
+    cellular_metric_y: float = 72.8
+    cellular_metric_left_x: float = 20.0
+    cellular_metric_right_margin: float = 20.0
+    cellular_metric_value_label_gap: float = 4.0
+    cellular_metric_inter_slot_gap: float = 12.0
+    activity_bar_baseline_y: float = 246.0
+    activity_bar_max_h: float = 26.0
+    activity_bar_min_h: float = 4.0
+    activity_bar_w: float = 7.0
+    activity_bar_start_x: float = 22.0
+    activity_bar_stride: float = 9.0
+    activity_bar_opacity_min: float = 0.43
+    activity_bar_opacity_max: float = 0.93
+    activity_bar_opacity_min_light: float = 0.28
+    activity_bar_opacity_max_light: float = 0.75
+    language_zone_x: float = 6.0
+    language_zone_y: float = 252.0
+    language_zone_h: float = 12.0
+    language_label_offset_x: float = 8.0
+    language_label_y_dark: float = 260.5
+    language_label_y_light: float = 260.5
+    language_segment_opacities: list[float] = Field(default_factory=lambda: [0.55, 0.40, 0.25, 0.10])
+    language_segment_opacities_light: list[float] = Field(default_factory=lambda: [0.12, 0.06, 0.04, 0.02])
+    inline_language_zone_left: float = 20.0
+    inline_language_zone_right_margin: float = 20.0
+    inline_language_swatch_w: float = 5.0
+    inline_language_swatch_h: float = 5.0
+    inline_language_swatch_rx: float = 1.0
+    inline_language_swatch_text_gap: float = 4.0
+    inline_language_entry_gap: float = 24.0
+    inline_language_swatch_y: float = 216.0
+    inline_language_label_y: float = 221.0
+    heatmap_x0: float = 20.0
+    heatmap_y0: float = 114.0
+    heatmap_cell_rx: float = 1.5
+    heatmap_legend_xs: list[float] = Field(default_factory=lambda: [467.0, 476.0, 485.0, 494.0, 503.0])
+    heatmap_legend_y: float = 101.0
+    heatmap_legend_size: float = 7.0
+    heatmap_legend_rx: float = 1.5
 
 
 class ParadigmStripConfig(FrozenModel):
@@ -332,6 +408,9 @@ class ParadigmBadgeConfig(FrozenModel):
     value_font_family: str = "Inter"
     label_font_size: float = 11
     value_font_size: float = 11
+    label_font_weight: int = 700
+    """CSS font-weight used by the rendered badge label. Resolver measurement
+    must match template typography or centered ink bounds drift from the SVG."""
     value_font_weight: int = 700
     show_indicator: bool = True
     """When False, the status-indicator zone collapses. Cellular paradigm
@@ -342,9 +421,10 @@ class ParadigmBadgeConfig(FrozenModel):
     frame_height_compact: int = 20
     """Height when ``variant == "compact"`` — defaults 20 (small-badge class)."""
     glyph_offset_left: int = 0
-    """Additional left-side offset for the glyph, used by paradigms that render
-    a decorative element (cellular: 3-col pattern strip) in the far-left region.
-    Brutalist/chrome: 0. Cellular: 18 (default) / 12 (compact)."""
+    """Legacy additional left-side offset for the glyph. Prefer
+    ``left_adornment_*`` fields when a paradigm renders real bookend geometry,
+    because those fields let the layout engine position content from the
+    rendered adornment boundary instead of from an inverse offset."""
     glyph_offset_left_compact: int = 0
     """Compact-variant glyph offset. Empty (0) falls back to glyph_offset_left."""
     glyph_size: int = 14
@@ -382,6 +462,43 @@ class ParadigmBadgeConfig(FrozenModel):
     at ``x=2..width-2`` per cellular-content.j2:9). Without this override,
     ``value_zone_right`` lands ``right_canvas_inset`` past the actual slab
     edge and drifts the centered value text right by half that amount."""
+    left_adornment_width: float = 0.0
+    """Rendered right edge of the optional left adornment measured from x=0.
+    Cellular large: 20 (= pattern x 2 + 3 cols * 6px). Zero disables
+    adornment-aware placement."""
+    left_adornment_width_compact: float = 0.0
+    """Compact-variant rendered adornment right edge. Zero falls back to
+    ``left_adornment_width``."""
+    left_adornment_gap: float = 4.0
+    """Gap between the rendered left adornment's right edge and the glyph.
+    Only applies when ``left_adornment_width`` resolves above zero."""
+    glyph_label_gap: float = 0.0
+    """Optional gap between glyph right edge and label left edge. Zero falls
+    back to the normal badge ``pad`` rhythm. Cellular sets this to match the
+    bookend→glyph gap so the identity cluster reads symmetrically."""
+    visual_gap: float = 0.0
+    """Optional visible-ink gap used by centered-text paradigms. When ``> 0``,
+    ``compute_badge_zones`` balances bookend/glyph/label/seam/value/right-edge
+    transitions using rendered ink bounds instead of advance-box padding.
+    Cellular uses this because its visible bookend makes the old 8px pad rhythm
+    look asymmetric at compact badge scale."""
+    left_adornment_start_x: int = 0
+    """Left x-coordinate of optional rendered left adornment cells."""
+    left_adornment_start_y: int = 0
+    """Top y-coordinate for optional left adornment cells."""
+    left_adornment_cols: int = 0
+    """Column count for optional left adornment cells. Zero disables the
+    adornment geometry contract."""
+    left_adornment_rows: int = 0
+    """Row count for optional left adornment cells."""
+    left_adornment_cell_w: int = 0
+    """Default cell width for optional left adornment geometry."""
+    left_adornment_cell_h: int = 0
+    """Default cell height for optional left adornment geometry."""
+    left_adornment_cell_w_compact: int = 0
+    """Compact-variant cell width. Zero falls back to ``left_adornment_cell_w``."""
+    left_adornment_cell_h_compact: int = 0
+    """Compact-variant cell height. Zero falls back to ``left_adornment_cell_h``."""
     indicator_size: int = 0
     """Optional paradigm-specific indicator side length. ``> 0`` overrides
     the profile's ``badge_indicator_size``. Brutalist v0.3.3 sets 10 to

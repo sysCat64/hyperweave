@@ -23,7 +23,6 @@
 
 {% block content %}
 {% set icon_size = width | default(64) %}
-{% set cx = icon_size / 2 %}
 
 {% include "frames/icon/" ~ (paradigm | default("default")) ~ "-content.j2" %}
 

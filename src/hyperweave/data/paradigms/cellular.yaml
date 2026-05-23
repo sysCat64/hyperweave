@@ -56,14 +56,29 @@ badge:
   show_indicator: true
   frame_height: 32
   frame_height_compact: 20
-  glyph_offset_left: 18
-  glyph_offset_left_compact: 12
   glyph_size: 12
-  glyph_size_compact: 12
+  glyph_size_compact: 10
   glyph_size_ratio: 0.6
-  glyph_size_compact_ratio: 0.6
+  glyph_size_compact_ratio: 0.5
   glyph_size_max: 12
   text_y_factor: 0.656
+  # Cellular renders a left bookend pattern. Layout positions the first
+  # content zone from the rendered pattern edge, not an inverse glyph offset,
+  # so compact can tighten the bookend→glyph gap without changing the rest of
+  # the badge pad rhythm.
+  left_adornment_width: 20
+  left_adornment_width_compact: 14
+  left_adornment_gap: 4
+  glyph_label_gap: 4
+  visual_gap: 4
+  left_adornment_start_x: 2
+  left_adornment_start_y: 2
+  left_adornment_cols: 3
+  left_adornment_rows: 4
+  left_adornment_cell_w: 6
+  left_adornment_cell_h: 7
+  left_adornment_cell_w_compact: 4
+  left_adornment_cell_h_compact: 4
   # Cellular paints a 1px gradient seam at lp_w (template lines 60-61),
   # not the brutalist 2px separator. Override sep_w so the resolver's
   # value_zone_left lines up with the cellular template's actual value
@@ -74,9 +89,10 @@ badge:
   # value_zone_right lands 2px past the slab edge and the centered
   # value text drifts 1px right.
   right_canvas_inset: 2
-  # v0.3.9 equal-spacing rule (compute_badge_zones): single pad between every
-  # PRESENT zone. 8px matches cellular's measured visual rhythm (label_font
-  # at 9px, value_font at 12px share an 8px breathing band).
+  # v0.3.10 visual rhythm: the rendered bookend makes the compact badge read
+  # too airy when the old 8px advance-box pad drives every gap. visual_gap=4
+  # balances bookend/glyph/label/seam/value/right-edge using ink bounds, while
+  # pad remains the legacy fallback for non-visual layout paths.
   pad: 8
   # Glyph y aligns to the label visual center in compose/layout.py; no
   # template-side or per-size vertical compensation is needed.
@@ -195,6 +211,15 @@ chart:
   chart_height: 380
   cell_size: 19
   header_band_height: 64
+  y_tick_target: 6
+  label_collision_font_family: JetBrains Mono
+  label_collision_font_size: 8
+  label_collision_font_weight: 700
+  label_collision_letter_spacing_em: 0.0
+  axis_y_label_x_offset: -10
+  axis_y_label_y_offset: 4
+  x_axis_label_y: 348
+  milestone_label_y_offset: -24
   # One-shot stroke-dashoffset draw animation on the polyline. Cellular
   # specimen renders the data line as an arriving signal rather than a
   # printed plot; gated by prefers-reduced-motion at the CSS layer.
@@ -210,6 +235,18 @@ stats:
   card_width: 530
   card_height: 233
   embeds_chart: false
+  metric_layout_mode: cellular_inline
+  metric_value_font_family: Chakra Petch
+  metric_label_font_family: JetBrains Mono
+  metric_label_font_size: 6.5
+  metric_label_font_weight: 500
+  metric_label_letter_spacing_em: 0.22
+  cellular_metric_value_font_family: Chakra Petch
+  cellular_metric_y: 72.8
+  cellular_metric_left_x: 20
+  cellular_metric_right_margin: 20
+  cellular_metric_value_label_gap: 4
+  cellular_metric_inter_slot_gap: 12
   header_band_height: 39
   heatmap_rows: 7
   heatmap_cols: 40
@@ -226,15 +263,16 @@ stats:
   # leave room for HYPERWEAVE is gone for cellular.
   #
   # 410 chosen so VLLM-PROJECT (~130px natural at Orbitron 13/700/0.16em)
-  # never clamps: 20 + 130 + 4 = 154, well under 410. Only usernames
+  # never clamps: 20 + 130 + 8 = 158, well under 410. Only usernames
   # exceeding ~386px natural ink hit the ceiling — none realistic.
   identity_x: 20
   bio_x: 410
   identity_padding: 2
   # Adaptive bio_x: bio sits at identity_x + identity_ink_width +
-  # identity_breathing_margin. For ELI64S (short, ~52px ink): bio at x=76.
-  # For VLLM-PROJECT (~130px ink): bio at x=154 (no clamp, no squish).
-  identity_breathing_margin: 4
+  # max(identity_breathing_margin, StatsLayout's 8px visible-gap floor).
+  # For ELI64S (short, ~52px ink): bio at x=80. For VLLM-PROJECT
+  # (~130px ink): bio at x=158 (no clamp, no squish).
+  identity_breathing_margin: 8
   # Bug A folded HYPERWEAVE into the footer, eliminating the header-row
   # collision that bio_collision_clamp was defending against. With
   # HYPERWEAVE at y=221 there's no right-side header element to collide

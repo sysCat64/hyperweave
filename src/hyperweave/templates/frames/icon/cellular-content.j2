@@ -20,15 +20,9 @@
    concentration, swap to a hash-based dispatch later. The simple modulo
    gives a balanced grid acceptable as the initial render. #}
 
-{% set _surface = surface_0 | default('var(--dna-surface)') %}
+{% set _surface = icon_surface_fill | default('var(--dna-surface)') %}
 {% set _cw = width | default(48) %}
 {% set _ch = height | default(48) %}
-{% set _cols = icon_grid_cols | default(5) %}
-{% set _rows = icon_grid_rows | default(5) %}
-{% set _cell = icon_cell_size | default(8) %}
-{% set _gap = icon_cell_gap | default(1) %}
-{% set _stride = _cell + _gap %}
-{% set _cell_rx = icon_cell_rx | default(1) %}
 {% set _inner_x = icon_inner_inset | default(10.08) %}
 {% set _inner_size = icon_inner_size | default(27.84) %}
 {% set _inner_rx = icon_inner_rx | default(4) %}
@@ -37,29 +31,6 @@
 {% set _outer_rx = icon_outer_rx | default(6) %}
 {% set _info = icon_info_accent %}
 {% set _mid = icon_mid_accent %}
-{% set _header_band = icon_header_band %}
-{% set chart_levels = cellular_palette.primary.chart_levels %}
-{% set _dark_active = chart_levels[1] %}
-
-{# 4-tier cell color map keyed by class slot. cz1/cz2/cz3/cz4 cycle with
-   different phase staggers; czd is the dormant low-opacity tone. #}
-{% set _cell_classes = ['cz1', 'cz2', 'cz3', 'cz4', 'czd'] %}
-{% set _cell_fills = [_dark_active, _mid, _info, _mid, _header_band] %}
-
-{# Pre-shuffled 25-entry slot table. Each entry is an index into _cell_classes
-   (0..4 = cz1/cz2/cz3/cz4/czd). The shuffle preserves the 5-of-each
-   distribution but breaks the diagonal wave pattern that modulo arithmetic
-   `(row*5 + col) % 5` would produce — adjacent cells getting sequential
-   phase offsets is what made the prototype's organic feel render as a
-   visible oscillation in the live SVG. The shuffle is fixed (deterministic)
-   so cached renders are byte-identical across runs. #}
-{% set _icon_slot_table = [
-  2, 4, 0, 3, 1,
-  0, 1, 4, 2, 3,
-  3, 2, 1, 4, 0,
-  4, 0, 3, 1, 2,
-  1, 3, 2, 0, 4
-] %}
 
 {# Card clip — masks any cell overflow inside the rounded outer rect so the
    8×8 cells along the edges of the 5×5 grid don't extrude past the corner
@@ -74,15 +45,8 @@
    are clipped to the card edge so corner cells stay inside the rounded
    rect. #}
 <g opacity="0.75" clip-path="url(#{{ uid }}-card-clip)">
-{% for row in range(_rows) %}
-  {% for col in range(_cols) %}
-    {% set _slot = _icon_slot_table[row * _cols + col] %}
-    {% set _cls = _cell_classes[_slot] %}
-    {% set _fill = _cell_fills[_slot] %}
-    {% set _cx = col * _stride %}
-    {% set _cy = row * _stride %}
-    <rect x="{{ _cx }}" y="{{ _cy }}" width="{{ _cell }}" height="{{ _cell }}" rx="{{ _cell_rx }}" fill="{{ _fill }}" class="{{ _cls }}"/>
-  {% endfor %}
+{% for cell in icon_cells %}
+    <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.size }}" height="{{ cell.size }}" rx="{{ cell.rx }}" fill="{{ cell.fill }}" class="{{ cell.class_name }}"/>
 {% endfor %}
 </g>
 
@@ -103,4 +67,4 @@
 
 {# Outer border — single mid_accent hairline at full opacity tracing the
    rounded card edge. Reads as the icon's structural frame. #}
-<rect x="0.5" y="0.5" width="{{ _cw - 1 }}" height="{{ _ch - 1 }}" fill="none" stroke="{{ _mid }}" stroke-width="0.5" rx="{{ _outer_rx }}"/>
+<rect x="{{ icon_geometry.cellular_border_x }}" y="{{ icon_geometry.cellular_border_y }}" width="{{ icon_outer_w }}" height="{{ icon_outer_h }}" fill="none" stroke="{{ _mid }}" stroke-width="0.5" rx="{{ _outer_rx }}"/>

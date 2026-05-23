@@ -16,25 +16,26 @@
    composition. Heatmap level 0..4 maps to area_tiers[4..0] (darkest →
    brightest); active levels carry b1/b2/b3/b4 phase-staggered breathe. #}
 
-{% set sw = width | default(530) %}
-{% set sh = height | default(233) %}
 {% set _surface = surface_0 | default('var(--dna-surface)') %}
 {% set area_tiers = cellular_palette.primary.area_tiers %}
 {% set _accent = stats_info_accent %}
-{% set _band_h = stats_header_band_height | default(39) %}
 
 {# Card clip — masks rendering to the rounded rect so the breathing heatmap
    and language bar can't bleed past the corners. #}
 <g clip-path="url(#{{ uid }}-card-clip)">
 
 {# Void ground — full canvas. #}
-<rect width="{{ sw }}" height="{{ sh }}" fill="{{ _surface }}"/>
+<rect width="{{ stats_layout.width }}" height="{{ stats_layout.height }}" fill="{{ _surface }}"/>
 
 {# ZONE 1: HEADER BAND (y=0..39) — gradient fill, username + bio inline at
    y=24, HYPERWEAVE brand stamp top-right, accent hairline at y=39. #}
-<rect width="{{ sw }}" height="{{ _band_h }}" fill="url(#{{ uid }}-top-grad)"/>
-<line x1="0" y1="{{ _band_h }}" x2="{{ sw }}" y2="{{ _band_h }}" stroke="{{ _accent }}" stroke-opacity="0.10" stroke-width="1"/>
-<text x="{{ identity_x }}" y="24" class="{{ uid }}-username"
+<rect x="{{ stats_layout.rects.cellular_header_band.x }}" y="{{ stats_layout.rects.cellular_header_band.y }}"
+      width="{{ stats_layout.rects.cellular_header_band.w }}" height="{{ stats_layout.rects.cellular_header_band.h }}"
+      fill="url(#{{ uid }}-top-grad)"/>
+<line x1="{{ stats_layout.lines.cellular_header_rule.x1 }}" y1="{{ stats_layout.lines.cellular_header_rule.y1 }}"
+      x2="{{ stats_layout.lines.cellular_header_rule.x2 }}" y2="{{ stats_layout.lines.cellular_header_rule.y2 }}"
+      stroke="{{ _accent }}" stroke-opacity="0.10" stroke-width="1"/>
+<text x="{{ stats_layout.texts.cellular_identity.x }}" y="{{ stats_layout.texts.cellular_identity.y }}" class="{{ uid }}-username"
   {%- if identity_text_length %} textLength="{{ identity_text_length }}" lengthAdjust="spacingAndGlyphs"{%- endif %}>{{ stats_username | upper }}</text>
 {% if stats_bio or stats_repo_label %}
 {# v0.3.9 algorithmic: identity_x + bio_x come from the cellular paradigm's
@@ -43,7 +44,7 @@
    bio_text_length is emitted by the same resolver when the bio's natural
    width would visually collide with the right-edge HYPERWEAVE branding —
    prevents karpathy-length bios from bleeding into the branding zone. #}
-<text x="{{ bio_x }}" y="24" class="{{ uid }}-bio"
+<text x="{{ stats_layout.texts.cellular_bio.x }}" y="{{ stats_layout.texts.cellular_bio.y }}" class="{{ uid }}-bio"
   {%- if bio_text_length %} textLength="{{ bio_text_length }}" lengthAdjust="spacingAndGlyphs"{%- endif %}>{% if stats_repo_label %}{{ stats_repo_label }}{% endif %}{% if stats_repo_label and stats_bio %} · {% endif %}{% if stats_bio %}{{ stats_bio }}{% endif %}</text>
 {% endif %}
 {# v0.3.9 Bug A + Bug #5: HYPERWEAVE branding lives in the footer band
@@ -51,7 +52,7 @@
    baseline produces visual alignment between the right-anchored
    HYPERWEAVE text and the left-packed language pills, both rendering
    small monospace text in the same footer band y=216-221. #}
-<text x="{{ sw - 20 }}" y="221" class="{{ uid }}-brand" text-anchor="end">HYPERWEAVE</text>
+<text x="{{ stats_layout.texts.cellular_brand.x }}" y="{{ stats_layout.texts.cellular_brand.y }}" class="{{ uid }}-brand" text-anchor="{{ stats_layout.texts.cellular_brand.anchor }}">HYPERWEAVE</text>
 
 {# ZONE 2: METRIC STRIP (y≈73). v0.3.9 Bug B: x positions computed
    algorithmically in compose/resolvers/stats.py by measuring each value
@@ -69,10 +70,9 @@
    Year (e.g. "2026") at left x=20; 5-tier legend rects at right side
    showing the heatmap palette in tier order (empty→brightest). Cell positions
    match prototype literals: x=467/476/485/494/503. #}
-<text x="20" y="106.6" class="{{ uid }}-cyr">{{ stats_heatmap_year }}</text>
-{% set _legend_x = [467, 476, 485, 494, 503] %}
-{% for i in range(5) %}
-<rect x="{{ _legend_x[i] }}" y="101" width="7" height="7" rx="1.5" fill="{{ area_tiers[4 - i] }}"/>
+<text x="{{ stats_layout.texts.cellular_year.x }}" y="{{ stats_layout.texts.cellular_year.y }}" class="{{ uid }}-cyr">{{ stats_heatmap_year }}</text>
+{% for cell in heatmap_legend_cells %}
+<rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.w }}" height="{{ cell.h }}" rx="{{ cell.rx }}" fill="{{ cell.fill }}"/>
 {% endfor %}
 
 {# ZONE 3b: HEATMAP (y=114..198) — 7 rows × 42 cols of square 11.080px cells
@@ -80,39 +80,9 @@
    x=20 + 41*12.28 + 11.08 = 514.56. Height fills 84.76px (7×11.080 +
    6×1.2). Active cells (level >= 1) carry b1/b2/b3/b4 phase-staggered
    breathe; level-0 cells stay static at the darkest tier (area_tiers[4]). #}
-{% set _hm_rows = heatmap_rows | default(7) %}
-{% set _hm_cols = heatmap_cols | default(42) %}
-{% set _hm_cell = heatmap_cell_size | default(11.080) %}
-{% set _hm_gap = heatmap_cell_gap | default(1.2) %}
-{% set _hm_stride = _hm_cell + _hm_gap %}
-{% set _hm_x0 = 20 %}
-{% set _hm_y0 = 114 %}
 <g data-hw-zone="heatmap">
-  {% set grid = heatmap_grid | default([]) %}
-  {% set grid_len = grid | length %}
-  {% set window_cells = _hm_cols * _hm_rows %}
-  {% set offset = (grid_len - window_cells) if grid_len > window_cells else 0 %}
-  {% set _anim_classes = ["b1", "b2", "b3", "b4"] %}
-  {% for col in range(_hm_cols) %}
-    {% for row in range(_hm_rows) %}
-      {% set idx = offset + col * _hm_rows + row %}
-      {% if idx >= 0 and idx < grid_len %}
-        {% set cell = grid[idx] %}
-        {% set level = cell.level | default(0) if cell is mapping else 0 %}
-      {% else %}
-        {% set level = 0 %}
-      {% endif %}
-      {% if level < 0 %}{% set level = 0 %}{% endif %}
-      {% if level > 4 %}{% set level = 4 %}{% endif %}
-      {% set fill = area_tiers[4 - level] %}
-      {% set cx = _hm_x0 + col * _hm_stride %}
-      {% set cy = _hm_y0 + row * _hm_stride %}
-      {% if level >= 1 %}
-      <rect x="{{ '%.3f' % cx }}" y="{{ '%.3f' % cy }}" width="{{ _hm_cell }}" height="{{ _hm_cell }}" rx="1.5" fill="{{ fill }}" class="{{ _anim_classes[(col + row) % 4] }}"/>
-      {% else %}
-      <rect x="{{ '%.3f' % cx }}" y="{{ '%.3f' % cy }}" width="{{ _hm_cell }}" height="{{ _hm_cell }}" rx="1.5" fill="{{ fill }}"/>
-      {% endif %}
-    {% endfor %}
+  {% for cell in heatmap_cells %}
+    <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.w }}" height="{{ cell.h }}" rx="{{ cell.rx }}" fill="{{ cell.fill }}"{% if cell.css_class %} class="{{ cell.css_class }}"{% endif %}/>
   {% endfor %}
 </g>
 
@@ -136,8 +106,8 @@
    above remains the visual focus of the bottom half of the card. #}
 <g data-hw-zone="languages">
   {% for entry in language_layout | default([]) %}
-  <rect x="{{ entry.swatch_x }}" y="216" width="5" height="5" rx="1" fill="{{ entry.swatch_color }}"/>
-  <text x="{{ entry.label_x }}" y="221" class="{{ uid }}-lt">{{ entry.label_text }}</text>
+  <rect x="{{ entry.swatch_x }}" y="{{ entry.swatch_y }}" width="{{ entry.swatch_w }}" height="{{ entry.swatch_h }}" rx="{{ entry.swatch_rx }}" fill="{{ entry.swatch_color }}"/>
+  <text x="{{ entry.label_x }}" y="{{ entry.label_y }}" class="{{ uid }}-lt">{{ entry.label_text }}</text>
   {% endfor %}
 </g>
 
@@ -146,4 +116,6 @@
 {# Card outline — drawn OUTSIDE the clip so the rounded rect stroke isn't
    itself clipped. info_accent at 10% alpha frames the composition without
    competing with the heatmap. #}
-<rect x="0.5" y="0.5" width="{{ sw - 1 }}" height="{{ sh - 1 }}" rx="8" fill="none" stroke="{{ _accent }}" stroke-opacity="0.10" stroke-width="1"/>
+<rect x="{{ stats_layout.cellular_outer_rect.x }}" y="{{ stats_layout.cellular_outer_rect.y }}"
+      width="{{ stats_layout.cellular_outer_rect.w }}" height="{{ stats_layout.cellular_outer_rect.h }}"
+      rx="{{ stats_layout.cellular_outer_rect.rx }}" fill="none" stroke="{{ _accent }}" stroke-opacity="0.10" stroke-width="1"/>

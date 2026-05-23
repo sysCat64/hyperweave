@@ -209,7 +209,12 @@ def test_build_markers_square_emits_crosshair() -> None:
         "size": 10,
         "is_endpoint": False,
         "half": 5,
+        "neg_half": -5,
         "cross": 2,
+        "neg_cross": -2,
+        "cross_center": 0,
+        "cellular_half": 5,
+        "cellular_neg_half": -5,
     }
     # Final marker is the endpoint beacon (3-nested-square variant).
     assert out[-1]["is_endpoint"] is True
@@ -227,6 +232,8 @@ def test_build_markers_circle_emits_circle_radius() -> None:
         "size": 6,
         "is_endpoint": False,
         "r": 3,
+        "cellular_half": 3,
+        "cellular_neg_half": -3,
     }
     # Circle has no dedicated endpoint partial; falls back to rect endpoint.
     assert out[-1]["shape"] == "rect"

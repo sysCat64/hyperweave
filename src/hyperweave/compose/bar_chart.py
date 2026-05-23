@@ -227,6 +227,14 @@ class PeakMarker:
     y: int
     w: int
     h: float
+    top_line_y: int
+    left_tick_y1: int
+    left_tick_y2: int
+    right_tick_x: int
+    right_tick_y1: int
+    right_tick_y2: int
+    label_x: int
+    label_y: int
 
 
 @dataclass(frozen=True)
@@ -529,6 +537,14 @@ def layout_bar_chart(
             y=peak_bar.y - int(PEAK_MARKER_H),
             w=peak_bar.w,
             h=PEAK_MARKER_H,
+            top_line_y=peak_bar.y - 1,
+            left_tick_y1=peak_bar.y - 2,
+            left_tick_y2=peak_bar.y + 1,
+            right_tick_x=peak_bar.x + peak_bar.w,
+            right_tick_y1=peak_bar.y - 2,
+            right_tick_y2=peak_bar.y + 1,
+            label_x=peak_bar.x + peak_bar.w // 2,
+            label_y=peak_bar.y - 4,
         )
 
     # Header labels: total billed tokens + peak-stage tokens.

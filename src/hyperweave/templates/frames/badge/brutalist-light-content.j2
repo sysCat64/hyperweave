@@ -6,23 +6,23 @@
    variant_overrides (surface_0 → paper, ink → dark, accent → seam-color). #}
 
 <g clip-path="url(#{{ uid }}-clip)">
-  <rect width="{{ lp_w }}" height="{{ h }}" fill="var(--dna-surface)"/>
+  <rect width="{{ left_panel_width }}" height="{{ h }}" fill="var(--dna-surface)"/>
   {# Right panel: brutalist light scholar variants paint the brown/crimson/cobalt gradient
      (panel_gradient_stops); v0.3.2 prototype shows "BUILD passing" with
      a dark brown right panel + cream label panel. Dark variants fall back
      to flat --dna-surface-deep (no gradient declared). #}
   {% if panel_gradient_stops %}
-  <rect x="{{ right_panel_x - 1 }}" width="{{ right_panel_w + 1 }}" height="{{ h }}" fill="url(#{{ uid }}-panel)"/>
+  <rect x="{{ right_panel_draw_x }}" width="{{ right_panel_draw_w }}" height="{{ h }}" fill="url(#{{ uid }}-panel)"/>
   {% else %}
-  <rect x="{{ right_panel_x - 1 }}" width="{{ right_panel_w + 1 }}" height="{{ h }}" fill="var(--dna-surface-deep)"/>
+  <rect x="{{ right_panel_draw_x }}" width="{{ right_panel_draw_w }}" height="{{ h }}" fill="var(--dna-surface-deep)"/>
   {% endif %}
 </g>
 {# Perimeter stroke: light substrate needs higher opacity for visibility
    (dark ink at 0.06 invisible on paper; variants override stroke_opacity to 0.20). #}
-<rect x=".5" y=".5" width="{{ width - 1 }}" height="{{ h - 1 }}" fill="none" stroke="var(--dna-ink-primary)" stroke-opacity="{{ stroke_opacity | default('0.20') }}"/>
+<rect x="{{ light_perimeter_inset }}" y="{{ light_perimeter_inset }}" width="{{ light_perimeter_w }}" height="{{ light_perimeter_h }}" fill="none" stroke="var(--dna-ink-primary)" stroke-opacity="{{ stroke_opacity | default('0.20') }}"/>
 {# Left ink bar: filled with ink primary (dark), not accent. Light substrate
    convention reads as printed manuscript margin rule rather than colored chassis. #}
-<rect x="0" y="0" width="{{ accent_w }}" height="{{ h }}" fill="var(--dna-ink-primary)" data-hw-zone="accent-bar"/>
+<rect x="{{ badge_origin_x }}" y="{{ badge_origin_y }}" width="{{ accent_w }}" height="{{ h }}" fill="var(--dna-ink-primary)" data-hw-zone="accent-bar"/>
 {# v0.3.2 brutalist-genome-expansion: badge divider grammar is
    GOLD-OVER-INK overlap (not the strip's 3+2+3 INK-SEAM-INK). Prototype
    the v0.3.2 brutalist light scholar full-set prototype:201 paints a 4px ink rect at x=50 with a
@@ -33,8 +33,8 @@
    Ink rect uses --dna-ink-primary directly (no state-sep override) so
    state-active badges stay plain ink — state color flows only through
    value text and indicator. #}
-<rect x="{{ lp_w }}" y="0" width="4" height="{{ h }}" fill="var(--dna-ink-primary)"/>
-<rect x="{{ lp_w - 1 }}" y="0" width="2" height="{{ h }}" fill="var(--dna-seam-color, var(--dna-signal))"/>
+<rect x="{{ left_panel_width }}" y="{{ badge_origin_y }}" width="{{ light_badge_ink_divider_w }}" height="{{ h }}" fill="var(--dna-ink-primary)"/>
+<rect x="{{ light_overlap_sep_x }}" y="{{ badge_origin_y }}" width="{{ light_badge_seam_w }}" height="{{ h }}" fill="var(--dna-seam-color, var(--dna-signal))"/>
 
 {# Glyph — fill routes through --dna-badge-glyph semantic var so light
    substrates use the variant's accent (gold/cyan/amber) on the dark right
@@ -70,12 +70,10 @@
    the way dark variants' concentric squares harmonize with the matte
    dark canvas — substrate polarity inverts the indicator metaphor too.
    Radii: r=3 outer ring + r=1 filled dot; positioned at center of the
-   indicator zone (indicator_x + ind_size/2, badge vertical center). #}
+   indicator zone (indicator_x + indicator_size/2, badge vertical center). #}
 {% if show_indicator %}
-{% set ind_cx = indicator_x + (ind_size / 2) %}
-{% set ind_cy = h / 2 %}
 <g data-hw-zone="status">
-  <circle cx="{{ ind_cx }}" cy="{{ ind_cy }}" r="3" fill="none" stroke="var(--hw-state-ring, var(--dna-seam-color, var(--dna-signal)))" stroke-width="1.2"/>
-  <circle class="hw-logic-bit" cx="{{ ind_cx }}" cy="{{ ind_cy }}" r="1" fill="var(--dna-status-color, var(--dna-seam-color, var(--dna-signal)))"/>
+  <circle cx="{{ indicator_center_x }}" cy="{{ indicator_center_y }}" r="{{ light_indicator_outer_r }}" fill="none" stroke="var(--hw-state-ring, var(--dna-seam-color, var(--dna-signal)))" stroke-width="{{ light_indicator_stroke_width }}"/>
+  <circle class="hw-logic-bit" cx="{{ indicator_center_x }}" cy="{{ indicator_center_y }}" r="{{ light_indicator_inner_r }}" fill="var(--dna-status-color, var(--dna-seam-color, var(--dna-signal)))"/>
 </g>
 {% endif %}

@@ -21,25 +21,24 @@
 {% endblock %}
 
 {% block content %}
-{% set strip_h = height | default(52) %}
+{% set strip_h = strip_zones.core.height %}
 {% set accent_w = accent_bar_width | default(6) %}
 {# glyph_zone_x_offset: paradigm-supplied push-right for paradigms that
    render decoration on the left edge (cellular bifamily flanks).
    brutalist/chrome leave it 0. #}
-{% set _gz_offset = glyph_zone_x_offset | default(0) %}
+{% set _gz_offset = strip_zones.core.glyph_zone_x_offset %}
 {% set _show_icon_box = show_icon_box | default(false) %}
 {% set _icon_box_size = icon_box_size | default(28) %}
 {% set _icon_box_pad = icon_box_pad | default(8) %}
 {# Identity-zone coordinates come from compute_strip_zones; the template only
    renders those resolved positions. #}
-{% set _icon_box_x = icon_box_x | default(0) %}
-{% set _icon_box_y = icon_box_y | default(0) %}
-{% set glyph_size = strip_glyph_render_size | default(0) %}
-{% set glyph_cx = strip_glyph_cx | default(0) %}
-{% set glyph_cy = strip_glyph_cy | default(0) %}
-{% set identity_x = identity_x | default(0) %}
-{% set metric_pitch = metric_pitch | default(106) %}
-{% set indicator_size = 14 %}
+{% set _icon_box_x = strip_zones.core.icon_box_x %}
+{% set _icon_box_y = strip_zones.core.icon_box_y %}
+{% set glyph_size = strip_zones.core.glyph_size %}
+{% set glyph_cx = strip_zones.core.glyph_cx %}
+{% set glyph_cy = strip_zones.core.glyph_cy %}
+{% set identity_x = strip_zones.core.identity_x %}
+{% set metric_pitch = strip_zones.core.metric_pitch %}
 {% set div_y1 = strip_divider_y1 | default(8) %}
 {% set div_y2 = strip_divider_y2 | default(44) %}
 {% set paradigm_strip = paradigm | default("default") %}
@@ -77,7 +76,7 @@
 {% set gs = glyph_size %}
 {% set gf = strip_glyph_fill | default('var(--dna-signal)') %}
 <g data-hw-zone="glyph" transform="translate({{ glyph_cx }},{{ glyph_cy }})">
-  <svg x="{{ -(gs // 2) }}" y="{{ -(gs // 2) }}"
+  <svg x="{{ strip_zones.core.glyph_svg_x }}" y="{{ strip_zones.core.glyph_svg_y }}"
        width="{{ gs }}" height="{{ gs }}"
        viewBox="{{ glyph_viewbox }}">
     <path d="{{ glyph_path }}" fill="{{ glyph_fill | default(gf) }}"/>
@@ -87,10 +86,10 @@
 
 {# === Identity text + optional subtitle (paradigm-driven stack).
        clipped to zone before first divider. === #}
-{% set first_div_x = first_divider_x | default(143) %}
+{% set first_div_x = strip_zones.core.first_divider_x %}
 <defs>
   <clipPath id="{{ uid }}-id-clip">
-    <rect x="{{ identity_clip_x | default(0) }}" y="0" width="{{ identity_clip_width | default(0) }}" height="{{ strip_h }}"/>
+    <rect x="{{ identity_clip_x | default(0) }}" y="{{ strip_identity_clip_y }}" width="{{ identity_clip_width | default(0) }}" height="{{ strip_h }}"/>
   </clipPath>
 </defs>
 <g clip-path="url(#{{ uid }}-id-clip)">
@@ -112,8 +111,8 @@
    eliminating the cell-0 asymmetry that shifted "12.4k" 24px from its left
    divider while "1.2k" sat at 12. cell_widths[i] is the full seam-to-seam
    distance (resolver: content + 20 pad). #}
-{% set first_div_x = first_divider_x | default(143) %}
-{% set _seams = seam_positions | default([]) %}
+{% set first_div_x = strip_zones.core.first_divider_x %}
+{% set _seams = strip_zones.core.seam_positions %}
 {# First divider — stroke sourced from resolver-injected context:
    divider_render_mode = "gradient" → chrome-defs url(#...-sep) gradient
    divider_render_mode = "class"    → profile-declared flat color.
@@ -147,7 +146,7 @@
 {% set _mta = _layout.text_anchor %}
 {% set _cell_x = _seams[loop.index0] %}
 {% set _trailing_x = _seams[loop.index] %}
-<g data-hw-zone="metric-{{ loop.index0 }}" transform="translate({{ _cell_x }},0)">
+<g data-hw-zone="metric-{{ loop.index0 }}" transform="translate({{ _cell_x }},{{ strip_metric_local_origin_y }})">
   <text x="{{ _lx }}" y="{{ strip_metric_label_y | default(18) }}" text-anchor="{{ _mta }}"
         class="{{ uid }}-metric-label">{{ metric.label | upper }}</text>
   {# Metric value — skew applied only when strip_metric_value_skew != 0
@@ -157,7 +156,7 @@
   {% set _skew = strip_metric_value_skew | default(0) %}
   {% if _skew != 0 %}
   <g transform="translate({{ _vx }},{{ strip_metric_value_y | default(36) }}) skewX({{ _skew }})">
-    <text x="0" y="0" text-anchor="{{ _mta }}" dominant-baseline="central"
+    <text x="{{ strip_metric_local_origin_x }}" y="{{ strip_metric_local_origin_y }}" text-anchor="{{ _mta }}" dominant-baseline="central"
           class="{{ uid }}-metric-value">{{ metric.value }}</text>
   </g>
   {% else %}
@@ -165,7 +164,7 @@
         class="{{ uid }}-metric-value">{{ metric.value }}</text>
   {% endif %}
 {% if metric.delta %}
-  <text x="{{ _vx }}" y="48" text-anchor="{{ _mta }}"
+  <text x="{{ _vx }}" y="{{ strip_metric_delta_y }}" text-anchor="{{ _mta }}"
         class="hw-delta hw-delta--{{ metric.delta_dir | default('neutral') }}">{{ metric.delta }}</text>
 {% endif %}
 </g>
@@ -191,7 +190,7 @@
    Stateless strips (STARS | FORKS | VERSION) get NO indicator element at
    all — same architectural posture as stateless badges. #}
 {% if show_status_indicator %}
-{% set _status_x = status_x | default(0) %}
+{% set _status_x = strip_zones.core.status_x %}
 {% set status_x = _status_x %}
 {% set status_cy = status_cy | default(0) %}
 <g data-hw-zone="status" transform="translate({{ status_x }},{{ status_cy }})"

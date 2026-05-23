@@ -57,6 +57,16 @@ class ChartPoint:
     value: int
 
 
+@dataclass(frozen=True)
+class LabelMetrics:
+    """Typography used for chart label collision measurement."""
+
+    font_family: str = "JetBrains Mono"
+    font_size: float = 9.0
+    font_weight: int = 800
+    letter_spacing_em: float = 0.12
+
+
 # ── Input normalisation ────────────────────────────────────────────────────
 
 
@@ -598,7 +608,16 @@ def _marker_spec(shape: str, x: int, y: int, size: int, *, is_endpoint: bool) ->
     if is_endpoint and shape == "circle":
         shape = "rect"
 
-    spec: dict[str, Any] = {"shape": shape, "x": x, "y": y, "size": size, "is_endpoint": is_endpoint}
+    cellular_half = size // 2
+    spec: dict[str, Any] = {
+        "shape": shape,
+        "x": x,
+        "y": y,
+        "size": size,
+        "is_endpoint": is_endpoint,
+        "cellular_half": cellular_half,
+        "cellular_neg_half": -cellular_half,
+    }
 
     # Pre-compute derived dimensions per shape so the partials are pure
     # substitution — no arithmetic in Jinja.
@@ -607,14 +626,52 @@ def _marker_spec(shape: str, x: int, y: int, size: int, *, is_endpoint: bool) ->
     elif is_endpoint and shape == "rect":
         # 3 nested squares (brutalist endpoint beacon).
         s1, s2, s3 = size + 8, size + 2, max(4, size - 4)
-        spec.update({"s1": s1, "s2": s2, "s3": s3, "h1": s1 // 2, "h2": s2 // 2, "h3": s3 // 2})
+        h1, h2, h3 = s1 // 2, s2 // 2, s3 // 2
+        spec.update(
+            {
+                "s1": s1,
+                "s2": s2,
+                "s3": s3,
+                "h1": h1,
+                "h2": h2,
+                "h3": h3,
+                "x1": x - h1,
+                "y1": y - h1,
+                "x2": x - h2,
+                "y2": y - h2,
+                "x3": x - h3,
+                "y3": y - h3,
+            }
+        )
     elif is_endpoint and shape == "diamond":
         # 2-layer rotated rects (chrome endpoint diamond).
         s1, s2 = size + 10, size + 5
-        spec.update({"s1": s1, "s2": s2, "h1": s1 // 2, "h2": s2 // 2})
+        h1, h2 = s1 // 2, s2 // 2
+        spec.update(
+            {
+                "s1": s1,
+                "s2": s2,
+                "h1": h1,
+                "h2": h2,
+                "neg_h1": -h1,
+                "neg_h2": -h2,
+                "rx1": 0.6,
+                "rx2": 0.4,
+            }
+        )
     else:
         # rect + diamond (non-endpoint): crosshair geometry.
-        spec.update({"half": size // 2, "cross": max(2, size // 5)})
+        half = size // 2
+        cross = max(2, size // 5)
+        spec.update(
+            {
+                "half": half,
+                "neg_half": -half,
+                "cross": cross,
+                "neg_cross": -cross,
+                "cross_center": 0,
+            }
+        )
     return spec
 
 
@@ -684,6 +741,8 @@ def _build_milestones(
     thresholds: list[int],
     y_labels: list[dict[str, Any]] | None = None,
     marker_size: int = 0,
+    label_metrics: LabelMetrics | None = None,
+    label_y_offset: int = -24,
 ) -> list[dict[str, Any]]:
     """Vertical marker lines at points where value crosses a threshold.
 
@@ -706,6 +765,7 @@ def _build_milestones(
     """
     if not points or not projected or not thresholds:
         return []
+    metrics = label_metrics or LabelMetrics()
 
     bottom_y = vp.y + vp.h
     # Start one below the first value so we only mark *crossings*, not the
@@ -753,8 +813,8 @@ def _build_milestones(
     # Proper bbox-overlap check (max-of-lefts < min-of-rights + padding) avoids
     # the order-sensitivity of _labels_collide which only works when left<right.
     def _bbox_overlap(a: dict[str, Any], b: dict[str, Any]) -> bool:
-        al, ar = _label_bounds(a)
-        bl, br = _label_bounds(b)
+        al, ar = _label_bounds(a, metrics)
+        bl, br = _label_bounds(b, metrics)
         return max(al, bl) < min(ar, br) + _LABEL_EDGE_PADDING_PX
 
     def _to_bound(d: dict[str, Any]) -> dict[str, Any]:
@@ -785,17 +845,29 @@ def _build_milestones(
         ms_label_bound = {"x": float(ms["x"]), "text": str(ms["label"]), "anchor": "middle"}
         collides = any(_bbox_overlap(ms_label_bound, _to_bound(other)) for other in (*kept, *y_label_bounds))
         if not collides:
-            ms_left, ms_right = _label_bounds(ms_label_bound)
+            ms_left, ms_right = _label_bounds(ms_label_bound, metrics)
             collides = _milestone_overlaps_marker(float(ms["x"]), ms_left, ms_right)
         if not collides:
+            x = int(ms["x"])
+            y = int(ms["y"])
             kept.append(
                 {
-                    "x": ms["x"],
+                    "x": x,
                     "text": ms["label"],
                     "value": ms["value"],
-                    "y": ms["y"],
+                    "y": y,
                     "bottom_y": ms["bottom_y"],
                     "label": ms["label"],
+                    "label_y": y + label_y_offset,
+                    "outer_x": x - 7,
+                    "outer_y": y - 4,
+                    "outer_size": 14,
+                    "mid_x": x - 4,
+                    "mid_y": y - 1,
+                    "mid_size": 8,
+                    "inner_x": x - 2,
+                    "inner_y": y + 1,
+                    "inner_size": 4,
                 }
             )
 
@@ -880,7 +952,7 @@ def _build_y_labels(ticks: list[int], v_min: int, v_max: int, vp: Viewport) -> l
 _LABEL_EDGE_PADDING_PX: float = 6.0
 
 
-def _label_pixel_width(text: str) -> float:
+def _label_pixel_width(text: str, metrics: LabelMetrics | None = None) -> float:
     """Rendered width of `text` in pixels at the widest milestone label CSS.
 
     Uses real ``measure_text`` against the brutalist milestone CSS
@@ -898,17 +970,24 @@ def _label_pixel_width(text: str) -> float:
     """
     from hyperweave.core.text import measure_text
 
-    return measure_text(text, font_family="JetBrains Mono", font_size=9, font_weight=800, letter_spacing_em=0.12)
+    resolved = metrics or LabelMetrics()
+    return measure_text(
+        text,
+        font_family=resolved.font_family,
+        font_size=resolved.font_size,
+        font_weight=resolved.font_weight,
+        letter_spacing_em=resolved.letter_spacing_em,
+    )
 
 
-def _label_bounds(label: dict[str, Any]) -> tuple[float, float]:
+def _label_bounds(label: dict[str, Any], metrics: LabelMetrics | None = None) -> tuple[float, float]:
     """Return (left_edge_px, right_edge_px) for a generated label dict.
 
     Honors the SVG `text-anchor` semantics: 'start' anchors the left edge
     at x, 'end' anchors the right edge at x, 'middle' centers the text on x.
     """
     x = float(label["x"])
-    w = _label_pixel_width(str(label["text"]))
+    w = _label_pixel_width(str(label["text"]), metrics)
     anchor = label.get("anchor", "middle")
     if anchor == "start":
         return (x, x + w)
@@ -917,10 +996,10 @@ def _label_bounds(label: dict[str, Any]) -> tuple[float, float]:
     return (x - w / 2, x + w / 2)
 
 
-def _labels_collide(left: dict[str, Any], right: dict[str, Any]) -> bool:
+def _labels_collide(left: dict[str, Any], right: dict[str, Any], metrics: LabelMetrics | None = None) -> bool:
     """True if `right`'s left edge is closer than padding to `left`'s right edge."""
-    _, left_right = _label_bounds(left)
-    right_left, _ = _label_bounds(right)
+    _, left_right = _label_bounds(left, metrics)
+    right_left, _ = _label_bounds(right, metrics)
     return right_left < left_right + _LABEL_EDGE_PADDING_PX
 
 
@@ -984,7 +1063,11 @@ def _space_axis_labels_evenly(labels: list[dict[str, Any]], vp: Viewport) -> lis
     return spaced
 
 
-def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[str, Any]]:
+def _build_x_date_labels(
+    points: list[ChartPoint],
+    vp: Viewport,
+    label_metrics: LabelMetrics | None = None,
+) -> list[dict[str, Any]]:
     """Adaptive x-axis date labels — count-driven (~6 labels across any span).
 
     v0.3.9 Bug #4 refactor: pre-fix this was STEP-driven (fixed 7-day
@@ -1006,6 +1089,7 @@ def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[st
     """
     if not points:
         return []
+    metrics = label_metrics or LabelMetrics()
     if len(points) == 1:
         p = points[0]
         return [{"x": vp.x + vp.w // 2, "text": p.date.strftime("%b %d, %Y"), "anchor": "middle"}]
@@ -1082,7 +1166,7 @@ def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[st
         return _space_axis_labels_evenly(candidates, vp) if use_calendar_months else candidates
     kept: list[dict[str, Any]] = [candidates[0]]
     for label in candidates[1:-1]:
-        if not _labels_collide(kept[-1], label):
+        if not _labels_collide(kept[-1], label, metrics):
             kept.append(label)
     # The terminal endpoint is always included. If it would collide with
     # the last-kept middle label, or has identical text (e.g. yearly
@@ -1094,11 +1178,11 @@ def _build_x_date_labels(points: list[ChartPoint], vp: Viewport) -> list[dict[st
     # Cascade-pop until the chain is collision-free.
     last_candidate = candidates[-1]
     same_text = last_candidate["text"] == kept[-1]["text"]
-    if same_text or _labels_collide(kept[-1], last_candidate):
+    if same_text or _labels_collide(kept[-1], last_candidate, metrics):
         kept[-1] = last_candidate
     else:
         kept.append(last_candidate)
-    while len(kept) >= 2 and _labels_collide(kept[-2], kept[-1]):
+    while len(kept) >= 2 and _labels_collide(kept[-2], kept[-1], metrics):
         kept.pop(-2)
     return _space_axis_labels_evenly(kept, vp) if use_calendar_months else kept
 
@@ -1133,6 +1217,8 @@ def build_chart_svg(
     cellular_dormant_range: list[str] | None = None,
     cellular_cell_size: int = 40,
     y_tick_target: int = 4,
+    label_metrics: LabelMetrics | None = None,
+    milestone_label_y_offset: int = -24,
 ) -> dict[str, Any]:
     """Render a set of time-series points into SVG fragment strings + label data.
 
@@ -1164,6 +1250,7 @@ def build_chart_svg(
         over label data.
     """
     structural = structural or {}
+    resolved_label_metrics = label_metrics or LabelMetrics()
     points = _normalize_points(raw_points)
 
     # Compute nice ticks FIRST so label positions, gridlines, and the projected
@@ -1174,7 +1261,7 @@ def build_chart_svg(
         ticks = _nice_y_ticks(v_max, target_count=y_tick_target)
         effective_max = ticks[-1] if ticks else max(v_max, 1)
         y_labels = _build_y_labels(ticks, 0, effective_max, viewport)
-        x_labels = _build_x_date_labels(points, viewport)
+        x_labels = _build_x_date_labels(points, viewport, resolved_label_metrics)
         # Project with zero-baseline so the polyline aligns to the tick labels.
         projected = _project_points(points, viewport, v_min=0, v_max=effective_max)
     else:
@@ -1219,7 +1306,16 @@ def build_chart_svg(
         gridlines = _build_gridlines_from_ticks(y_labels, viewport)
     else:
         gridlines = _build_gridlines(viewport, rows=4)
-    milestones_list = _build_milestones(points, projected, viewport, milestones or [], y_labels, marker_size=point_size)
+    milestones_list = _build_milestones(
+        points,
+        projected,
+        viewport,
+        milestones or [],
+        y_labels,
+        marker_size=point_size,
+        label_metrics=resolved_label_metrics,
+        label_y_offset=milestone_label_y_offset,
+    )
 
     # Empty state overlay: only when there are no data points AND a message
     # was provided. Without a message the chart degrades silently (useful for

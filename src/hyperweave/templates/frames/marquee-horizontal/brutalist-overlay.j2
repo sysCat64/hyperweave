@@ -7,6 +7,6 @@
      2. 4px left accent bar (genome.signal_hex solid)
    Brutalism's K-override: flat slab, sharp corners (rx=0), one accent bar.
 #}
-<rect x="0.5" y="0.5" width="{{ mw - 1 }}" height="{{ mh - 1 }}"
+<rect x="{{ marquee_geom.brutalist_border_x }}" y="{{ marquee_geom.brutalist_border_y }}" width="{{ marquee_perimeter_w }}" height="{{ marquee_perimeter_h }}"
       fill="none" stroke="{{ signal_hex }}" stroke-width="1" opacity="0.4"/>
-<rect x="0" y="0" width="4" height="{{ mh }}" fill="{{ signal_hex }}"/>
+<rect x="{{ marquee_geom.brutalist_accent_x }}" y="{{ marquee_geom.brutalist_accent_y }}" width="{{ marquee_geom.brutalist_accent_w }}" height="{{ mh }}" fill="{{ signal_hex }}"/>

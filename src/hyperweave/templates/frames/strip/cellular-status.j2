@@ -10,10 +10,9 @@
    ACTIVE text subtitle removed: state is already encoded by the frame's
    outline color (state_passing_core → green, etc.), so a redundant ACTIVE
    label added noise without information. #}
-{% set inner_size = 6 %}
 <rect class="hw-state-frame" fill="none" stroke="var(--hw-state-signal, var(--dna-signal))" stroke-width="1"
-      x="0" y="{{ -(indicator_size // 2) }}"
+      x="{{ strip_status_origin_x }}" y="{{ strip_zones.status.outer_y }}"
       width="{{ indicator_size }}" height="{{ indicator_size }}" opacity="0.65"/>
 <rect class="hw-bit" fill="var(--hw-state-signal, var(--dna-signal))"
-      x="4" y="{{ -(indicator_size // 2) + 4 }}"
-      width="{{ inner_size }}" height="{{ inner_size }}"/>
+      x="{{ strip_zones.status.cellular_inner_x }}" y="{{ strip_zones.status.cellular_inner_y }}"
+      width="{{ strip_zones.status.cellular_inner_w }}" height="{{ strip_zones.status.cellular_inner_h }}"/>

@@ -61,7 +61,7 @@ def _genome_motions(genome_id: str) -> list[str]:
     return [m for m in BorderMotionId if m.value in compatible]
 
 
-# ── Mock telemetry data for receipt / rhythm-strip / master-card ──
+# ── Mock telemetry data for receipt / rhythm-strip ──
 
 # ── Real-transcript visual fidelity corpus (v0.2.21) ──
 # Five transcripts spanning a range of sizes from the user's local Claude Code
@@ -651,11 +651,6 @@ def generate_static() -> int:
                 filename = f"{ftype.value.replace('-', '_')}_{skin}_{label}.svg"
                 _write(telemetry_dir / filename, svg)
                 total += 1
-
-    # Master-card single voltage variant (multi-skin master-card deferred to pre-v0.3.0).
-    svg = _compose(FrameType.MASTER_CARD, "telemetry-voltage", telemetry_data=MOCK_TELEMETRY)
-    _write(telemetry_dir / "master_card.svg", svg)
-    total += 1
 
     # ── 9. Genome-agnostic dividers (live at /a/inneraura/dividers/, generated once) ──
     # Render via compose() with a default genome — the templates hardcode their
@@ -1292,7 +1287,7 @@ def _emit_telemetry_readme() -> None:
     Receipt + rhythm-strip rendered under each of the four telemetry skins
     (voltage, claude-code, cream, codex) with mock data, plus real
     transcripts from Claude Code and Codex sessions matched to their
-    runtime-paired skin alongside the voltage fallback. master-card too.
+    runtime-paired skin alongside the voltage fallback.
 
     Cross-runtime renders (codex data in cream skin, claude-code data in
     codex skin) are not generated — they're noise rather than signal.
@@ -1300,7 +1295,7 @@ def _emit_telemetry_readme() -> None:
     lines: list[str] = [
         "# HyperWeave Telemetry — Receipt + Rhythm-Strip Matrix",
         "",
-        "Telemetry artifacts (receipt cards, rhythm strips, master-cards) are "
+        "Telemetry artifacts (receipt cards, rhythm strips) are "
         "**genome-independent at the rendering layer** but render under one of "
         "four named skins: `telemetry-voltage` (universal fallback), "
         "`telemetry-claude-code`, `telemetry-cream`, `telemetry-codex`.",
@@ -1343,10 +1338,6 @@ def _emit_telemetry_readme() -> None:
 
     lines.extend(
         [
-            "## master-card (voltage only)",
-            "",
-            "![master-card](proofset/telemetry/master_card.svg)",
-            "",
             "## Cross-reference",
             "",
             "- [Main README](README.md) — proofset overview + genome cross-links",

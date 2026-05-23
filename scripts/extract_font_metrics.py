@@ -56,8 +56,10 @@ def load_font_from_b64(path: Path) -> TTFont:
     return TTFont(BytesIO(base64.b64decode(raw_b64)))
 
 
-def extract_widths_and_bearings(font: TTFont, baseline_size_px: int) -> tuple[dict[str, int], dict[str, list[int]]]:
-    """Return per-char (advance_widths, ink_bearings) at the baseline size.
+def extract_widths_and_bearings(
+    font: TTFont, baseline_size_px: int
+) -> tuple[dict[str, int], dict[str, list[int]], dict[str, list[int]]]:
+    """Return per-char (advance_widths, ink_bearings, vertical_bounds).
 
     Advance widths follow the original schema — tenths-of-pixels at
     ``baseline_size_px``. Ink bearings are returned as
@@ -85,6 +87,7 @@ def extract_widths_and_bearings(font: TTFont, baseline_size_px: int) -> tuple[di
     scale = baseline_size_px / units_per_em
     widths: dict[str, int] = {}
     bearings: dict[str, list[int]] = {}
+    vertical_bounds: dict[str, list[int]] = {}
     for ch in SUPPORTED_ASCII:
         codepoint = ord(ch)
         if codepoint not in cmap:
@@ -102,15 +105,18 @@ def extract_widths_and_bearings(font: TTFont, baseline_size_px: int) -> tuple[di
         except Exception:
             # Defensive: a malformed glyph shouldn't crash the extraction.
             bearings[ch] = [0, widths[ch]]
+            vertical_bounds[ch] = [0, 0]
             continue
         if pen.bounds is None:
             bearings[ch] = [0, widths[ch]]
+            vertical_bounds[ch] = [0, 0]
             continue
         xmin, _ymin, xmax, _ymax = pen.bounds
         lsb_px_at_baseline = xmin * scale  # ink-left from glyph origin
         rsb_px_at_baseline = (advance_design_units - xmax) * scale  # advance - ink-right
         bearings[ch] = [round(lsb_px_at_baseline * 10), round(rsb_px_at_baseline * 10)]
-    return widths, bearings
+        vertical_bounds[ch] = [round(_ymin * scale * 10), round(_ymax * scale * 10)]
+    return widths, bearings, vertical_bounds
 
 
 def compute_fallback_width(widths: dict[str, int]) -> int:
@@ -130,8 +136,10 @@ def emit_metrics_json(
     is_monospace: bool = False,
     char_width_px: float = 0.0,
     bearings: dict[str, list[int]] | None = None,
+    vertical_bounds: dict[str, list[int]] | None = None,
     widths_by_weight: dict[str, dict[str, int]] | None = None,
     bearings_by_weight: dict[str, dict[str, list[int]]] | None = None,
+    vertical_bounds_by_weight: dict[str, dict[str, list[int]]] | None = None,
 ) -> dict[str, object]:
     """Build the JSON dict matching inter.json schema (plus registry fields).
 
@@ -152,15 +160,28 @@ def emit_metrics_json(
     }
     if bearings:
         result["bearings"] = bearings
+    if vertical_bounds:
+        result["vertical_bounds"] = vertical_bounds
     if widths_by_weight:
         result["widths_by_weight"] = widths_by_weight
     if bearings_by_weight:
         result["bearings_by_weight"] = bearings_by_weight
+    if vertical_bounds_by_weight:
+        result["vertical_bounds_by_weight"] = vertical_bounds_by_weight
     return result
 
 
 # Known font configs. Add entries here to extend.
 FONT_CONFIGS: dict[str, dict[str, object]] = {
+    "inter": {
+        "family": "Inter",
+        "baseline_size_px": 11,
+        "bold_expansion_factor": 1.0,
+        "aliases": ["inter", "system-ui", "sans-serif", "-apple-system", "blinkmacsystemfont", "segoe ui"],
+        "is_monospace": False,
+        "char_width_px": 0.0,
+        "metric_weights": [400, 700, 800, 900],
+    },
     "orbitron": {
         "family": "Orbitron",
         "baseline_size_px": 20,
@@ -239,18 +260,20 @@ def extract_one(slug: str) -> Path:
 
     font = load_font_from_b64(b64_path)
     baseline = int(config["baseline_size_px"])
-    widths, bearings = extract_widths_and_bearings(font, baseline)
+    widths, bearings, vertical_bounds = extract_widths_and_bearings(font, baseline)
     widths_by_weight: dict[str, dict[str, int]] = {}
     bearings_by_weight: dict[str, dict[str, list[int]]] = {}
+    vertical_bounds_by_weight: dict[str, dict[str, list[int]]] = {}
     metric_weights = config.get("metric_weights")
     if isinstance(metric_weights, list):
         for weight in metric_weights:
             weight_int = int(weight)
             weight_font = load_metric_font_for_weight(slug, font, config, weight_int)
-            weight_widths, weight_bearings = extract_widths_and_bearings(weight_font, baseline)
+            weight_widths, weight_bearings, weight_vertical_bounds = extract_widths_and_bearings(weight_font, baseline)
             key = str(weight_int)
             widths_by_weight[key] = weight_widths
             bearings_by_weight[key] = weight_bearings
+            vertical_bounds_by_weight[key] = weight_vertical_bounds
 
     char_width_px = float(config["char_width_px"])
     is_mono = bool(config["is_monospace"])
@@ -268,8 +291,10 @@ def extract_one(slug: str) -> Path:
         is_monospace=is_mono,
         char_width_px=char_width_px,
         bearings=bearings,
+        vertical_bounds=vertical_bounds,
         widths_by_weight=widths_by_weight,
         bearings_by_weight=bearings_by_weight,
+        vertical_bounds_by_weight=vertical_bounds_by_weight,
     )
 
     out_path = METRICS_DIR / f"{slug}.json"

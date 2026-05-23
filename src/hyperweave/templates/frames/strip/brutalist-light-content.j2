@@ -12,7 +12,7 @@
 
   {# (2) Perimeter — lower opacity for paper visibility (dark ink at 0.15
      reads correctly on cream/white without dominating the rule). #}
-  <rect x="0.5" y="0.5" width="{{ width - 1 }}" height="{{ strip_h - 1 }}"
+  <rect x="{{ strip_perimeter_inset }}" y="{{ strip_perimeter_inset }}" width="{{ strip_perimeter_w }}" height="{{ strip_perimeter_h }}"
         fill="none" stroke="var(--dna-signal)" stroke-width="1" opacity="0.15"/>
 
   {# (3) Left accent rail — same 6px width as dark, accent color from variant. #}
@@ -21,21 +21,21 @@
   {# (4) Dark gradient brand panel — uses panel_gradient_stops defined per
      light variant. The gradient defs in brutalist-defs.j2 emits the
      {{ uid }}-panel linearGradient gated on the same presence check. #}
-  <rect x="{{ brand_panel_x }}" y="0"
-        width="{{ brand_panel_w }}" height="{{ strip_h }}"
+  <rect x="{{ strip_zones.core.brand_panel_x }}" y="{{ strip_origin_y }}"
+        width="{{ strip_zones.core.brand_panel_w }}" height="{{ strip_h }}"
         fill="url(#{{ uid }}-panel)"/>
 
   {# (5) INK-SEAM-INK triple divider — substrate inversion of ACCENT-VOID-ACCENT:
      outer bars use --dna-ink-primary (dark ink) at full opacity, center seam
      uses --dna-seam-color (gold / amber / cyan per variant). The brutalist scholar
      manuscript convention reads as ink-rule-with-gold-vein. #}
-  <rect x="{{ triple_divider_x }}" y="0"
+  <rect x="{{ strip_zones.core.triple_divider_x }}" y="{{ strip_origin_y }}"
         width="{{ triple_divider_bar_w }}" height="{{ strip_h }}"
         fill="var(--dna-ink-primary)"/>
-  <rect x="{{ triple_divider_x + triple_divider_bar_w }}" y="0"
+  <rect x="{{ strip_zones.core.triple_divider_void_x }}" y="{{ strip_origin_y }}"
         width="{{ triple_divider_void_w }}" height="{{ strip_h }}"
         fill="var(--dna-seam-color)"/>
-  <rect x="{{ triple_divider_x + triple_divider_bar_w + triple_divider_void_w }}" y="0"
+  <rect x="{{ strip_zones.core.triple_divider_right_x }}" y="{{ strip_origin_y }}"
         width="{{ triple_divider_bar_w }}" height="{{ strip_h }}"
         fill="var(--dna-ink-primary)"/>
 
@@ -48,11 +48,8 @@
      (derived in compose/resolver.py as ``strip_height * strip_glyph_ratio``),
      distinct from ornament_size which sizes the right bookend. Centers
      within the ornament's bounding box. #}
-  {% set _idg_size = strip_glyph_size %}
-  {% set _idg_y = ornament_y + (ornament_size - _idg_size) // 2 %}
-  {% set _idg_x = ornament_x + (ornament_size - _idg_size) // 2 %}
-  <g data-hw-zone="brand-glyph" transform="translate({{ _idg_x }},{{ _idg_y }})">
-    <svg viewBox="{{ glyph_viewbox }}" width="{{ _idg_size }}" height="{{ _idg_size }}">
+  <g data-hw-zone="brand-glyph" transform="translate({{ strip_zones.bookend.identity_glyph_x }},{{ strip_zones.bookend.identity_glyph_y }})">
+    <svg viewBox="{{ glyph_viewbox }}" width="{{ strip_glyph_size }}" height="{{ strip_glyph_size }}">
       <path d="{{ glyph_path }}" fill="var(--dna-glyph-inner, var(--dna-signal))"/>
     </svg>
   </g>
@@ -60,10 +57,10 @@
   <rect x="{{ ornament_x }}" y="{{ ornament_y }}"
         width="{{ ornament_size }}" height="{{ ornament_size }}"
         fill="var(--dna-signal)"/>
-  <rect x="{{ ornament_x + ornament_inner_inset }}"
-        y="{{ ornament_y + ornament_inner_inset }}"
-        width="{{ ornament_size - 2 * ornament_inner_inset }}"
-        height="{{ ornament_size - 2 * ornament_inner_inset }}"
+  <rect x="{{ strip_zones.bookend.ornament_inner_x }}"
+        y="{{ strip_zones.bookend.ornament_inner_y }}"
+        width="{{ strip_zones.bookend.ornament_inner_w }}"
+        height="{{ strip_zones.bookend.ornament_inner_h }}"
         fill="var(--dna-bg)"/>
   {% endif %}
 
@@ -79,14 +76,13 @@
      divider uses --dna-ink-primary at 0.08 opacity (slightly lower than
      dark's 0.10 because dark ink on paper has higher luminance contrast
      at the same opacity). #}
-  {% set _ns = namespace(cx=first_divider_x) %}
   {% for metric in metrics %}
     {% set _layout = cell_layouts[loop.index0] %}
-    {% if not loop.first %}
-    <line x1="{{ _ns.cx }}" y1="2" x2="{{ _ns.cx }}" y2="{{ strip_h - 2 }}"
+    {% if _layout.show_leading_rule %}
+    <line x1="{{ _layout.cell_x }}" y1="{{ strip_zones.core.metric_rule_y1 }}" x2="{{ _layout.cell_x }}" y2="{{ strip_zones.core.metric_rule_y2 }}"
           stroke="var(--dna-ink-primary)" stroke-width="0.5" opacity="0.08"/>
     {% endif %}
-    <g data-hw-zone="metric-{{ loop.index0 }}" transform="translate({{ _ns.cx }},0)">
+    <g data-hw-zone="metric-{{ loop.index0 }}" transform="translate({{ _layout.cell_x }},0)">
       <text x="{{ _layout.label_x }}" y="{{ metric_label_y }}"
             text-anchor="{{ _layout.text_anchor }}"
             class="{{ uid }}-metric-label">{{ metric.label | upper }}</text>
@@ -94,7 +90,6 @@
             text-anchor="{{ _layout.text_anchor }}"
             class="{{ uid }}-metric-value">{{ metric.value }}</text>
     </g>
-    {% set _ns.cx = _ns.cx + _layout.cell_w %}
   {% endfor %}
 
   {# (9) Bookend ornament — accent outer + ink-primary cutout (substrate
@@ -105,14 +100,14 @@
      status diamond (rendered outside this clip group). Never both — prior
      v0.3.2 attempt double-rendered visibly. #}
   {% if not show_status_indicator %}
-  <g transform="translate({{ bookend_x }},{{ strip_h // 2 }})">
-    <rect x="{{ -(ornament_size // 2) }}" y="{{ -(ornament_size // 2) }}"
+  <g transform="translate({{ strip_zones.core.bookend_x }},{{ strip_zones.core.half_h }})">
+    <rect x="{{ strip_zones.bookend.outer_x }}" y="{{ strip_zones.bookend.outer_y }}"
           width="{{ ornament_size }}" height="{{ ornament_size }}"
           fill="var(--dna-signal)"/>
-    <rect x="{{ -(ornament_size // 2) + ornament_inner_inset }}"
-          y="{{ -(ornament_size // 2) + ornament_inner_inset }}"
-          width="{{ ornament_size - 2 * ornament_inner_inset }}"
-          height="{{ ornament_size - 2 * ornament_inner_inset }}"
+    <rect x="{{ strip_zones.bookend.inner_x }}"
+          y="{{ strip_zones.bookend.inner_y }}"
+          width="{{ strip_zones.bookend.inner_w }}"
+          height="{{ strip_zones.bookend.inner_h }}"
           fill="var(--dna-ink-primary)"/>
   </g>
   {% endif %}
@@ -121,7 +116,7 @@
 {# (10) Status indicator at bookend_x (replaces decorative bookend on stateful
    strips). Same posture as dark; reuses brutalist-status.j2 partial. #}
 {% if show_status_indicator %}
-<g data-hw-zone="status" transform="translate({{ bookend_x }},{{ strip_h // 2 }})"
+<g data-hw-zone="status" transform="translate({{ strip_zones.core.bookend_x }},{{ strip_zones.core.half_h }})"
    {% if status_shape_rendering != "geometricPrecision" %}shape-rendering="{{ status_shape_rendering }}"{% endif %}>
 {% include "frames/strip/brutalist-status.j2" %}
 </g>

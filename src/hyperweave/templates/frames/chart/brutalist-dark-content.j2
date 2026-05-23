@@ -4,25 +4,20 @@
    crosshair markers, nested-square milestones.
    Chart fragments (area, polyline, markers, milestones) come from chart_engine. #}
 
-{% set cw = width | default(900) %}
-{% set ch = height | default(500) %}
 {# v0.3.2 viewport defaults: aligned with the v0.3.2 brutalist dark chart prototype
    celadon panel. Prototype chart area spans x=90 to x=857, y=140 to y=388 —
    pre-v0.3.2 defaults (80,150,760,245) drifted axis rails 10px left and grid
    baseline 5px high relative to the locked spec. #}
-{% set vx = chart_viewport_x | default(90) %}
-{% set vy = chart_viewport_y | default(140) %}
-{% set vw = chart_viewport_w | default(767) %}
-{% set vh = chart_viewport_h | default(248) %}
-
 <g clip-path="url(#{{ uid }}-clip)" class="{{ uid }}-chart">
 
   {# L0: FLAT SLAB #}
-  <rect width="{{ cw }}" height="{{ ch }}" fill="var(--dna-surface)"/>
+  <rect width="{{ chart_layout.width }}" height="{{ chart_layout.height }}" fill="var(--dna-surface)"/>
 
   {# L1: GRAIN — paints before the perimeter and left rail so the structural
      stroke + accent bar read as crisp ink layered over the substrate texture. #}
-  <rect x="3" y="3" width="{{ cw - 6 }}" height="{{ ch - 6 }}" filter="url(#{{ uid }}-grain)"/>
+  <rect x="{{ chart_layout.brutalist_dark_grain_rect.x }}" y="{{ chart_layout.brutalist_dark_grain_rect.y }}"
+        width="{{ chart_layout.brutalist_dark_grain_rect.w }}" height="{{ chart_layout.brutalist_dark_grain_rect.h }}"
+        filter="url(#{{ uid }}-grain)"/>
 
   {# L2: ASYMMETRIC L-FRAME — heavy left accent rail anchors the chart as a
      Y-axis spine while the outer perimeter ships as a barely-visible 1.5px
@@ -31,8 +26,12 @@
      structurally the perimeter is uniform — the rail dominates the eye.
      Matches the v0.3.2 brutalist dark prototype's celadon panel exactly
      (lines 55-56 of hw-elegant-mono-star-charts-v3.html). #}
-  <rect width="6" height="{{ ch }}" fill="var(--dna-signal)" data-hw-zone="accent-rail"/>
-  <rect x="0.75" y="0.75" width="{{ cw - 1.5 }}" height="{{ ch - 1.5 }}" fill="none"
+  <rect x="{{ chart_layout.rects.brutalist_left_rail.x }}" y="{{ chart_layout.rects.brutalist_left_rail.y }}"
+        width="{{ chart_layout.rects.brutalist_left_rail.w }}" height="{{ chart_layout.rects.brutalist_left_rail.h }}"
+        fill="var(--dna-signal)" data-hw-zone="accent-rail"/>
+  <rect x="{{ chart_layout.brutalist_perimeter_rect.x }}" y="{{ chart_layout.brutalist_perimeter_rect.y }}"
+        width="{{ chart_layout.brutalist_perimeter_rect.w }}" height="{{ chart_layout.brutalist_perimeter_rect.h }}"
+        fill="none"
         stroke="var(--dna-border, var(--dna-signal))" stroke-width="1.5" stroke-opacity="0.25"/>
 
   {# STRUCTURAL RULES — y-coordinates from the v0.3.2 brutalist dark chart prototype
@@ -43,24 +42,23 @@
      visually on top of the rule — visible as "3K" bleeding into the title box.
      Moving the rule to y=122 puts an 18px gap between rule and chart top,
      matching the light variant's title-zone-end hairline at y=122. #}
-  <line x1="3" y1="42" x2="{{ cw - 3 }}" y2="42"
+  <line x1="{{ chart_layout.lines.brutalist_header_rule.x1 }}" y1="{{ chart_layout.lines.brutalist_header_rule.y1 }}"
+        x2="{{ chart_layout.lines.brutalist_header_rule.x2 }}" y2="{{ chart_layout.lines.brutalist_header_rule.y2 }}"
         stroke="var(--dna-border, var(--dna-signal))" stroke-width="2.5" opacity="0.55"/>
-  <line x1="3" y1="122" x2="{{ cw - 3 }}" y2="122"
+  <line x1="{{ chart_layout.lines.brutalist_title_rule.x1 }}" y1="{{ chart_layout.lines.brutalist_title_rule.y1 }}"
+        x2="{{ chart_layout.lines.brutalist_title_rule.x2 }}" y2="{{ chart_layout.lines.brutalist_title_rule.y2 }}"
         stroke="var(--dna-border, var(--dna-signal))" stroke-width="2.5" opacity="0.55"/>
-  <line x1="3" y1="440" x2="{{ cw - 3 }}" y2="440"
+  <line x1="{{ chart_layout.lines.brutalist_footer_rule.x1 }}" y1="{{ chart_layout.lines.brutalist_footer_rule.y1 }}"
+        x2="{{ chart_layout.lines.brutalist_footer_rule.x2 }}" y2="{{ chart_layout.lines.brutalist_footer_rule.y2 }}"
         stroke="var(--dna-border, var(--dna-signal))" stroke-width="2.5" opacity="0.55"/>
 
   {# Y-axis rail + baseline #}
-  <line x1="{{ vx }}" y1="{{ vy }}" x2="{{ vx }}" y2="{{ vy + vh }}"
+  <line x1="{{ chart_layout.y_axis_line.x1 }}" y1="{{ chart_layout.y_axis_line.y1 }}"
+        x2="{{ chart_layout.y_axis_line.x2 }}" y2="{{ chart_layout.y_axis_line.y2 }}"
         stroke="var(--dna-border, var(--dna-signal))" stroke-width="2" opacity="0.5"/>
-  <line x1="{{ vx }}" y1="{{ vy + vh }}" x2="{{ vx + vw }}" y2="{{ vy + vh }}"
+  <line x1="{{ chart_layout.x_axis_line.x1 }}" y1="{{ chart_layout.x_axis_line.y1 }}"
+        x2="{{ chart_layout.x_axis_line.x2 }}" y2="{{ chart_layout.x_axis_line.y2 }}"
         stroke="var(--dna-border, var(--dna-signal))" stroke-width="2" opacity="0.5"/>
-
-  {# Grid coordinates #}
-  <text class="{{ uid }}-grid-coord" x="{{ vx + 4 }}" y="{{ vy + 10 }}">001</text>
-  <text class="{{ uid }}-grid-coord" x="{{ vx + vw - 4 }}" y="{{ vy + 10 }}" text-anchor="end">002</text>
-  <text class="{{ uid }}-grid-coord" x="{{ vx + 4 }}" y="{{ vy + vh - 3 }}">003</text>
-  <text class="{{ uid }}-grid-coord" x="{{ vx + vw - 4 }}" y="{{ vy + vh - 3 }}" text-anchor="end">004</text>
 
   {# ZONE 1: HEADER #}
   <g data-hw-zone="header">
@@ -69,8 +67,8 @@
        x=20 with text at x=42 leaves a 6px breathing gap (dark template was
        at translate(18,16) with text x=42 → 8px gap; unified to translate(20,13)
        for cross-substrate spatial parity per user feedback). #}
-    <g transform="translate(20, 13)">
-      <svg viewBox="0 0 24 24" width="16" height="16">
+    <g transform="translate({{ chart_layout.rects.brutalist_glyph.x }}, {{ chart_layout.rects.brutalist_glyph.y }})">
+      <svg viewBox="0 0 24 24" width="{{ chart_layout.rects.brutalist_glyph.w }}" height="{{ chart_layout.rects.brutalist_glyph.h }}">
         <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" fill="var(--dna-chart-glyph, var(--dna-glyph-inner, var(--dna-signal)))"/>
       </svg>
     </g>
@@ -84,11 +82,13 @@
        prototype line 427's "ELI64S / README-AI" cadence. chart_title is
        upper-cased repo slug "OWNER/REPO" from resolver; we re-split to
        insert visual breathing room around the separator. #}
-    <text class="{{ uid }}-hdr-user" x="42" y="28">{{ chart_title | replace('/', ' / ') }}</text>
+    <text class="{{ uid }}-hdr-user" x="{{ chart_layout.texts.brutalist_header_user.x }}" y="{{ chart_layout.texts.brutalist_header_user.y }}">{{ chart_title | replace('/', ' / ') }}</text>
     {# Status dot y=17 centers at y=21, aligned with header text cap-center
        (text y=28 baseline minus 0.7*12/2 ≈ y=24). Pre-fix y=11 placed dot
        9px above text visual center. #}
-    <rect class="{{ uid }}-status-dot" x="{{ cw - 28 }}" y="17" width="8" height="8" fill="var(--dna-signal)" shape-rendering="crispEdges"/>
+    <rect class="{{ uid }}-status-dot" x="{{ chart_layout.rects.brutalist_status_dot.x }}" y="{{ chart_layout.rects.brutalist_status_dot.y }}"
+          width="{{ chart_layout.rects.brutalist_status_dot.w }}" height="{{ chart_layout.rects.brutalist_status_dot.h }}"
+          fill="var(--dna-signal)" shape-rendering="crispEdges"/>
   </g>
 
   {# ZONE 2: TITLE + HERO. Positions ported from
@@ -98,20 +98,20 @@
      Title subtitle text includes "LIFETIME GROWTH · {date range}" — date
      range derived from chart_window_label when populated. #}
   <g data-hw-zone="title">
-    <text class="{{ uid }}-title-main" x="24" y="90">STAR HISTORY</text>
+    <text class="{{ uid }}-title-main" x="{{ chart_layout.texts.brutalist_dark_title.x }}" y="{{ chart_layout.texts.brutalist_dark_title.y }}">STAR HISTORY</text>
     {# chart_date_range from resolver: "Jan 2024 — May 2026" with em-dash.
        Prototype line 36 shows "→" right-arrow. Replace em-dash with arrow
        for the v0.3.2 brutalist cadence. #}
-    <text class="{{ uid }}-title-sub" x="24" y="108">LIFETIME GROWTH{% if chart_date_range %} · {{ chart_date_range | upper | replace('—', '→') }}{% endif %}</text>
+    <text class="{{ uid }}-title-sub" x="{{ chart_layout.texts.brutalist_dark_subtitle.x }}" y="{{ chart_layout.texts.brutalist_dark_subtitle.y }}">LIFETIME GROWTH{% if chart_date_range %} · {{ chart_date_range | upper | replace('—', '→') }}{% endif %}</text>
 
-    <text class="{{ uid }}-hero-value" x="{{ cw - 24 }}" y="90" text-anchor="end">{{ chart_current_stars }}</text>
-    <text class="{{ uid }}-hero-label" x="{{ cw - 24 }}" y="108" text-anchor="end">TOTAL STARS</text>
+    <text class="{{ uid }}-hero-value" x="{{ chart_layout.texts.brutalist_dark_hero_value.x }}" y="{{ chart_layout.texts.brutalist_dark_hero_value.y }}" text-anchor="{{ chart_layout.texts.brutalist_dark_hero_value.anchor }}">{{ chart_current_stars }}</text>
+    <text class="{{ uid }}-hero-label" x="{{ chart_layout.texts.brutalist_dark_hero_label.x }}" y="{{ chart_layout.texts.brutalist_dark_hero_label.y }}" text-anchor="{{ chart_layout.texts.brutalist_dark_hero_label.anchor }}">TOTAL STARS</text>
   </g>
 
   {# ZONE 3: CHART #}
   <g data-hw-zone="chart">
     {% for label in chart_y_labels %}
-    <text class="{{ uid }}-axis-y" x="{{ vx - 8 }}" y="{{ label.y + 4 }}" text-anchor="end">{{ label.text }}</text>
+    <text class="{{ uid }}-axis-y" x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}">{{ label.text }}</text>
     {% endfor %}
 
     {%- for gl in chart_gridlines %}
@@ -147,7 +147,7 @@
   {# X-AXIS LABELS #}
   <g data-hw-zone="x-axis">
     {% for label in chart_x_labels %}
-    <text class="{{ uid }}-axis-x" x="{{ label.x }}" y="420" text-anchor="{{ label.anchor | default('middle') }}">{{ label.text }}</text>
+    <text class="{{ uid }}-axis-x" x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}">{{ label.text }}</text>
     {% endfor %}
   </g>
 
@@ -160,8 +160,8 @@
        baseline-to-visual-center offset ~2.8px, baseline at y=472 puts visual
        center at y=469.2 — vertically centered in the footer zone. Pre-fix
        was at y=462, 10px above zone center. #}
-    <text class="{{ uid }}-foot" x="20" y="472">github.com/{{ chart_repo }}</text>
-    <text class="{{ uid }}-foot-brand" x="{{ cw - 22 }}" y="472" text-anchor="end">HYPERWEAVE · STAR HISTORY</text>
+    <text class="{{ uid }}-foot" x="{{ chart_layout.texts.brutalist_footer_url.x }}" y="{{ chart_layout.texts.brutalist_footer_url.y }}">github.com/{{ chart_repo }}</text>
+    <text class="{{ uid }}-foot-brand" x="{{ chart_layout.texts.brutalist_footer_brand.x }}" y="{{ chart_layout.texts.brutalist_footer_brand.y }}" text-anchor="{{ chart_layout.texts.brutalist_footer_brand.anchor }}">HYPERWEAVE · STAR HISTORY</text>
   </g>
 
 </g>

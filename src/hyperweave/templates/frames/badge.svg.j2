@@ -22,10 +22,6 @@
 {% block content %}
 {% set h = height | default(20) %}
 {% set accent_w = accent_bar_width | default(4) %}
-{% set sep_w_val = sep_width | default(2) %}
-{% set seam_w_val = seam_width | default(3) %}
-{% set ind_size = indicator_size | default(8) %}
-{% set lp_w = left_panel_width | default(60) %}
 
 {% include "frames/badge/" ~ (paradigm | default("default")) ~ "-content.j2" %}
 

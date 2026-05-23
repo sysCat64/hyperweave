@@ -1,21 +1,19 @@
 {# Chrome badge content: envelope, well, separator, diamond status indicator.
    Specimen: badge-final.svg
    Layer order: envelope -> inner stroke -> well -> chrome bleed -> specular #}
-{% set rx = chrome_corner | default('4') %}
-
 {# Chrome envelope #}
 <g clip-path="url(#{{ uid }}-clip)">
   <rect width="{{ width }}" height="{{ h }}" fill="url(#{{ uid }}-env)" filter="url(#{{ uid }}-sh)"/>
-  <rect x="1" y="1" width="{{ width - 2 }}" height="{{ h - 2 }}" rx="{{ rx | int - 1 }}" fill="none" stroke="#000510" stroke-width="0.6"/>
-  <rect class="hw-well" x="2" y="2" width="{{ width - 4 }}" height="{{ h - 4 }}" rx="2" fill="url(#{{ uid }}-well)"/>
-  <rect x="2" y="2" width="4" height="{{ h - 4 }}" fill="url(#{{ uid }}-env)" opacity="0.7"/>
+  <rect x="{{ chrome_inner_inset }}" y="{{ chrome_inner_inset }}" width="{{ cellular_inner_stroke_w }}" height="{{ cellular_inner_stroke_h }}" rx="{{ chrome_inner_rx }}" fill="none" stroke="var(--dna-surface-deep)" stroke-width="0.6"/>
+  <rect class="hw-well" x="{{ chrome_well_inset }}" y="{{ chrome_well_inset }}" width="{{ chrome_well_w }}" height="{{ chrome_well_h }}" rx="{{ chrome_well_rx }}" fill="url(#{{ uid }}-well)"/>
+  <rect x="{{ chrome_well_inset }}" y="{{ chrome_well_inset }}" width="{{ chrome_rail_w }}" height="{{ chrome_well_h }}" fill="url(#{{ uid }}-env)" opacity="0.7"/>
 </g>
 
 {# Top highlight #}
-<rect x="8" y="2" width="{{ width - 16 }}" height="0.5" rx="0.25" fill="{{ specular_light }}" opacity="{{ highlight_opacity | default('0.1') }}"/>
+<rect x="{{ chrome_highlight_x }}" y="{{ chrome_highlight_y }}" width="{{ chrome_highlight_w }}" height="{{ chrome_highlight_h }}" rx="{{ chrome_highlight_rx }}" fill="{{ specular_light }}" opacity="{{ highlight_opacity | default('0.1') }}"/>
 
 {# Separator line #}
-<line x1="{{ lp_w }}" y1="5" x2="{{ lp_w }}" y2="{{ h - 5 }}" stroke="url(#{{ uid }}-sep)" stroke-width="0.75"/>
+<line x1="{{ left_panel_width }}" y1="{{ chrome_separator_y1 }}" x2="{{ left_panel_width }}" y2="{{ chrome_separator_y2 }}" stroke="url(#{{ uid }}-sep)" stroke-width="0.75"/>
 
 {# Glyph — glyph_y supplied by compose/layout.py (Invariant 6). #}
 {% if has_glyph and glyph_svg %}
@@ -29,9 +27,9 @@
    compute_badge_zones. Etched seam (two hairlines: dark cut at seam_left_x,
    specular catch +0.6px right) renders between label and value. #}
 {% if seam_left_x and seam_left_x > 0 %}
-<line x1="{{ seam_left_x }}" y1="4.5" x2="{{ seam_left_x }}" y2="15.5"
+<line x1="{{ seam_left_x }}" y1="{{ chrome_seam_y1 }}" x2="{{ seam_left_x }}" y2="{{ chrome_seam_y2 }}"
       stroke="var(--dna-seam-gap)" stroke-width="0.6" opacity="0.8"/>
-<line x1="{{ seam_specular_x }}" y1="4.5" x2="{{ seam_specular_x }}" y2="15.5"
+<line x1="{{ seam_specular_x }}" y1="{{ chrome_seam_y1 }}" x2="{{ seam_specular_x }}" y2="{{ chrome_seam_y2 }}"
       stroke="var(--dna-specular, var(--dna-signal))" stroke-width="0.4" opacity="0.09"/>
 {% endif %}
 
@@ -57,12 +55,12 @@
    aliasing that caused warm-tan strokes on horizon (accent_complement was
    warm tan, --dna-signal-dim resolved to it, the var() fallback never fired). #}
 {% if show_indicator %}
-<g data-hw-zone="status" transform="translate({{ indicator_x + ind_size // 2 }},{{ h // 2 }})">
-  <rect x="-4.2" y="-4.2" width="8.4" height="8.4" rx="0.7"
-        transform="rotate(45)" fill="var(--dna-diamond-housing, #040C14)"/>
-  <rect x="-4.2" y="-4.2" width="8.4" height="8.4" rx="0.7"
-        transform="rotate(45)" fill="none" stroke="var(--dna-diamond-stroke, #1A3550)" stroke-width="0.5"/>
-  <rect class="hw-logic-bit" x="-2.2" y="-2.2" width="4.4" height="4.4" rx="0.3"
+<g data-hw-zone="status" transform="translate({{ indicator_center_x }},{{ indicator_center_y }})">
+  <rect x="{{ diamond_outer_x }}" y="{{ diamond_outer_y }}" width="{{ diamond_outer_size }}" height="{{ diamond_outer_size }}" rx="{{ chrome_diamond_outer_rx }}"
+        transform="rotate(45)" fill="var(--dna-diamond-housing)"/>
+  <rect x="{{ diamond_outer_x }}" y="{{ diamond_outer_y }}" width="{{ diamond_outer_size }}" height="{{ diamond_outer_size }}" rx="{{ chrome_diamond_outer_rx }}"
+        transform="rotate(45)" fill="none" stroke="var(--dna-diamond-stroke)" stroke-width="{{ chrome_diamond_stroke_width }}"/>
+  <rect class="hw-logic-bit" x="{{ diamond_inner_x }}" y="{{ diamond_inner_y }}" width="{{ diamond_inner_size }}" height="{{ diamond_inner_size }}" rx="{{ chrome_diamond_inner_rx }}"
         transform="rotate(45)" fill="var(--dna-status-color, var(--dna-status-passing-core))"/>
 </g>
 {% endif %}

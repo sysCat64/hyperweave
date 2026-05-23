@@ -92,7 +92,7 @@ def resolve(spec: ComposeSpec) -> ResolvedArtifact:
     """Resolve a ComposeSpec into a typed ResolvedArtifact."""
     # Telemetry frames flow through _resolve_telemetry_genome() precedence chain:
     # explicit --genome override → JSONL runtime field → telemetry-voltage fallback.
-    if spec.type in {FrameType.RECEIPT, FrameType.RHYTHM_STRIP, FrameType.MASTER_CARD}:
+    if spec.type in {FrameType.RECEIPT, FrameType.RHYTHM_STRIP}:
         tel: dict[str, Any] = dict(spec.telemetry_data or {})
         genome_id = _resolve_telemetry_genome(spec, tel)
         genome = _load_genome(genome_id)
@@ -117,7 +117,6 @@ def resolve(spec: ComposeSpec) -> ResolvedArtifact:
         "marquee-horizontal": resolve_marquee,
         "receipt": resolve_receipt,
         "rhythm-strip": resolve_rhythm_strip,
-        "master-card": resolve_master_card,
         "catalog": resolve_catalog,
         "chart": resolve_chart,
         "stats": resolve_stats,
@@ -296,7 +295,7 @@ def resolve_badge(
       standard (brutalist, clinical, etc.)  -- two-panel, sep+seam, sharp
       chrome                                -- envelope gradient, well, bevel filter
     """
-    from hyperweave.core.text import measure_text
+    from hyperweave.core.text import measure_text_ink_metrics
 
     badge_cfg_for_height = paradigm_spec.badge if paradigm_spec else None
     # Height + size class: paradigm-driven default or compact variant.
@@ -339,6 +338,25 @@ def resolve_badge(
             glyph_size = badge_cfg_for_glyph_size.glyph_size
     else:
         glyph_size = 14
+
+    glyph_data = _kw.get("glyph_data") or {}
+    glyph_path = str(glyph_data.get("path", ""))
+    glyph_viewbox = str(glyph_data.get("viewBox", ""))
+    glyph_id = str(glyph_data.get("id", ""))
+    glyph_visual_w = float(glyph_size)
+    glyph_render_viewbox = glyph_viewbox
+    glyph_render_ink_w = glyph_visual_w
+    glyph_render_ink_h = glyph_visual_w
+    glyph_optical_scale = 1.0
+    if glyph_path:
+        from hyperweave.render.glyph_metrics import compute_glyph_render_metrics
+
+        glyph_render_metrics = compute_glyph_render_metrics(glyph_id, glyph_path, glyph_viewbox, float(glyph_size))
+        glyph_visual_w = glyph_render_metrics.rendered_ink_w
+        glyph_render_viewbox = glyph_render_metrics.render_viewbox
+        glyph_render_ink_w = glyph_render_metrics.rendered_ink_w
+        glyph_render_ink_h = glyph_render_metrics.rendered_ink_h
+        glyph_optical_scale = glyph_render_metrics.optical_scale
 
     # Paradigm may override profile-level seam structure. Cellular declares
     # sep_w=1 because its template paints a 1px gradient seam where
@@ -395,6 +413,7 @@ def resolve_badge(
     # + Chakra Petch @ 9/12 (default) or 7/9 (compact).
     _label_family = paradigm_spec.badge.label_font_family if paradigm_spec else "Inter"
     _value_family = paradigm_spec.badge.value_font_family if paradigm_spec else "Inter"
+    _label_weight = paradigm_spec.badge.label_font_weight if paradigm_spec else 700
     _value_weight = paradigm_spec.badge.value_font_weight if paradigm_spec else 700
     _label_size = paradigm_spec.badge.label_font_size if paradigm_spec else font_size
     _value_size = paradigm_spec.badge.value_font_size if paradigm_spec else font_size
@@ -415,19 +434,19 @@ def resolve_badge(
         else (0.06 if use_mono else 0.0)
     )
     _value_ls_em = paradigm_spec.badge.value_letter_spacing_em if paradigm_spec else 0.0
-    lw = (
-        measure_text(
+    label_metrics = (
+        measure_text_ink_metrics(
             label_display,
             font_family=_label_family,
             font_size=_label_size,
-            font_weight=400 if use_mono else 700,
+            font_weight=_label_weight,
             letter_spacing_em=_label_ls_em,
         )
         if label_display
-        else 0.0
+        else None
     )
-    vw = (
-        measure_text(
+    value_metrics = (
+        measure_text_ink_metrics(
             value_raw,
             font_family=_value_family,
             font_size=_value_size,
@@ -435,15 +454,22 @@ def resolve_badge(
             letter_spacing_em=_value_ls_em,
         )
         if value_raw
-        else 0.0
+        else None
     )
+    lw = label_metrics.advance_width if label_metrics is not None else 0.0
+    vw = value_metrics.advance_width if value_metrics is not None else 0.0
+    label_ink_w = label_metrics.ink_width if label_metrics is not None else 0.0
+    value_ink_w = value_metrics.ink_width if value_metrics is not None else 0.0
+    label_start_bearing = label_metrics.leading_bearing if label_metrics is not None else 0.0
+    value_start_bearing = value_metrics.leading_bearing if value_metrics is not None else 0.0
 
     has_glyph = bool(spec.glyph or spec.custom_glyph_svg)
+    badge_cfg = paradigm_spec.badge if paradigm_spec else None
 
-    # Glyph-left offset: paradigms that render decoration on the left edge
-    # (cellular pattern strip at x=2..~20) need the glyph pushed rightward so
-    # it doesn't overlap. Brutalist/chrome declare 0 (no offset).
-    badge_cfg_for_glyph = paradigm_spec.badge if paradigm_spec else None
+    # Legacy glyph-left offset fallback. Paradigms with rendered left
+    # adornment geometry declare left_adornment_* below, so the layout engine
+    # can position content from the actual bookend edge.
+    badge_cfg_for_glyph = badge_cfg
     if badge_cfg_for_glyph is not None:
         if compact and badge_cfg_for_glyph.glyph_offset_left_compact > 0:
             glyph_left_offset = badge_cfg_for_glyph.glyph_offset_left_compact
@@ -476,46 +502,49 @@ def resolve_badge(
     # for etched seam (chrome) when seam_render_w > 0; structural separator
     # (sep_w + seam_w) for paradigms with seam_render_w == 0.
     pad = paradigm_spec.badge.pad if paradigm_spec else 8
-    badge_cfg = paradigm_spec.badge if paradigm_spec else None
     text_anchor = badge_cfg.text_anchor if badge_cfg else "middle"
     seam_render_w = badge_cfg.seam_render_w if badge_cfg else 0.0
     seam_specular_offset = badge_cfg.seam_specular_offset if badge_cfg else 0.0
-    # Algorithmic bearing correction. For paradigms
-    # with text_anchor=start (chrome), the seam needs to sit at the visible
-    # ink end + pad/2, not at the advance-width end + pad/2. The difference
-    # is the LAST glyph's right side-bearing (RSB) — a per-glyph value
-    # that varies (Orbitron K ≠ S ≠ I). measure_text_trailing_bearing reads
-    # the RSB directly from the font LUT (extracted via fonttools BoundsPen
-    # in scripts/extract_font_metrics.py). No paradigm tuning — the font
-    # itself supplies the correction. Centered text (text_anchor=middle in
-    # brutalist/cellular) balances bearing across both edges so corrections
-    # stay at 0.
-    from hyperweave.core.text import measure_text_trailing_bearing
-
-    if text_anchor == "start":
-        label_end_bearing = (
-            measure_text_trailing_bearing(
-                label_display,
-                font_family=_label_family,
-                font_size=_label_size,
-                font_weight=400 if use_mono else 700,
-            )
-            if label_display
-            else 0.0
+    cellular_pattern_cols = badge_cfg.left_adornment_cols if badge_cfg else 0
+    cellular_pattern_rows = badge_cfg.left_adornment_rows if badge_cfg else 0
+    cellular_pattern_cell_w = 0
+    cellular_pattern_cell_h = 0
+    cellular_pattern_start_x = badge_cfg.left_adornment_start_x if badge_cfg else 0
+    cellular_pattern_start_y = badge_cfg.left_adornment_start_y if badge_cfg else 0
+    left_adornment_width = 0.0
+    left_adornment_gap = 0.0
+    glyph_label_gap = badge_cfg.glyph_label_gap if badge_cfg else 0.0
+    visual_gap = badge_cfg.visual_gap if badge_cfg else 0.0
+    if badge_cfg and cellular_pattern_cols > 0 and cellular_pattern_rows > 0:
+        cellular_pattern_cell_w = (
+            badge_cfg.left_adornment_cell_w_compact
+            if compact and badge_cfg.left_adornment_cell_w_compact > 0
+            else badge_cfg.left_adornment_cell_w
         )
-        value_end_bearing = (
-            measure_text_trailing_bearing(
-                value_raw,
-                font_family=_value_family,
-                font_size=_value_size,
-                font_weight=_value_weight,
-            )
-            if value_raw
-            else 0.0
+        cellular_pattern_cell_h = (
+            badge_cfg.left_adornment_cell_h_compact
+            if compact and badge_cfg.left_adornment_cell_h_compact > 0
+            else badge_cfg.left_adornment_cell_h
         )
-    else:
-        label_end_bearing = 0.0
-        value_end_bearing = 0.0
+        if cellular_pattern_cell_w > 0 and cellular_pattern_cell_h > 0:
+            configured_adornment_width = (
+                badge_cfg.left_adornment_width_compact
+                if compact and badge_cfg.left_adornment_width_compact > 0
+                else badge_cfg.left_adornment_width
+            )
+            left_adornment_width = float(
+                configured_adornment_width
+                if configured_adornment_width > 0
+                else cellular_pattern_start_x + cellular_pattern_cols * cellular_pattern_cell_w
+            )
+            left_adornment_gap = float(badge_cfg.left_adornment_gap if badge_cfg.left_adornment_gap > 0 else pad)
+    # Algorithmic bearing correction. Start-anchored chrome uses trailing
+    # bearings to place seams at the visible ink edge. Centered cellular can
+    # opt into full visual-gap layout, which also needs leading bearings so
+    # the SVG middle anchor lands where the visible ink bounds require.
+    use_visual_bearings = text_anchor == "start" or visual_gap > 0
+    label_end_bearing = label_metrics.trailing_bearing if use_visual_bearings and label_metrics is not None else 0.0
+    value_end_bearing = value_metrics.trailing_bearing if use_visual_bearings and value_metrics is not None else 0.0
     # Compact variant uses glyph_y_offset_compact when declared. The
     # text-visual-vs-frame-center delta scales with font size: cellular's
     # +2px at h=32/9px font becomes near zero at h=20/compact font.
@@ -523,6 +552,10 @@ def resolve_badge(
         glyph_y_offset = badge_cfg.glyph_y_offset_compact
     else:
         glyph_y_offset = badge_cfg.glyph_y_offset if badge_cfg else 0.0
+    center_glyph_on_text_ink = (
+        label_metrics is not None and badge_cfg is not None and badge_cfg.text_visual_center_offset_em != 0
+    )
+    text_ink_center_offset_y = label_metrics.ink_center_offset_y if label_metrics is not None else 0.0
     # Paradigm-aware min badge width. Zero defers to the layout engine's
     # default (60); chrome declares 40 for content-driven shrinkage.
     min_total_w = badge_cfg.min_total_width if badge_cfg and badge_cfg.min_total_width > 0 else 60
@@ -550,9 +583,87 @@ def resolve_badge(
         seam_specular_offset=seam_specular_offset,
         label_end_bearing=label_end_bearing,
         value_end_bearing=value_end_bearing,
+        measured_label_ink_w=label_ink_w,
+        measured_value_ink_w=value_ink_w,
+        label_start_bearing=label_start_bearing,
+        value_start_bearing=value_start_bearing,
         glyph_y_offset=glyph_y_offset,
         text_visual_center_offset_em=badge_cfg.text_visual_center_offset_em if badge_cfg else 0.3,
+        text_ink_center_offset_y=text_ink_center_offset_y,
+        center_glyph_on_text_ink=center_glyph_on_text_ink,
+        glyph_visual_w=glyph_visual_w,
+        left_adornment_width=left_adornment_width,
+        left_adornment_gap=left_adornment_gap,
+        glyph_label_gap=glyph_label_gap,
+        visual_gap=visual_gap,
     )
+
+    indicator_center_x = zones.indicator_x + zones.indicator_size / 2 if zones.show_indicator else 0.0
+    indicator_center_y = height / 2
+    diamond_outer_size = round(indicator_size + 0.4, 1)
+    diamond_outer_half = round(diamond_outer_size / 2, 1)
+    diamond_inner_size = round(max(1.0, indicator_size * 0.55), 1)
+    diamond_inner_half = round(diamond_inner_size / 2, 1)
+
+    cellular_pattern_cells: list[dict[str, object]] = []
+    cellular_color_grid = ((0, 2, 1, 0), (1, 0, 2, 1), (2, 1, 0, 2))
+    cellular_class_grid = (("cz1", "czd", "cz3", "czf"), ("cz2", "cz4", "czd", "cz1"), ("czd", "czf", "cz2", "czd"))
+    for col in range(cellular_pattern_cols):
+        color_column = cellular_color_grid[col % len(cellular_color_grid)]
+        class_column = cellular_class_grid[col % len(cellular_class_grid)]
+        for row in range(cellular_pattern_rows):
+            cellular_pattern_cells.append(
+                {
+                    "x": cellular_pattern_start_x + col * cellular_pattern_cell_w,
+                    "y": cellular_pattern_start_y + row * cellular_pattern_cell_h,
+                    "w": cellular_pattern_cell_w,
+                    "h": cellular_pattern_cell_h,
+                    "color_index": color_column[row % len(color_column)],
+                    "css_class": class_column[row % len(class_column)],
+                }
+            )
+    cellular_content_start_x = left_adornment_width + 6 if left_adornment_width > 0 else 0
+    cellular_label_slab_x = left_adornment_width if left_adornment_width > 0 else 0
+    cellular_value_slab_x = zones.left_panel_w + 1 + seam_w
+    cellular_value_slab_w = zones.width - cellular_value_slab_x - 2
+    right_panel_draw_x = zones.right_panel_x - 1
+    right_panel_draw_w = zones.right_panel_w + 1
+    light_perimeter_w = zones.width - 1
+    light_perimeter_h = height - 1
+    light_overlap_sep_x = zones.left_panel_w - 1
+    seam_gap_x = zones.left_panel_w + sep_w
+    chrome_well_w = zones.width - 4
+    chrome_well_h = height - 4
+    chrome_highlight_w = zones.width - 16
+    chrome_separator_y2 = height - 5
+    badge_origin_x = 0
+    badge_origin_y = 0
+    chrome_inner_inset = 1
+    chrome_well_inset = 2
+    chrome_inner_rx = 3
+    chrome_well_rx = 2
+    chrome_rail_w = 4
+    chrome_highlight_x = 8
+    chrome_highlight_y = 2
+    chrome_highlight_h = 0.5
+    chrome_highlight_rx = 0.25
+    chrome_separator_y1 = 5
+    chrome_seam_y1 = 4.5
+    chrome_seam_y2 = height - 4.5
+    chrome_diamond_outer_rx = 0.7
+    chrome_diamond_inner_rx = 0.3
+    chrome_diamond_stroke_width = 0.5
+    cellular_inner_inset = 1
+    cellular_canvas_inset = 2
+    cellular_top_highlight_h = 1
+    cellular_bottom_highlight_h = 0.5
+    cellular_seam_w = 1
+    light_perimeter_inset = 0.5
+    light_badge_ink_divider_w = 4
+    light_badge_seam_w = 2
+    light_indicator_outer_r = 3
+    light_indicator_inner_r = 1
+    light_indicator_stroke_width = 1.2
 
     # Variant resolution and profile visual context (envelope, well, specular,
     # chrome text gradients) are now applied universally by the dispatcher at
@@ -567,13 +678,52 @@ def resolve_badge(
             "label": label_raw,
             "label_display": label_display,
             "value": value_raw,
+            "label_font_family": f"'{_label_family}',sans-serif",
+            "value_font_family": f"'{_value_family}',sans-serif",
             "left_panel_width": zones.left_panel_w,
             "right_panel_x": zones.right_panel_x,
             "right_panel_w": zones.right_panel_w,
+            "right_panel_draw_x": right_panel_draw_x,
+            "right_panel_draw_w": right_panel_draw_w,
+            "badge_origin_x": badge_origin_x,
+            "badge_origin_y": badge_origin_y,
+            "light_perimeter_w": light_perimeter_w,
+            "light_perimeter_h": light_perimeter_h,
+            "light_perimeter_inset": light_perimeter_inset,
+            "light_overlap_sep_x": light_overlap_sep_x,
+            "light_badge_ink_divider_w": light_badge_ink_divider_w,
+            "light_badge_seam_w": light_badge_seam_w,
+            "light_indicator_outer_r": light_indicator_outer_r,
+            "light_indicator_inner_r": light_indicator_inner_r,
+            "light_indicator_stroke_width": light_indicator_stroke_width,
+            "seam_gap_x": seam_gap_x,
+            "chrome_inner_inset": chrome_inner_inset,
+            "chrome_well_inset": chrome_well_inset,
+            "chrome_inner_rx": chrome_inner_rx,
+            "chrome_well_rx": chrome_well_rx,
+            "chrome_rail_w": chrome_rail_w,
+            "chrome_well_w": chrome_well_w,
+            "chrome_well_h": chrome_well_h,
+            "chrome_highlight_x": chrome_highlight_x,
+            "chrome_highlight_y": chrome_highlight_y,
+            "chrome_highlight_w": chrome_highlight_w,
+            "chrome_highlight_h": chrome_highlight_h,
+            "chrome_highlight_rx": chrome_highlight_rx,
+            "chrome_separator_y1": chrome_separator_y1,
+            "chrome_separator_y2": chrome_separator_y2,
+            "chrome_seam_y1": chrome_seam_y1,
+            "chrome_seam_y2": chrome_seam_y2,
+            "chrome_diamond_outer_rx": chrome_diamond_outer_rx,
+            "chrome_diamond_inner_rx": chrome_diamond_inner_rx,
+            "chrome_diamond_stroke_width": chrome_diamond_stroke_width,
             "text_y": zones.text_y,
             "glyph_x": zones.glyph_x,
             "glyph_y": zones.glyph_y,
             "glyph_render_size": glyph_size,
+            "glyph_render_viewbox": glyph_render_viewbox,
+            "glyph_render_ink_w": glyph_render_ink_w,
+            "glyph_render_ink_h": glyph_render_ink_h,
+            "glyph_optical_scale": glyph_optical_scale,
             "label_x": zones.label_x,
             "value_x": zones.value_x,
             "label_text_length": zones.label_text_length,
@@ -581,23 +731,34 @@ def resolve_badge(
             # Chrome etched-seam coordinates.
             "seam_left_x": zones.seam_left_x,
             "seam_specular_x": zones.seam_specular_x,
+            "seam_right_x": zones.seam_right_x,
             "text_anchor": zones.text_anchor,
             "value_zone_left": zones.value_zone_left,
             "value_zone_right": zones.value_zone_right,
             "value_zone_width": zones.value_zone_width,
             "indicator_x": zones.indicator_x,
             "indicator_y": zones.indicator_y,
+            "indicator_center_x": indicator_center_x,
+            "indicator_center_y": indicator_center_y,
             "sep_width": sep_w,
             "seam_width": seam_w,
             "indicator_size": zones.indicator_size,
             "inner_bit_w": zones.inner_bit_w,
             "inner_bit_offset": zones.inner_bit_offset,
+            "diamond_outer_x": -diamond_outer_half,
+            "diamond_outer_y": -diamond_outer_half,
+            "diamond_outer_size": diamond_outer_size,
+            "diamond_inner_x": -diamond_inner_half,
+            "diamond_inner_y": -diamond_inner_half,
+            "diamond_inner_size": diamond_inner_size,
             "indicator_stroke_width": indicator_stroke_width,
             "accent_bar_width": accent_w,
             "has_glyph": has_glyph,
             "show_indicator": zones.show_indicator,
             "use_mono": use_mono,
             "label_uppercase": label_uppercase,
+            "badge_label_font_size": _label_size,
+            "badge_value_font_size": _value_size,
             "inset": inset,
             "badge_mode": badge_mode,
             "data_hw_statemode": data_hw_statemode_for(badge_mode),
@@ -606,6 +767,25 @@ def resolve_badge(
             # is updated to read badge_mode directly.
             "is_state_badge": badge_mode != "stateless",
             "compact": compact,
+            "cellular_pattern_cells": cellular_pattern_cells,
+            "cellular_inner_inset": cellular_inner_inset,
+            "cellular_canvas_inset": cellular_canvas_inset,
+            "cellular_top_highlight_h": cellular_top_highlight_h,
+            "cellular_bottom_highlight_h": cellular_bottom_highlight_h,
+            "cellular_seam_w": cellular_seam_w,
+            "cellular_content_start_x": cellular_content_start_x,
+            "cellular_label_slab_x": cellular_label_slab_x,
+            "cellular_label_slab_w": zones.left_panel_w - cellular_label_slab_x,
+            "cellular_seam_shadow_x": zones.left_panel_w + 1,
+            "cellular_value_slab_x": cellular_value_slab_x,
+            "cellular_value_slab_w": cellular_value_slab_w,
+            "cellular_inner_stroke_w": zones.width - 2,
+            "cellular_inner_stroke_h": height - 2,
+            "cellular_inner_stroke_width": 0.5 if compact else 0.7,
+            "cellular_canvas_w": zones.width - 4,
+            "cellular_canvas_h": height - 4,
+            "cellular_content_w": zones.width - cellular_content_start_x - 4,
+            "cellular_bottom_y": height - 2.5,
         },
     }
 
@@ -868,6 +1048,10 @@ def resolve_strip(
         triple_divider_bar_width=strip_cfg.triple_divider_bar_width if strip_cfg else 3,
         triple_divider_void_width=strip_cfg.triple_divider_void_width if strip_cfg else 2,
         bookend_x_fallback=strip_cfg.bookend_x if strip_cfg else 0,
+        ornament_x=strip_cfg.ornament_x if strip_cfg else 0,
+        ornament_y=strip_cfg.ornament_y if strip_cfg else 0,
+        ornament_size=strip_cfg.ornament_size if strip_cfg else 14,
+        ornament_inner_inset=strip_cfg.ornament_inner_inset if strip_cfg else 3,
         identity_w=id_text_w,
         subtitle_w=subtitle_w,
         subtitle_text=subtitle_raw,
@@ -877,6 +1061,7 @@ def resolve_strip(
         has_status_indicator=show_status_indicator,
         status_indicator_post_gap=_post_indicator_gap,
         flank_width=flank_width,
+        flank_cell_size=flank_cell_size,
         strip_min_width=strip_cfg.strip_min_width if strip_cfg else 0,
     )
     width = zones.width
@@ -890,6 +1075,7 @@ def resolve_strip(
     identity_clip_width = max(0.0, first_divider_x - identity_clip_x)
 
     ctx: dict[str, Any] = {
+        "strip_zones": zones,
         "identity": identity,
         "identity_font_family": _id_family,
         "identity_font_size": _id_size,
@@ -932,6 +1118,23 @@ def resolve_strip(
         "seam_positions": seams,
         "status_x": status_x,
         "status_cy": height / 2,
+        "indicator_size": 14,
+        "strip_origin_x": 0,
+        "strip_origin_y": 0,
+        "strip_perimeter_inset": 0.5,
+        "strip_metric_delta_y": 48,
+        "strip_metric_local_origin_x": 0,
+        "strip_metric_local_origin_y": 0,
+        "strip_identity_clip_y": 0,
+        "strip_chrome_inner_inset": 1,
+        "strip_chrome_well_inset": 2,
+        "strip_chrome_well_rx": 2,
+        "strip_chrome_highlight_x": 8,
+        "strip_chrome_highlight_y": 2,
+        "strip_chrome_highlight_h": 0.5,
+        "strip_chrome_highlight_rx": 0.25,
+        "strip_cellular_panel_y": 2,
+        "strip_status_origin_x": 0,
         "content_right": content_right,
         "glyph_zone_x_offset": glyph_zone_x_offset,
         "icon_box_x": zones.icon_box_x,
@@ -947,6 +1150,11 @@ def resolve_strip(
         "subtitle_y": height / 2 + 9,
         "strip_divider_y1": 8,
         "strip_divider_y2": height - 8,
+        "strip_perimeter_w": zones.perimeter_w,
+        "strip_perimeter_h": zones.perimeter_h,
+        "strip_half_h": zones.half_h,
+        "strip_glyph_svg_x": zones.glyph_svg_x,
+        "strip_glyph_svg_y": zones.glyph_svg_y,
         "show_status_indicator": show_status_indicator,
         "strip_mode": strip_mode,
         "data_hw_statemode": data_hw_statemode_for(strip_mode),
@@ -996,6 +1204,35 @@ def resolve_strip(
         "strip_metric_label_font": profile.get("strip_metric_label_font", "var(--dna-font-mono, 'SF Mono', monospace)"),
         "strip_divider_color": profile.get("strip_divider_color", "var(--dna-border)"),
         "strip_divider_opacity": profile.get("strip_divider_opacity", 1.0),
+        "strip_status_outer_x": zones.status_outer_x,
+        "strip_status_outer_y": zones.status_outer_y,
+        "strip_status_inner_x": zones.status_inner_x,
+        "strip_status_inner_y": zones.status_inner_y,
+        "strip_status_inner_w": zones.status_inner_w,
+        "strip_status_inner_h": zones.status_inner_h,
+        "cellular_status_inner_x": zones.status_cellular_inner_x,
+        "cellular_status_inner_y": zones.status_cellular_inner_y,
+        "cellular_status_inner_w": zones.status_cellular_inner_w,
+        "cellular_status_inner_h": zones.status_cellular_inner_h,
+        "strip_status_chrome_outer_x": zones.status_chrome_outer_x,
+        "strip_status_chrome_outer_y": zones.status_chrome_outer_y,
+        "strip_status_chrome_outer_size": zones.status_chrome_outer_size,
+        "strip_status_chrome_outer_rx": zones.status_chrome_outer_rx,
+        "strip_status_chrome_inner_x": zones.status_chrome_inner_x,
+        "strip_status_chrome_inner_y": zones.status_chrome_inner_y,
+        "strip_status_chrome_inner_size": zones.status_chrome_inner_size,
+        "strip_status_chrome_inner_rx": zones.status_chrome_inner_rx,
+        "strip_chrome_inner_w": zones.chrome_inner_w,
+        "strip_chrome_inner_h": zones.chrome_inner_h,
+        "strip_chrome_well_w": zones.chrome_well_w,
+        "strip_chrome_well_h": zones.chrome_well_h,
+        "strip_chrome_accent_h": zones.chrome_accent_h,
+        "strip_chrome_highlight_w": zones.chrome_highlight_w,
+        "cellular_left_flank_cells": zones.cellular_left_flank_cells or [],
+        "cellular_right_flank_cells": zones.cellular_right_flank_cells or [],
+        "cellular_panel_x": zones.cellular_panel_x,
+        "cellular_panel_w": zones.cellular_panel_w,
+        "cellular_panel_h": zones.cellular_panel_h,
     }
     # Phase 4A: surface paradigm-driven divider/status rendering context so
     # templates branch on resolved values (``divider_render_mode``,
@@ -1027,12 +1264,28 @@ def resolve_strip(
         ctx["brand_panel_x"] = zones.brand_panel_x
         ctx["brand_panel_w"] = zones.brand_panel_w
         ctx["triple_divider_x"] = zones.triple_divider_x
+        ctx["triple_divider_void_x"] = zones.triple_divider_void_x
+        ctx["triple_divider_right_x"] = zones.triple_divider_right_x
         ctx["triple_divider_bar_w"] = strip_cfg.triple_divider_bar_width
         ctx["triple_divider_void_w"] = strip_cfg.triple_divider_void_width
         ctx["ornament_x"] = strip_cfg.ornament_x
         ctx["ornament_y"] = strip_cfg.ornament_y
         ctx["ornament_size"] = strip_cfg.ornament_size
         ctx["ornament_inner_inset"] = strip_cfg.ornament_inner_inset
+        ctx["identity_glyph_x"] = zones.identity_glyph_x
+        ctx["identity_glyph_y"] = zones.identity_glyph_y
+        ctx["ornament_inner_x"] = zones.ornament_inner_x
+        ctx["ornament_inner_y"] = zones.ornament_inner_y
+        ctx["ornament_inner_w"] = zones.ornament_inner_w
+        ctx["ornament_inner_h"] = zones.ornament_inner_h
+        ctx["bookend_outer_x"] = zones.bookend_outer_x
+        ctx["bookend_outer_y"] = zones.bookend_outer_y
+        ctx["bookend_inner_x"] = zones.bookend_inner_x
+        ctx["bookend_inner_y"] = zones.bookend_inner_y
+        ctx["bookend_inner_w"] = zones.bookend_inner_w
+        ctx["bookend_inner_h"] = zones.bookend_inner_h
+        ctx["metric_rule_y1"] = zones.metric_rule_y1
+        ctx["metric_rule_y2"] = zones.metric_rule_y2
         # v0.3.9 algorithmic strip glyph: the LEFT identity glyph is sized
         # via ``strip_glyph_size`` (derived from strip_height * ratio),
         # distinct from the right-edge bookend square sized by ornament_size.
@@ -1141,12 +1394,116 @@ def resolve_icon(
     icon_info_accent = primary_tone.get("info_accent", "")
     icon_mid_accent = primary_tone.get("mid_accent", "")
     icon_header_band = primary_tone.get("header_band", "")
+    icon_cell_stride = icon_cell_size + icon_cell_gap
+    chart_levels = primary_tone.get("chart_levels") or []
+    icon_dark_active = chart_levels[1] if len(chart_levels) > 1 else icon_mid_accent
+    icon_slot_table = [
+        2,
+        4,
+        0,
+        3,
+        1,
+        0,
+        1,
+        4,
+        2,
+        3,
+        3,
+        2,
+        1,
+        4,
+        0,
+        4,
+        0,
+        3,
+        1,
+        2,
+        1,
+        3,
+        2,
+        0,
+        4,
+    ]
+    icon_cell_classes = ["cz1", "cz2", "cz3", "cz4", "czd"]
+    icon_cell_fills = [icon_dark_active, icon_mid_accent, icon_info_accent, icon_mid_accent, icon_header_band]
+    icon_cells: list[dict[str, Any]] = []
+    if icon_grid_cols > 0 and icon_grid_rows > 0 and icon_cell_size > 0:
+        for row in range(icon_grid_rows):
+            for col in range(icon_grid_cols):
+                slot = icon_slot_table[row * icon_grid_cols + col]
+                icon_cells.append(
+                    {
+                        "x": col * icon_cell_stride,
+                        "y": row * icon_cell_stride,
+                        "size": icon_cell_size,
+                        "rx": icon_cell_rx,
+                        "class_name": icon_cell_classes[slot],
+                        "fill": icon_cell_fills[slot],
+                    }
+                )
+
+    icon_geometry = {
+        "chrome_square_group_x": 12,
+        "chrome_square_group_y": 12,
+        "chrome_square_outer_w": 96,
+        "chrome_square_outer_h": 96,
+        "chrome_square_outer_rx": 6,
+        "chrome_square_inner_x": 1.5,
+        "chrome_square_inner_y": 1.5,
+        "chrome_square_inner_w": 93,
+        "chrome_square_inner_h": 93,
+        "chrome_square_inner_rx": 4.5,
+        "chrome_square_well_x": 3,
+        "chrome_square_well_y": 3,
+        "chrome_square_well_w": 90,
+        "chrome_square_well_h": 90,
+        "chrome_square_well_rx": 3.2,
+        "chrome_square_rail_x": 3,
+        "chrome_square_rail_y": 3,
+        "chrome_square_rail_w": 6,
+        "chrome_square_rail_h": 90,
+        "chrome_square_accent_x": 14,
+        "chrome_square_accent_y": 3,
+        "chrome_square_accent_w": 76,
+        "chrome_square_accent_h": 0.6,
+        "chrome_square_glyph_x": 30,
+        "chrome_square_glyph_y": 30,
+        "chrome_square_glyph_size": 36,
+        "chrome_circle_group_x": 60,
+        "chrome_circle_group_y": 60,
+        "chrome_circle_outer_r": 46,
+        "chrome_circle_well_r": 42,
+        "chrome_circle_glyph_x": -24,
+        "chrome_circle_glyph_y": -24,
+        "chrome_circle_glyph_size": 48,
+        "brutalist_circle_cx": 32,
+        "brutalist_circle_cy": 32,
+        "brutalist_circle_r": 28,
+        "brutalist_circle_glyph_x": 18,
+        "brutalist_circle_glyph_y": 18,
+        "brutalist_circle_glyph_size": 28,
+        "brutalist_square_x": 2,
+        "brutalist_square_y": 2,
+        "brutalist_square_w": 60,
+        "brutalist_square_h": 60,
+        "brutalist_square_border_x": 1.25,
+        "brutalist_square_border_y": 1.25,
+        "brutalist_square_border_w": 61.5,
+        "brutalist_square_border_h": 61.5,
+        "brutalist_square_accent_h": 3,
+        "brutalist_square_glyph_x": 18,
+        "brutalist_square_glyph_y": 20,
+        "brutalist_square_glyph_size": 28,
+        "cellular_border_x": 0.5,
+        "cellular_border_y": 0.5,
+    }
 
     ctx: dict[str, Any] = {
         "icon_shape": shape,
         "icon_rx": 0,
         "icon_label": icon_label,
         "icon_variant": icon_variant,
+        "icon_geometry": icon_geometry,
         # Raw genome hex colors for gradient stops (CSS var() doesn't work in SVG stops)
         "genome_signal": genome.get("accent", "#845ef7"),
         "genome_surface": genome.get("surface_0", "#000000"),
@@ -1168,6 +1525,10 @@ def resolve_icon(
         "icon_glyph_inset": icon_glyph_inset,
         "icon_glyph_size": icon_glyph_size,
         "icon_outer_rx": icon_outer_rx,
+        "icon_cells": icon_cells,
+        "icon_outer_w": card_w - 1,
+        "icon_outer_h": card_h - 1,
+        "icon_surface_fill": genome.get("surface_0", "var(--dna-surface)"),
         # Cellular accent stops.
         "icon_info_accent": icon_info_accent,
         "icon_mid_accent": icon_mid_accent,
@@ -1181,6 +1542,252 @@ def resolve_icon(
         "template": "frames/icon.svg.j2",
         "context": ctx,
     }
+
+
+def _divider_stop(offset: str, color: str, opacity: str | None = None) -> dict[str, str]:
+    """Return a divider gradient stop record for stencil templates."""
+    stop = {"offset": offset, "color": color}
+    if opacity is not None:
+        stop["opacity"] = opacity
+    return stop
+
+
+def _divider_geometry_context(
+    *,
+    variant: str,
+    width: int,
+    height: int,
+    cellular_palette: dict[str, Any],
+) -> dict[str, Any]:
+    """Compute legacy divider geometry and specimen palettes outside Jinja."""
+    cy = height // 2
+    cx = width // 2
+    block_size = 20
+    block_half = block_size // 2
+    block_spread = int(width * 0.257)
+    current_points = {
+        "p1": int(width * 0.125),
+        "p2": int(width * 0.25),
+        "p3": int(width * 0.375),
+        "p4": int(width * 0.5),
+        "p5": int(width * 0.625),
+        "p6": int(width * 0.75),
+        "p7": int(width * 0.875),
+    }
+    current_amp = int(height * 0.33)
+    takeoff_rx = cx
+    takeoff_dip = int(height * 0.3)
+    aura_rx = int(width * 0.45)
+    filament_x = int(width * 0.05)
+    bridge = cellular_palette.get("bridge") or {}
+    primary_main = str(bridge.get("primary_main") or "")
+    primary_deep = str(bridge.get("primary_alt") or "")
+    secondary_main = str(bridge.get("secondary_main") or "")
+    secondary_deep = str(bridge.get("secondary_alt") or "")
+    dissolve_left_cells: list[dict[str, object]] = []
+    dissolve_right_cells: list[dict[str, object]] = []
+    for col in range(4):
+        for row in range(2):
+            dissolve_left_cells.append(
+                {
+                    "x": col * 12,
+                    "y": 2 + row * 12,
+                    "w": 12,
+                    "h": 12,
+                    "fill": primary_main if (col + row) % 2 == 0 else primary_deep,
+                }
+            )
+            dissolve_right_cells.append(
+                {
+                    "x": width - 48 + col * 12,
+                    "y": 2 + row * 12,
+                    "w": 12,
+                    "h": 12,
+                    "fill": secondary_main if (col + row) % 2 == 0 else secondary_deep,
+                }
+            )
+    dissolve_left_scatter = [
+        {"x": x, "y": y, "size": size, "opacity": opacity}
+        for x, y, size, opacity in (
+            (56, 7, 8, 0.85),
+            (68, 10, 6, 0.7),
+            (80, 5, 7, 0.55),
+            (94, 11, 5, 0.45),
+            (108, 8, 5, 0.3),
+            (122, 12, 3, 0.2),
+            (58, 17, 6, 0.7),
+            (70, 18, 5, 0.55),
+            (84, 16, 7, 0.4),
+            (100, 15, 4, 0.25),
+        )
+    ]
+    dissolve_right_scatter = [
+        {"x": width - offset, "y": y, "size": size, "opacity": opacity}
+        for offset, y, size, opacity in (
+            (124, 12, 3, 0.2),
+            (110, 8, 5, 0.3),
+            (96, 11, 5, 0.45),
+            (84, 5, 7, 0.55),
+            (72, 10, 6, 0.7),
+            (62, 7, 8, 0.85),
+            (102, 15, 4, 0.25),
+            (88, 18, 5, 0.4),
+            (76, 16, 7, 0.55),
+            (64, 17, 6, 0.7),
+        )
+    ]
+    seam_y = height // 2
+    seam_gap = 16
+    seam_segment_edges = [0, 152, 168, 312, 328, 472, 488, 632, 648, width]
+    seam_segments = [
+        {"x1": seam_segment_edges[i], "x2": seam_segment_edges[i + 1], "y": seam_y}
+        for i in range(0, len(seam_segment_edges), 2)
+    ]
+    seam_joints = [{"x": x, "y1": seam_y - 4, "y2": seam_y + 4} for x in seam_segment_edges[1:-1]]
+    ctx: dict[str, Any] = {
+        "divider_variant": variant,
+        "divider_w": width,
+        "divider_h": height,
+        "divider_cx": cx,
+        "divider_cy": cy,
+        "divider_pattern_x": 0,
+        "divider_pattern_y": 0,
+        "divider_pattern_w": 20,
+        "divider_pattern_h": 20,
+        "divider_dot_cx": 10,
+        "divider_dot_cy": 10,
+        "divider_dot_r": 0.5,
+        "divider_rule_fade_stops": [
+            _divider_stop("0%", "#000000", "0"),
+            _divider_stop("20%", "#000000", "1"),
+            _divider_stop("50%", "#000000", "1"),
+            _divider_stop("80%", "#000000", "1"),
+            _divider_stop("100%", "#000000", "0"),
+        ],
+        "divider_dot_color": "#000000",
+        "divider_rainbow_stops": [
+            _divider_stop("0%", "#ff0000"),
+            _divider_stop("20%", "#0000ff"),
+            _divider_stop("40%", "#ff8c00"),
+            _divider_stop("60%", "#00fa9a"),
+            _divider_stop("80%", "#4b0082"),
+            _divider_stop("100%", "#ff0000"),
+        ],
+        "divider_escape_stops": [
+            {
+                "offset": "0%",
+                "color": "#FF6B6B",
+                "values": "#FF6B6B;#FF4444;#FF0000;#FF6B6B",
+            },
+            {
+                "offset": "50%",
+                "color": "#FFA500",
+                "values": "#FFA500;#FF8C00;#FFD700;#FFA500",
+            },
+            {
+                "offset": "100%",
+                "color": "#FFFF00",
+                "values": "#FFFF00;#FFD700;#FFFFFF;#FFFF00",
+            },
+        ],
+        "divider_flux_stops": [
+            _divider_stop("0%", "#3b82f6", "0"),
+            _divider_stop("20%", "#3b82f6", "0.8"),
+            _divider_stop("40%", "#8b5cf6", "1"),
+            _divider_stop("50%", "#ec4899", "1"),
+            _divider_stop("60%", "#f59e0b", "1"),
+            _divider_stop("80%", "#10b981", "0.8"),
+            _divider_stop("100%", "#10b981", "0"),
+        ],
+        "block_size": block_size,
+        "block_rect_x": 0,
+        "block_y": cy - block_half,
+        "block_rule_y": cy - 2,
+        "block_rule_x": 0,
+        "block_rule_h": 4,
+        "block_offset": int(width * 0.357),
+        "block_spread": block_spread,
+        "block_center_x": block_spread // 2,
+        "block_center_rect_x": -30,
+        "block_center_rect_y": -8,
+        "block_center_rect_w": 60,
+        "block_center_rect_h": 16,
+        "block_symbol_x": 0,
+        "block_symbol_y": 4,
+        "block_gold_y": cy - 4,
+        "block_gold_size": 8,
+        "block_gold_left_x": int(width * 0.214),
+        "block_gold_right_x": int(width * 0.774),
+        "block_label_x": cx,
+        "block_label_y": cy + 25,
+        "block_red": "#DC143C",
+        "block_blue": "#0047AB",
+        "block_gold": "#FFD700",
+        "block_white": "#FFFFFF",
+        "block_black": "#000000",
+        "block_label_color": "#999999",
+        "current_path": (
+            f"M0,{cy} C{current_points['p1']},{cy - current_amp} "
+            f"{current_points['p2']},{cy + current_amp} {current_points['p3']},{cy} "
+            f"C{current_points['p4']},{cy - current_amp} {current_points['p5']},{cy + current_amp} "
+            f"{current_points['p6']},{cy} C{current_points['p7']},{cy - current_amp} {width},{cy} {width},{cy}"
+        ),
+        "takeoff_trajectory_path": f"M0,{cy} Q{width // 4},{cy - takeoff_dip} {takeoff_rx},{cy} T{width},{cy}",
+        "takeoff_motion_path": f"M-{takeoff_rx},0 Q-{width // 4},-{takeoff_dip} 0,0 T{takeoff_rx},0",
+        "takeoff_warning_x": 0,
+        "takeoff_warning_y": cy - 5,
+        "takeoff_warning_h": 10,
+        "takeoff_rocket_x": takeoff_rx,
+        "takeoff_rocket_y": cy,
+        "takeoff_body_x": -10,
+        "takeoff_body_y": 0,
+        "takeoff_body_w": 20,
+        "takeoff_body_h": 15,
+        "takeoff_left_booster_cx": -15,
+        "takeoff_right_booster_cx": 15,
+        "takeoff_booster_cy": 10,
+        "takeoff_booster_r": 2,
+        "takeoff_warning_label_x": width - 50,
+        "takeoff_warning_label_y": int(height * 0.2),
+        "takeoff_trajectory_color": "#FF4444",
+        "takeoff_nose_color": "#FF3333",
+        "takeoff_body_color": "#CC0000",
+        "takeoff_booster_color": "#FF0000",
+        "aura_cx": cx,
+        "aura_cy": cy,
+        "aura_rx": aura_rx,
+        "aura_ry": 4,
+        "filament_x": filament_x,
+        "filament_y": cy - 1,
+        "filament_w": int(width * 0.9),
+        "filament_h": 1.5,
+        "filament_rx": 1,
+        "dissolve_line_x1": 48,
+        "dissolve_line_y": 14,
+        "dissolve_line_x2": width - 48,
+        "dissolve_left_cells": dissolve_left_cells,
+        "dissolve_right_cells": dissolve_right_cells,
+        "dissolve_left_scatter": dissolve_left_scatter,
+        "dissolve_right_scatter": dissolve_right_scatter,
+        "dissolve_primary_main": primary_main,
+        "dissolve_secondary_main": secondary_main,
+        "zeropoint_line_x": 0,
+        "zeropoint_line_h": 2,
+        "zeropoint_line_y": cy - 1,
+        "zeropoint_outer_r": 4,
+        "zeropoint_inner_r": 2,
+        "zeropoint_label_x": cx,
+        "zeropoint_label_y": cy + 14,
+        "zeropoint_label_color": "#666666",
+        "band_rect_x": 0,
+        "band_rect_y": 6,
+        "band_rect_h": 4,
+        "band_rect_rx": 0.8,
+        "seam_segments": seam_segments,
+        "seam_joints": seam_joints,
+        "seam_gap": seam_gap,
+    }
+    return ctx
 
 
 def resolve_divider(
@@ -1231,8 +1838,8 @@ def resolve_divider(
     genome_specific = f"frames/divider/{spec.genome_id}-{variant}.svg.j2"
     template = genome_specific if template_exists(genome_specific) else "frames/divider.svg.j2"
 
+    cellular_palette = _kw.get("cellular_palette") or {}
     ctx: dict[str, Any] = {
-        "divider_variant": variant,
         "divider_label": spec.value or "",
         "variant": spec.variant or "",
         # Pass through chrome chromosomes so chrome-band template's envelope_stops
@@ -1249,6 +1856,14 @@ def resolve_divider(
         "accent_signal": genome.get("accent_signal", ""),
         "surface_deep": genome.get("surface_2", ""),
     }
+    ctx.update(
+        _divider_geometry_context(
+            variant=variant,
+            width=w,
+            height=h,
+            cellular_palette=cellular_palette,
+        )
+    )
     # Profile visual context now injected centrally by the dispatcher.
 
     return {
@@ -1765,10 +2380,40 @@ def _resolve_horizontal(
     speed = spec.marquee_speeds[0] if spec.marquee_speeds else 1.0
     scroll_distance = content_end_x - start_x
     scroll_dur = round(scroll_distance / (base_speed * speed), 2)
+    separator_fill = f"var(--dna-signal, {separator_color})"
+    chrome_well_w = max(0, width - 8)
+    chrome_well_h = max(0, height - 8)
+    chrome_inner_w = max(0, width - 2)
+    chrome_inner_h = max(0, height - 2)
+    chrome_top_accent_w = max(0, width - 48)
+    marquee_geom = {
+        "chrome_outer_rx": 4,
+        "chrome_well_x": 4,
+        "chrome_well_y": 4,
+        "chrome_well_rx": 2.6,
+        "chrome_rail_x": 4,
+        "chrome_rail_y": 4,
+        "chrome_rail_w": 6,
+        "chrome_inner_x": 1,
+        "chrome_inner_y": 1,
+        "chrome_inner_rx": 3.2,
+        "chrome_top_accent_x": 24,
+        "chrome_top_accent_y": 4,
+        "chrome_top_accent_h": 0.6,
+        "brutalist_border_x": 0.5,
+        "brutalist_border_y": 0.5,
+        "brutalist_accent_x": 0,
+        "brutalist_accent_y": 0,
+        "brutalist_accent_w": 4,
+        "cellular_hairline_x": 0,
+        "cellular_top_hairline_y": 0,
+        "cellular_hairline_h": 0.5,
+    }
 
     ctx: dict[str, Any] = {
         "direction": spec.marquee_direction,
         "scroll_items": laid_out,
+        "marquee_geom": marquee_geom,
         "scroll_distance": scroll_distance,
         "scroll_dur": scroll_dur,
         "scroll_start_x": start_x,
@@ -1782,6 +2427,18 @@ def _resolve_horizontal(
         "separator_size": separator_size,
         "separator_glyph": separator_glyph,
         "separator_color": separator_color,
+        "separator_fill": separator_fill,
+        "marquee_baseline_y": height // 2,
+        "separator_rect_y": (height - separator_size) // 2,
+        "marquee_perimeter_w": width - 1,
+        "marquee_perimeter_h": height - 1,
+        "chrome_well_w": chrome_well_w,
+        "chrome_well_h": chrome_well_h,
+        "chrome_inner_w": chrome_inner_w,
+        "chrome_inner_h": chrome_inner_h,
+        "chrome_rail_h": chrome_well_h,
+        "chrome_top_accent_w": chrome_top_accent_w,
+        "cellular_bottom_hairline_y": height - 0.5,
         # Text-fill mode (template uses text_fill_gradient_id when item.value_color is "").
         "text_fill_mode": text_fill_mode,
         "text_fill_gradient_id": text_fill_gradient_id,
@@ -2382,11 +3039,11 @@ def resolve_receipt(
     # Rhythm-panel legend: 4 tool swatches + error-tick swatch + DOMINANT label.
     # Each entry has pre-computed x-offset for the template to consume directly.
     phase_legend: list[dict[str, Any]] = [
-        {"id": "coordinate", "label": "coordinate", "x": 0, "kind": "tool"},
-        {"id": "execute", "label": "execute", "x": 82, "kind": "tool"},
-        {"id": "explore", "label": "explore", "x": 152, "kind": "tool"},
-        {"id": "mutate", "label": "mutate", "x": 220, "kind": "tool"},
-        {"id": "error_tick", "label": "error tick", "x": 290, "kind": "error"},
+        {"id": "coordinate", "label": "coordinate", "x": 0, "text_x": 10, "kind": "tool"},
+        {"id": "execute", "label": "execute", "x": 82, "text_x": 92, "kind": "tool"},
+        {"id": "explore", "label": "explore", "x": 152, "text_x": 162, "kind": "tool"},
+        {"id": "mutate", "label": "mutate", "x": 220, "text_x": 230, "kind": "tool"},
+        {"id": "error_tick", "label": "error tick", "x": 290, "text_x": 296, "kind": "error"},
     ]
     # DOMINANT label right-aligned (template renders this separately due to anchor).
     rhythm_dominant_label = f"{dominant_label.upper()} · {dominant_pct}%" if dominant_label and dominant else "SESSION"
@@ -2479,13 +3136,70 @@ def resolve_receipt(
     # failing-core color signal carries more semantic weight than down here.
     footer_bl = "Cost is an estimate based on public per-token rates."
     footer_br = "hyperweave.app"
+    card_inset = int(genome.get("card_inset", 0))
+    receipt_w = 800
+    receipt_h = 500
+    card_inner_w = receipt_w - (2 * card_inset)
+    card_inner_h = receipt_h - (2 * card_inset)
+    receipt_geom = {
+        "card_rx": 5.5,
+        "card_inner_rx": 3,
+        "card_top_highlight_h": 32,
+        "glyph_y": 16,
+        "glyph_size": 18,
+        "provider_y": 31,
+        "model_y": 31,
+        "pill_group_y": 14,
+        "pill_h": 22,
+        "pill_inner_x": 2,
+        "pill_inner_y": 2,
+        "pill_inner_h": 18,
+        "pill_rule_top_y": 2,
+        "pill_rule_bottom_y": 19,
+        "pill_rule_h": 1,
+        "pill_text_y": 14,
+        "hero_headline_y": 66,
+        "decomp_y": 92,
+        "hero_rule_y": 104,
+        "treemap_group_y": _treemap_group_y,
+        "treemap_header_y": 12,
+        "treemap_cell_hero_text_x": 14,
+        "treemap_cell_text_x": 10,
+        "hero_error_rect_x": -24,
+        "hero_error_rect_y": -10,
+        "hero_error_rect_w": 22,
+        "hero_error_rect_h": 14,
+        "hero_error_text_x": -13,
+        "hero_error_text_y": 0,
+        "rhythm_header_right_y": 0,
+        "axis_tick_y": 20,
+        "grid_y1": 30,
+        "track_x1": 0,
+        "bar_rx": 0.3,
+        "legend_group_x": 0,
+        "legend_marker_y": 0,
+        "legend_error_w": 2,
+        "legend_marker_w": 6,
+        "legend_marker_h": 6,
+        "legend_text_y": 6,
+        "legend_dominant_y": 6,
+        "footer_rule_y": 452,
+        "footer_top_y": 470,
+        "footer_bottom_y": 487,
+        "card_top_strip_x": 0,
+        "card_top_strip_y": 0,
+        "card_top_strip_h": 2,
+        "card_border_x": 0.5,
+        "card_border_y": 0.5,
+    }
 
     return {
-        "width": 800,
-        "height": 500,
+        "width": receipt_w,
+        "height": receipt_h,
         "template": "frames/receipt.svg.j2",
         "context": {
             "telemetry": tel,
+            "receipt_geom": receipt_geom,
             # Hero zone (v0.2.21 risograph-canonical)
             "provider_label": provider_label,
             "provider_label_x": provider_label_x,
@@ -2499,7 +3213,9 @@ def resolve_receipt(
             "atmosphere_stops": genome.get("atmosphere_stops", []),
             "atmosphere_blooms": genome.get("atmosphere_blooms", []),
             "card_top_highlight": bool(genome.get("card_top_highlight", False)),
-            "card_inset": int(genome.get("card_inset", 0)),
+            "card_inset": card_inset,
+            "card_inner_w": card_inner_w,
+            "card_inner_h": card_inner_h,
             "hero_profile": hero_profile,
             "hero_tool_class": hero_tool_class,
             "hero_headline": hero_headline,
@@ -2510,6 +3226,8 @@ def resolve_receipt(
             "pill_label": pill_label,
             "pill_w": pill_w,
             "pill_x": pill_x,
+            "pill_inner_w": pill_w - 4,
+            "pill_center_x": pill_w // 2,
             # Pill corner radius — genome-token driven (0=square, 11=full pill).
             # SVG2 auto-clamps rx to min(rx, height/2): inner rect (h=18) caps
             # at 9, outer rect (h=22) caps at 11. Both fully rounded at half-h.
@@ -2535,6 +3253,7 @@ def resolve_receipt(
             "rhythm_header_right": rhythm_header_right,
             "rhythm_dominant_label": rhythm_dominant_label,
             "rhythm_baseline_y": bar_baseline_y,
+            "rhythm_legend_y": bar_baseline_y + 16,
             "bar_area_h": bar_area_h,
             "time_axis_ticks": time_axis_ticks,
             "duration_minutes": int(duration_m),
@@ -2546,12 +3265,12 @@ def resolve_receipt(
             # element positioning across the receipt template; see the geometry
             # constants block above for its definition.
             "left_margin": left_margin,
-            "content_right_x": 800 - left_margin,
+            "content_right_x": receipt_w - left_margin,
             # Adaptive zone boundaries — collapse when treemap has fewer tiers.
             "bottom_divider_y": bottom_divider_y,
             "rhythm_group_y": rhythm_group_y,
-            "inner_w": 800 - 1,
-            "inner_h": 500 - 1,
+            "inner_w": receipt_w - 1,
+            "inner_h": receipt_h - 1,
             "axis_tick_top_y": bar_area_h,
             "axis_tick_bottom_y": bar_area_h + 6,
             "axis_label_y": bar_area_h + 18,
@@ -2647,10 +3366,10 @@ def resolve_rhythm_strip(
     # Session info + 4 tool-legend chips. The chips render alphabetically with
     # 28px stride matching the specimen.
     identity_chips = [
-        {"tool_class": "explore", "label": "EXP", "x": 0},
-        {"tool_class": "execute", "label": "EXE", "x": 28},
-        {"tool_class": "mutate", "label": "MUT", "x": 56},
-        {"tool_class": "coordinate", "label": "CRD", "x": 84},
+        {"tool_class": "explore", "label": "EXP", "x": 0, "text_x": 8},
+        {"tool_class": "execute", "label": "EXE", "x": 28, "text_x": 36},
+        {"tool_class": "mutate", "label": "MUT", "x": 56, "text_x": 64},
+        {"tool_class": "coordinate", "label": "CRD", "x": 84, "text_x": 92},
     ]
 
     # ── Velocity zone (200-264px) ──
@@ -2683,6 +3402,63 @@ def resolve_rhythm_strip(
     # ── Status zone (522-600px) ──
     status_indicator = compute_status_dot(n_errors=n_errors, total_calls=calls)
     dominant_phase = compute_dominant_phase(stages, active_duration_m)
+    rhythm_strip_geom = {
+        "card_rx": 5,
+        "identity_x": 16,
+        "identity_y": 0,
+        "identity_title_y": 22,
+        "identity_info_y": 38,
+        "identity_token_y": 52,
+        "chip_y": 0,
+        "chip_w": 6,
+        "chip_h": 6,
+        "chip_rx": 1,
+        "chip_text_y": 5.5,
+        "divider_y1": 14,
+        "divider_y2": 78,
+        "identity_divider_x": 190,
+        "velocity_x": 200,
+        "velocity_y": 0,
+        "velocity_divider_x": 264,
+        "velocity_text_x": 10,
+        "velocity_label_y": 18,
+        "velocity_value_y": 38,
+        "velocity_unit_y": 49,
+        "sparkline_dot_r": 1.5,
+        "sparkline_label_left_x": 210,
+        "sparkline_label_right_x": 256,
+        "sparkline_label_y": 76,
+        "rhythm_x": 268,
+        "rhythm_y": 0,
+        "rhythm_title_x": 0,
+        "rhythm_title_y": 46,
+        "rhythm_baseline_x1": 0,
+        "rhythm_baseline_y": 78,
+        "bar_rx": 0.3,
+        "time_label_x": 0,
+        "time_label_y": 87,
+        "density_x": -2,
+        "density_y": 52,
+        "density_transform": "rotate(-90, -2, 52)",
+        "status_divider_x": 510,
+        "status_x": 522,
+        "status_y": 0,
+        "status_dot_cx": 6,
+        "status_dot_cy": 20,
+        "status_dot_r": 3.5,
+        "status_word_x": 14,
+        "status_word_y": 23,
+        "status_errors_y": 38,
+        "status_dominant_label_y": 54,
+        "status_dominant_y": 67,
+        "status_pct_y": 79,
+        "edge_x": 1,
+        "edge_top_y": 0,
+        "edge_h": 0.8,
+        "border_x": 0.5,
+        "border_y": 0.5,
+        "border_rx": 4.5,
+    }
 
     return {
         "width": 600,
@@ -2690,6 +3466,7 @@ def resolve_rhythm_strip(
         "template": "frames/rhythm-strip.svg.j2",
         "context": {
             "telemetry": tel,
+            "rhythm_strip_geom": rhythm_strip_geom,
             # IDENTITY zone
             "session_id_short": sid_short,
             "call_number": calls,
@@ -2701,6 +3478,8 @@ def resolve_rhythm_strip(
             # VELOCITY zone
             "velocity_label": velocity_label,
             "sparkline_points": sparkline.points,
+            "sparkline_start_point": sparkline.points[0] if sparkline.points else None,
+            "sparkline_end_point": sparkline.points[-1] if sparkline.points else None,
             "sparkline_fill_path": sparkline.fill_path,
             "sparkline_stroke_path": sparkline.stroke_path,
             "sparkline_label_left": sparkline.label_left,
@@ -2713,6 +3492,10 @@ def resolve_rhythm_strip(
             "rhythm_baseline_y": bar_layout.baseline_y,
             "rhythm_label_left": "0m",
             "rhythm_label_right": f"{int(active_duration_m)}m" if active_duration_m else "0m",
+            "rhythm_axis_w": bar_area_w,
+            "rhythm_strip_inner_w": 598,
+            "rhythm_strip_bottom_highlight_y": 91.2,
+            "rhythm_strip_inner_h": 91,
             # STATUS zone
             "status_word": status_indicator.word,
             "status_severity": status_indicator.severity,
@@ -2741,116 +3524,6 @@ def resolve_rhythm_strip(
     }
 
 
-def resolve_master_card(
-    spec: ComposeSpec,
-    genome: dict[str, Any],
-    profile: dict[str, Any],
-    **_kw: Any,
-) -> dict[str, Any]:
-    """Resolve telemetry master card — specimen-faithful layout.
-
-    Computes: hero summary, session history sparkline, burn curve,
-    codebase heatmap, skill tracker.
-    Specimen: specs/telemetry-artifacts/mastercard.svg (800x900)
-    """
-    tel: dict[str, Any] = dict(spec.telemetry_data or {})
-    session: dict[str, Any] = tel.get("session", {})
-    tokens_data: dict[str, Any] = tel.get("tokens", {})
-    cost_data: dict[str, Any] = tel.get("cost", {})
-    tools: list[dict[str, Any]] = tel.get("tools", [])
-    sessions: list[dict[str, Any]] = tel.get("sessions", [])
-    files: list[dict[str, Any]] = tel.get("files", [])
-    skills: list[dict[str, Any]] = tel.get("skills", [])
-
-    total_tok = tokens_data.get("input", 0) + tokens_data.get("output", 0)
-    total_cost = cost_data.get("total", 0)
-    calls = sum(t.get("count", 0) for t in tools) if tools else 0
-    n_sessions = len(sessions) if sessions else 1
-    model = session.get("model", "Claude Session")
-
-    # ── Session history sparkline bars (752px wide) ──
-    content_w = 752
-    history_bars: list[dict[str, Any]] = []
-    if sessions:
-        max_tok = max(s.get("tokens", 0) for s in sessions) or 1
-        bar_w = max(int(content_w / len(sessions)) - 3, 4)
-        for i, s in enumerate(sessions):
-            tok = s.get("tokens", 0)
-            h = max(int(144 * tok / max_tok), 2)
-            health = "signal" if s.get("corrections", 0) == 0 else "warning"
-            if tok > max_tok * 0.8:
-                health = "failing"
-            history_bars.append(
-                {
-                    "x": i * (bar_w + 3),
-                    "y": 144 - h,
-                    "w": bar_w,
-                    "h": h,
-                    "health": health,
-                    "label": s.get("label", ""),
-                }
-            )
-
-    # ── Heatmap rows ──
-    heatmap_rows: list[dict[str, Any]] = []
-    if files:
-        max_reads = max(f.get("reads", 0) for f in files) or 1
-        for f in files[:10]:
-            reads = f.get("reads", 0)
-            writes = f.get("writes", 0)
-            intensity = min(int(reads / max_reads * 4), 4)
-            heatmap_rows.append(
-                {
-                    "path": f.get("path", ""),
-                    "reads": reads,
-                    "writes": writes,
-                    "bar_w": int(200 * reads / max_reads),
-                    "intensity": intensity,
-                    "last": f.get("last", ""),
-                }
-            )
-
-    # ── Skill bars ──
-    skill_bars: list[dict[str, Any]] = []
-    for s in skills:
-        attempts = s.get("attempts", 0)
-        accepted = s.get("accepted", 0)
-        pct = round(accepted / attempts * 100, 1) if attempts > 0 else 0
-        skill_bars.append(
-            {
-                "name": s.get("name", ""),
-                "lang": s.get("lang", ""),
-                "attempts": attempts,
-                "accepted": accepted,
-                "pct": pct,
-                "state": s.get("state", "learning"),
-                "bar_w": int(336 * pct / 100),
-            }
-        )
-
-    return {
-        "width": 800,
-        "height": 900,
-        "template": "frames/master-card.svg.j2",
-        "context": {
-            "telemetry": tel,
-            "mc_title": f"{_fmt_tok(total_tok)} tokens · ${total_cost:.2f}",
-            "mc_subtitle": f"{model} · {n_sessions} sessions",
-            "mc_total_tokens": f"{calls} calls",
-            "mc_total_cost": f"${total_cost:.2f} total",
-            "mc_session_count": n_sessions,
-            "session_entries": sessions,
-            "history_bars": history_bars,
-            "burn_session_id": session.get("id", session.get("model", "latest")),
-            "heatmap_file_count": len(files),
-            "heatmap_rows": heatmap_rows,
-            "skills": skill_bars,
-            "footer_left": "hyperweave.app",
-            "footer_right": f"{model}",
-        },
-    }
-
-
 def resolve_catalog(
     spec: ComposeSpec,
     genome: dict[str, Any],
@@ -2858,11 +3531,70 @@ def resolve_catalog(
     **_kw: Any,
 ) -> dict[str, Any]:
     """Resolve editorial catalog."""
+    catalog_w = 800
+    catalog_h = 400
+    catalog_margin = 32
+    catalog_columns = 3
+    catalog_col_gap = 16
+    catalog_card_h = 140
+    catalog_card_gap = 16
+    catalog_content_w = catalog_w - (catalog_margin * 2)
+    catalog_col_w = int((catalog_content_w - (catalog_col_gap * (catalog_columns - 1))) / catalog_columns)
+    catalog_header_end_y = catalog_margin + 56
+    catalog_grid_start_y = catalog_header_end_y + 16
+    catalog_footer_y = catalog_h - 24
+    catalog_geom = {
+        "frame_rx": 6,
+        "border_x": 0.5,
+        "border_y": 0.5,
+        "title_y": 28,
+        "subtitle_y": 46,
+        "card_rx": 4,
+        "card_border_x": 0.5,
+        "card_border_y": 0.5,
+        "card_accent_h": 3,
+        "item_text_x": 12,
+        "item_label_y": 24,
+        "item_title_y": 42,
+        "item_description_y": 60,
+        "badge_y": 14,
+    }
+    source_items = list((spec.connector_data or {}).get("catalog_items", []))
+    catalog_items: list[dict[str, Any]] = []
+    for idx, raw_item in enumerate(source_items):
+        item = dict(raw_item)
+        row = idx // catalog_columns
+        col = idx % catalog_columns
+        item["card_x"] = catalog_margin + (col * (catalog_col_w + catalog_col_gap))
+        item["card_y"] = catalog_grid_start_y + (row * (catalog_card_h + catalog_card_gap))
+        item["card_inner_w"] = catalog_col_w - 1
+        item["card_inner_h"] = catalog_card_h - 1
+        item["meta_y"] = catalog_card_h - 12
+        item["badge_x"] = catalog_col_w - 12
+        catalog_items.append(item)
     return {
-        "width": 800,
-        "height": 400,
+        "width": catalog_w,
+        "height": catalog_h,
         "template": "frames/catalog.svg.j2",
-        "context": {},
+        "context": {
+            "catalog_geom": catalog_geom,
+            "catalog_w": catalog_w,
+            "catalog_h": catalog_h,
+            "catalog_margin": catalog_margin,
+            "catalog_content_w": catalog_content_w,
+            "catalog_columns": catalog_columns,
+            "catalog_col_gap": catalog_col_gap,
+            "catalog_col_w": catalog_col_w,
+            "catalog_card_h": catalog_card_h,
+            "catalog_card_gap": catalog_card_gap,
+            "catalog_inner_w": catalog_w - 1,
+            "catalog_inner_h": catalog_h - 1,
+            "catalog_right_x": catalog_w - catalog_margin,
+            "catalog_header_end_y": catalog_header_end_y,
+            "catalog_grid_start_y": catalog_grid_start_y,
+            "catalog_footer_y": catalog_footer_y,
+            "catalog_cards": catalog_items,
+        },
     }
 
 
@@ -3114,9 +3846,20 @@ def _genome_material_context(genome: dict[str, Any], profile: dict[str, Any]) ->
     Renamed from ``_profile_visual_context`` — the function has always
     read from ``genome``, not ``profile``. The old name was misleading.
     """
+
+    def _stop_color(stops: object, offset: str) -> str:
+        if not isinstance(stops, list):
+            return ""
+        for stop in stops:
+            if isinstance(stop, dict) and stop.get("offset") == offset:
+                return str(stop.get("color") or "")
+        return ""
+
     corner_raw = str(genome.get("corner", "4px")).replace("px", "")
+    envelope_stops = genome.get("envelope_stops", [])
+    chrome_text_gradient = genome.get("chrome_text_gradient", [])
     return {
-        "envelope_stops": genome.get("envelope_stops", []),
+        "envelope_stops": envelope_stops,
         "well_top": genome.get("well_top", ""),
         "well_bottom": genome.get("well_bottom", ""),
         # Icon-specific well colors (v0.2.16): chrome icons use a more saturated
@@ -3126,10 +3869,15 @@ def _genome_material_context(genome: dict[str, Any], profile: dict[str, Any]) ->
         "icon_well_top": genome.get("icon_well_top", "") or genome.get("well_top", ""),
         "icon_well_bottom": genome.get("icon_well_bottom", "") or genome.get("well_bottom", ""),
         "specular_light": genome.get("highlight_color", ""),
+        "chrome_rim_soft": genome.get("chrome_rim_soft", "") or _stop_color(envelope_stops, "50%"),
+        "chrome_rim_core": genome.get("chrome_rim_core", "") or _stop_color(chrome_text_gradient, "50%"),
+        "chrome_icon_inner_stroke": genome.get("chrome_icon_inner_stroke", ""),
+        "chrome_icon_top_accent": genome.get("chrome_icon_top_accent", "") or _stop_color(envelope_stops, "44%"),
         "highlight_opacity": genome.get("highlight_opacity", ""),
+        "bevel_shadow_color": genome.get("shadow_color", ""),
         "bevel_shadow_opacity": genome.get("shadow_opacity", ""),
         "chrome_corner": corner_raw,
-        "chrome_text_gradient": genome.get("chrome_text_gradient", []),
+        "chrome_text_gradient": chrome_text_gradient,
         "hero_text_gradient": genome.get("hero_text_gradient", []),
         "chrome_rhythm": genome.get("rhythm_base", ""),
         # v0.3.2 Phase 4: substrate-aware glyph fill. Light scholar prototypes

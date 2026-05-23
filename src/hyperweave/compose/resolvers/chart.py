@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from hyperweave.compose.chart_layout import compute_chart_layout, position_x_labels, position_y_labels
 from hyperweave.render.chart_engine import Viewport, build_chart_svg
 
 if TYPE_CHECKING:
@@ -47,20 +48,12 @@ def resolve_chart(
         line_animate = bool(cc.line_animate)
         cellular_cell_size = int(cc.cell_size) if cc.cell_size > 0 else 40
         chart_header_band_height = int(cc.header_band_height)
-        identity_font_family = cc.identity_font_family
-        identity_font_size = cc.identity_font_size
-        identity_font_weight = cc.identity_font_weight
-        identity_letter_spacing_em = cc.identity_letter_spacing_em
     else:
         width, height = 900, 500
         vp = Viewport(x=80, y=150, w=760, h=245)
         line_animate = False
         cellular_cell_size = 40
         chart_header_band_height = 0
-        identity_font_family = "JetBrains Mono"
-        identity_font_size = 12.0
-        identity_font_weight = 700
-        identity_letter_spacing_em = 0.06
 
     # Three-state machine. "fresh" preserved (not renamed to "live") for
     # backward compat with the existing data-hw-status contract; "empty" is
@@ -113,12 +106,17 @@ def resolve_chart(
         if isinstance(dormant, list) and len(dormant) == 2:
             cellular_dormant_range = dormant
 
-    # Cellular charts target a denser Y-tick set (6 labels: 3K/2K/1.5K/1K/0.5K/0)
-    # to match the cobalt-sapphire reference's axis prominence. Brutalist and
-    # chrome stay at 4 labels — their chart aesthetic doesn't need the extra
-    # granularity. Detected via cellular_palette presence (only cellular
-    # paradigm passes it).
-    y_tick_target = 6 if cellular_chart_levels else 4
+    repo = connector.get("repo") if connector else None
+    repo = repo or f"{spec.chart_owner}/{spec.chart_repo}".strip("/")
+    chart_header_label = _chart_header_label(repo=repo, connector=connector)
+    chart_layout = (
+        compute_chart_layout(chart=paradigm_spec.chart, repo=repo, header_label=chart_header_label)
+        if paradigm_spec is not None
+        else None
+    )
+    label_metrics = chart_layout.label_metrics if chart_layout is not None else None
+    y_tick_target = paradigm_spec.chart.y_tick_target if paradigm_spec is not None else 4
+    milestone_label_y_offset = paradigm_spec.chart.milestone_label_y_offset if paradigm_spec is not None else -24
 
     chart_fragments = build_chart_svg(
         raw_points,
@@ -130,10 +128,9 @@ def resolve_chart(
         cellular_dormant_range=cellular_dormant_range,
         cellular_cell_size=cellular_cell_size,
         y_tick_target=y_tick_target,
+        label_metrics=label_metrics,
+        milestone_label_y_offset=milestone_label_y_offset,
     )
-
-    repo = connector.get("repo") if connector else None
-    repo = repo or f"{spec.chart_owner}/{spec.chart_repo}".strip("/")
 
     # Hero identity strings shown at top + right of the standalone chart.
     title_upper = (repo or "star history").upper()
@@ -153,6 +150,21 @@ def resolve_chart(
     chart_info_accent = primary_tone.get("info_accent", "") if primary_tone else ""
     chart_mid_accent = primary_tone.get("mid_accent", "") if primary_tone else ""
     chart_header_band = primary_tone.get("header_band", "") if primary_tone else ""
+    chart_y_labels = (
+        position_y_labels(chart_fragments["y_labels"], chart_layout)
+        if chart_layout is not None
+        else chart_fragments["y_labels"]
+    )
+    chart_x_labels = (
+        position_x_labels(chart_fragments["x_labels"], chart_layout.x_axis_y)
+        if chart_layout is not None
+        else chart_fragments["x_labels"]
+    )
+    identity_font_family = paradigm_spec.chart.identity_font_family if paradigm_spec is not None else "JetBrains Mono"
+    identity_font_size = paradigm_spec.chart.identity_font_size if paradigm_spec is not None else 12.0
+    identity_font_weight = paradigm_spec.chart.identity_font_weight if paradigm_spec is not None else 700
+    identity_letter_spacing_em = paradigm_spec.chart.identity_letter_spacing_em if paradigm_spec is not None else 0.06
+    header_identity_text_length = chart_layout.header_identity_text_length if chart_layout is not None else 0.0
 
     # Profile visual context (envelope/well/specular/chrome text gradients)
     # is injected universally by the dispatcher at resolver.resolve(), so
@@ -160,6 +172,7 @@ def resolve_chart(
     ctx: dict[str, Any] = {
         "chart_repo": repo,
         "chart_title": title_upper,
+        "chart_header_label": chart_header_label,
         "chart_current_stars": current_display,
         "chart_viewport_x": vp.x,
         "chart_viewport_y": vp.y,
@@ -172,8 +185,8 @@ def resolve_chart(
         "chart_polyline": chart_fragments["polyline"],
         "chart_markers": chart_fragments["markers"],
         "chart_milestones": chart_fragments["milestones"],
-        "chart_y_labels": chart_fragments["y_labels"],
-        "chart_x_labels": chart_fragments["x_labels"],
+        "chart_y_labels": chart_y_labels,
+        "chart_x_labels": chart_x_labels,
         "chart_empty_state": chart_fragments["empty_state"],
         "chart_date_range": date_range,
         "data_hw_status": status,
@@ -196,6 +209,8 @@ def resolve_chart(
         "identity_font_size": identity_font_size,
         "identity_font_weight": identity_font_weight,
         "identity_letter_spacing_em": identity_letter_spacing_em,
+        "chart_layout": chart_layout,
+        "chart_header_identity_text_length": header_identity_text_length,
     }
     # Surface non-fresh states via the document-level data-hw-status attribute.
     # "fresh" stays implicit (live data is the default, no status marker needed).
@@ -215,6 +230,39 @@ def _format_compact(n: int) -> str:
     if n >= 10000:
         return f"{n / 1000:.1f}K".rstrip("0").rstrip(".")
     return f"{n:,}"
+
+
+def _chart_header_label(*, repo: str, connector: dict[str, Any] | None) -> str:
+    """Compose the chart header identity from project slug and data provider."""
+    project = (repo.rsplit("/", 1)[-1] if repo else "project").strip() or "project"
+    provider = _chart_provider(connector)
+    return f"{project.upper()} · {provider.upper()}"
+
+
+def _chart_provider(connector: dict[str, Any] | None) -> str:
+    if connector:
+        for key in ("provider", "source", "provider_source", "platform"):
+            value = connector.get(key)
+            if isinstance(value, str) and value.strip():
+                return _normalize_provider(value)
+        for key in ("url", "html_url", "repo_url", "source_url"):
+            value = connector.get(key)
+            if isinstance(value, str) and value.strip():
+                lowered = value.lower()
+                if "huggingface.co" in lowered:
+                    return "huggingface"
+                if "github.com" in lowered:
+                    return "github"
+    return "github"
+
+
+def _normalize_provider(value: str) -> str:
+    lowered = value.strip().lower()
+    if lowered in {"gh", "github", "github-core", "github-graphql"}:
+        return "github"
+    if lowered in {"hf", "huggingface", "hugging-face"}:
+        return "huggingface"
+    return lowered
 
 
 def _format_date_range(points: list[Any]) -> str:

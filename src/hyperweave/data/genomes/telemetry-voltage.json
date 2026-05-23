@@ -68,8 +68,7 @@
   "state_offline_bright": "#B0B4BC",
   "paradigms": {
     "receipt": "default",
-    "rhythm-strip": "default",
-    "master-card": "default"
+    "rhythm-strip": "default"
   },
   "structural": {},
   "typography": {},

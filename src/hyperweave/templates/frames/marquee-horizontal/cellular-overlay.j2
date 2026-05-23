@@ -16,7 +16,7 @@
 {% set hairline = primary_mid_accent | default(cellular_palette.primary.mid_accent) %}
 
 {# Top hairline #}
-<rect x="0" y="0" width="{{ mw }}" height="0.5" fill="{{ hairline }}" opacity="0.2"/>
+<rect x="{{ marquee_geom.cellular_hairline_x }}" y="{{ marquee_geom.cellular_top_hairline_y }}" width="{{ mw }}" height="{{ marquee_geom.cellular_hairline_h }}" fill="{{ hairline }}" opacity="0.2"/>
 
 {# Bottom hairline #}
-<rect x="0" y="{{ mh - 0.5 }}" width="{{ mw }}" height="0.5" fill="{{ hairline }}" opacity="0.2"/>
+<rect x="{{ marquee_geom.cellular_hairline_x }}" y="{{ cellular_bottom_hairline_y }}" width="{{ mw }}" height="{{ marquee_geom.cellular_hairline_h }}" fill="{{ hairline }}" opacity="0.2"/>

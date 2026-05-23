@@ -7,7 +7,7 @@
    replaced by bevel). Guard on data presence (envelope_stops). #}
 
 {# 11-stop chrome envelope · 6.854s (φ⁴) drift on the body fill #}
-<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="-0.05" y2="0.95">
+<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="{{ gradient_y_neg_005 }}" y2="{{ gradient_y_095 }}">
 {% for stop in envelope_stops %}
   <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}"/>
 {% endfor %}
@@ -19,12 +19,12 @@
 
 {# Radial icon well · deep navy interior. cx=0.5 cy=0.4 r=0.6 puts the well's
    bright center slightly above geometric center, matching the v2 specimen.
-   Uses icon_well_top/icon_well_bottom (v2 spec: #0C1E2E -> #06101A) which
+   Uses icon_well_top/icon_well_bottom, which
    the dispatcher fills from genome.icon_well_* with fallback to genome.well_*
    for genomes that don't differentiate. The icon's small radial well needs
    more saturated navy than the wider marquee/strip well to feel like deep
    chrome rather than near-black slate. #}
-<radialGradient id="{{ uid }}-well" cx="0.5" cy="0.4" r="0.6">
+<radialGradient id="{{ uid }}-well" cx="{{ gradient_c_mid }}" cy="{{ gradient_cy_upper }}" r="{{ gradient_r_medium }}">
   <stop offset="0%"   stop-color="{{ icon_well_top }}"/>
   <stop offset="100%" stop-color="{{ icon_well_bottom }}"/>
 </radialGradient>
@@ -34,9 +34,9 @@
 <linearGradient id="{{ uid }}-rim" x1="0" y1="0" x2="1" y2="0">
   <stop offset="0%"   stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="38%"  stop-color="{{ specular_light }}" stop-opacity="0"/>
-  <stop offset="46%"  stop-color="#C8DAE6" stop-opacity="0.28"/>
-  <stop offset="50%"  stop-color="#FFFFFF" stop-opacity="0.55"/>
-  <stop offset="54%"  stop-color="#C8DAE6" stop-opacity="0.28"/>
+  <stop offset="46%"  stop-color="{{ chrome_rim_soft }}" stop-opacity="0.28"/>
+  <stop offset="50%"  stop-color="{{ chrome_rim_core }}" stop-opacity="0.55"/>
+  <stop offset="54%"  stop-color="{{ chrome_rim_soft }}" stop-opacity="0.28"/>
   <stop offset="62%"  stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="100%" stop-color="{{ specular_light }}" stop-opacity="0"/>
   <animate attributeName="x1" values="-0.5;1.1;-0.5" dur="17.944s" repeatCount="indefinite"
@@ -53,7 +53,7 @@
    frequency specular topography. specularExponent reduced from 22 to 16 to
    soften micro-aliasing without changing perceptual material at viewing scale. #}
 <filter id="{{ uid }}-bevel" x="-8%" y="-8%" width="116%" height="116%" filterRes="256">
-  <feDropShadow dx="0" dy="2.5" stdDeviation="4" flood-color="#000000" flood-opacity="0.5"/>
+  <feDropShadow dx="0" dy="2.5" stdDeviation="4" flood-color="{{ bevel_shadow_color }}" flood-opacity="0.5"/>
   <feSpecularLighting in="SourceAlpha" surfaceScale="1.6" specularConstant="0.55" specularExponent="16" lighting-color="{{ specular_light }}" result="spec">
     <feDistantLight azimuth="225" elevation="45"/>
   </feSpecularLighting>

@@ -35,5 +35,5 @@
 
 {% block content %}
 {# Thick envelope band — single rect filling the genome envelope #}
-<rect x="0" y="6" width="{{ width }}" height="4" rx="0.8" fill="url(#{{ uid }}-env)" opacity="0.75"/>
+<rect x="{{ band_rect_x }}" y="{{ band_rect_y }}" width="{{ width }}" height="{{ band_rect_h }}" rx="{{ band_rect_rx }}" fill="url(#{{ uid }}-env)" opacity="0.75"/>
 {% endblock %}

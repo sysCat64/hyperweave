@@ -13,20 +13,12 @@
   <rect width="{{ width }}" height="{{ strip_h }}" fill="{{ surface_0 | default('var(--dna-surface)') }}"/>
 
   {% if has_flanks %}
-  {% set fcs = flank_cell_size | default(12) %}
-  {% set n_rows = strip_h // fcs %}
-  {% set n_cols = (flank_width | default(36)) // fcs %}
   {# 2. Left flank — primary tone cells (always rendered when has_flanks).
      Asymmetric phi offsets via cz1/cz2/cz3/cz4/czf/czd classes. #}
   {% set primary_trio = cellular_palette.primary.cellular_cells %}
-  <g opacity="{{ cellular_pattern_opacity | default('0.7') }}">
-  {% for col in range(n_cols) %}
-    {% for row in range(n_rows) %}
-    {% set color_idx = (col + row * 2) % 3 %}
-    {% set class_idx = (col * 3 + row) % 5 %}
-    {% set classes = ["cz1", "cz2", "cz3", "cz4", "czf"] %}
-    <rect x="{{ col * fcs }}" y="{{ row * fcs }}" width="{{ fcs }}" height="{{ fcs }}" fill="{{ primary_trio[color_idx] }}" class="{{ classes[class_idx] }}"/>
-    {% endfor %}
+  <g opacity="{{ strip_zones.cellular.pattern_opacity }}">
+  {% for cell in strip_zones.cellular.left_flank_cells %}
+    <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.size }}" height="{{ cell.size }}" fill="{{ primary_trio[cell.color_idx] }}" class="{{ cell.class_name }}"/>
   {% endfor %}
   </g>
 
@@ -34,22 +26,14 @@
      palette here; solo variants get primary mirrored via resolve_cellular_palette).
      Different cz-class rotation than the left so the pulse pattern doesn't echo. #}
   {% set secondary_trio = cellular_palette.secondary.cellular_cells %}
-  {% set right_flank_x = width - (flank_width | default(36)) %}
-  <g opacity="{{ cellular_pattern_opacity | default('0.7') }}">
-  {% for col in range(n_cols) %}
-    {% for row in range(n_rows) %}
-    {% set color_idx = (col + row * 2) % 3 %}
-    {% set class_idx = (col * 3 + row) % 5 %}
-    {% set classes = ["cz2", "cz3", "cz4", "cz1", "czf"] %}
-    <rect x="{{ right_flank_x + col * fcs }}" y="{{ row * fcs }}" width="{{ fcs }}" height="{{ fcs }}" fill="{{ secondary_trio[color_idx] }}" class="{{ classes[class_idx] }}"/>
-    {% endfor %}
+  <g opacity="{{ strip_zones.cellular.pattern_opacity }}">
+  {% for cell in strip_zones.cellular.right_flank_cells %}
+    <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.size }}" height="{{ cell.size }}" fill="{{ secondary_trio[cell.color_idx] }}" class="{{ cell.class_name }}"/>
   {% endfor %}
   </g>
   {% endif %}
 
   {# 4. Content panel — interior between flanks #}
-  {% set panel_x = flank_width | default(0) if has_flanks else 0 %}
-  {% set panel_w = width - (2 * (flank_width | default(0))) if has_flanks else width %}
-  <rect x="{{ panel_x }}" y="2" width="{{ panel_w }}" height="{{ strip_h - 4 }}" fill="{{ surface_0 | default('var(--dna-surface)') }}" opacity="0.95"/>
-  <rect x="{{ panel_x }}" y="2" width="{{ panel_w }}" height="{{ strip_h - 4 }}" fill="none" stroke="{{ border_tint | default('var(--dna-border-tint)') }}" stroke-width="0.5" opacity="0.28"/>
+  <rect x="{{ strip_zones.cellular.panel_x }}" y="{{ strip_cellular_panel_y }}" width="{{ strip_zones.cellular.panel_w }}" height="{{ strip_zones.cellular.panel_h }}" fill="{{ surface_0 | default('var(--dna-surface)') }}" opacity="0.95"/>
+  <rect x="{{ strip_zones.cellular.panel_x }}" y="{{ strip_cellular_panel_y }}" width="{{ strip_zones.cellular.panel_w }}" height="{{ strip_zones.cellular.panel_h }}" fill="none" stroke="{{ border_tint | default('var(--dna-border-tint)') }}" stroke-width="0.5" opacity="0.28"/>
 </g>

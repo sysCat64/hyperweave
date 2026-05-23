@@ -8,7 +8,7 @@
 {# Envelope — genome-declared. Required field for chrome paradigm;
    enforced at load time by validate_genome_against_paradigms so this
    template never needs a specimen-color fallback. #}
-<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="-0.1" y2="0.9">
+<linearGradient id="{{ uid }}-env" x1="0" x2="0" y1="{{ gradient_y_neg_010 }}" y2="{{ gradient_y_090 }}">
 {% for stop in envelope_stops %}
   <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}"/>
 {% endfor %}
@@ -49,7 +49,7 @@
   <stop offset="0%"   stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="35%"  stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="46%"  stop-color="{{ specular_light }}" stop-opacity="0.3"/>
-  <stop offset="50%"  stop-color="#FFFFFF" stop-opacity="0.6"/>
+  <stop offset="50%"  stop-color="var(--dna-specular-core, var(--dna-ink-primary))" stop-opacity="0.6"/>
   <stop offset="54%"  stop-color="{{ specular_light }}" stop-opacity="0.3"/>
   <stop offset="65%"  stop-color="{{ specular_light }}" stop-opacity="0"/>
   <stop offset="100%" stop-color="{{ specular_light }}" stop-opacity="0"/>
@@ -58,7 +58,7 @@
 </linearGradient>
 
 <filter id="{{ uid }}-bevel" x="-3%" y="-4%" width="106%" height="112%">
-  <feDropShadow dx="0" dy="2.5" stdDeviation="4" flood-color="#000000" flood-opacity="{{ bevel_shadow_opacity | default('0.5') }}"/>
+  <feDropShadow dx="0" dy="2.5" stdDeviation="4" flood-color="var(--dna-shadow-color, black)" flood-opacity="{{ bevel_shadow_opacity | default('0.5') }}"/>
 </filter>
 
 <filter id="{{ uid }}-horizon-glow" x="-5%" y="-400%" width="110%" height="900%">
@@ -69,7 +69,10 @@
   </feMerge>
 </filter>
 
-<clipPath id="{{ uid }}-clip"><rect width="{{ width }}" height="{{ height }}" rx="6"/></clipPath>
+<clipPath id="{{ uid }}-clip">
+  <rect width="{{ stats_layout.rects.chrome_clip.w }}" height="{{ stats_layout.rects.chrome_clip.h }}"
+        rx="{{ stats_layout.rects.chrome_clip.rx }}"/>
+</clipPath>
 
 <style>
   {{ font_faces | safe }}
@@ -83,8 +86,8 @@
   .{{ uid }}-foot       { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 7px; font-weight: 600; letter-spacing: 0.14em; fill: var(--dna-ink-muted); opacity: 0.8; }
   .{{ uid }}-brand      { font-family: var(--dna-font-mono, 'JetBrains Mono', monospace); font-size: 7px; font-weight: 700; letter-spacing: 0.28em; fill: var(--dna-ink-muted); opacity: 0.65; }
   [data-hw-status="active"], [data-hw-status="passing"] { --hw-core: var(--dna-signal); }
-  [data-hw-status="warning"] { --hw-core: var(--dna-status-warning-core, #F59E0B); }
-  [data-hw-status="critical"], [data-hw-status="failing"] { --hw-core: var(--dna-status-failing-core, #EF4444); }
+  [data-hw-status="warning"] { --hw-core: var(--dna-status-warning-core, var(--dna-signal)); }
+  [data-hw-status="critical"], [data-hw-status="failing"] { --hw-core: var(--dna-status-failing-core, var(--dna-signal)); }
   @keyframes {{ uid }}-breathe       { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
   @keyframes {{ uid }}-horizon-pulse { 0%,100% { opacity: 0.75; } 50% { opacity: 1; } }
   .{{ uid }}-dia, .{{ uid }}-present { animation: {{ uid }}-breathe 2.618s ease-in-out infinite; will-change: opacity; }

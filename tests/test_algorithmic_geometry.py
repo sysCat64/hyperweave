@@ -118,7 +118,7 @@ def test_cellular_vllm_project_renders_without_username_squish() -> None:
     Pre-fix the cellular bio_x ceiling at 110 forced VLLM-PROJECT (~130px
     natural at Orbitron 13/700/0.16em) into a 88px textLength clamp,
     visually squishing the characters. Post-Bug-#1 the ceiling widened to
-    410 — VLLM-PROJECT renders at natural width with bio at x=171.
+    410 — VLLM-PROJECT renders at natural width with bio breathing room.
     """
     import re
 
@@ -146,7 +146,10 @@ def test_cellular_vllm_project_renders_without_username_squish() -> None:
     assert "textLength" not in username_match.group(0), (
         f"VLLM-PROJECT should render at natural width, not textLength-clamped. Match: {username_match.group(0)}"
     )
-    bio_match = re.search(r'<text x="([\d.]+)" y="24" class="[^"]+-bio">Python / 39 repos</text>', result.svg)
+    bio_match = re.search(
+        r'<text x="([\d.]+)" y="24(?:\.0)?" class="[^"]+-bio">Python / 39 repos</text>',
+        result.svg,
+    )
     assert bio_match, "cellular bio text not found"
     bio_x = float(bio_match.group(1))
     expected_bio_x = round(
@@ -158,7 +161,7 @@ def test_cellular_vllm_project_renders_without_username_squish() -> None:
             font_weight=700,
             letter_spacing_em=0.16,
         )
-        + 4
+        + 8
     )
     assert bio_x == expected_bio_x
 
@@ -216,9 +219,9 @@ def test_brutalist_adaptive_bio_x_short_username() -> None:
     assert result.svg
     import re
 
-    match = re.search(r'class="[^"]+-m"\s+x="(\d+)"', result.svg)
+    match = re.search(r'class="[^"]+-m"\s+x="([\d.]+)"', result.svg)
     assert match, "repo_label x not found in brutalist SVG"
-    bio_x = int(match.group(1))
+    bio_x = float(match.group(1))
     # ELI64S is ~52px ink; adaptive should land bio between 100-115 (well
     # below the v0.3.9-pre static 134).
     assert 95 <= bio_x <= 115, (
@@ -249,9 +252,9 @@ def test_brutalist_adaptive_bio_x_long_username_matches_clamped_v038() -> None:
     assert result.svg
     import re
 
-    match = re.search(r'class="[^"]+-m"\s+x="(\d+)"', result.svg)
+    match = re.search(r'class="[^"]+-m"\s+x="([\d.]+)"', result.svg)
     assert match, "repo_label x not found in brutalist SVG"
-    bio_x = int(match.group(1))
+    bio_x = float(match.group(1))
     # 44 + 70 + 8 = 122 (v0.3.8 value)
     assert bio_x == 122, f"Brutalist long-username bio_x should derive to 122 (v0.3.8 value) — got {bio_x}"
 

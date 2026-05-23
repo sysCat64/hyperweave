@@ -24,14 +24,14 @@
    routes its fill through --dna-chart-milestone-text (=ink-primary on both
    substrates) so the label reads as the strongest ink tone available, never
    bleeding into the cream/paper canvas. #}
-<rect x="{{ ms.x - 7 }}" y="{{ ms.y - 4 }}" width="14" height="14"
+<rect x="{{ ms.outer_x }}" y="{{ ms.outer_y }}" width="{{ ms.outer_size }}" height="{{ ms.outer_size }}"
       fill="var(--dna-chart-milestone-outer, var(--dna-signal))"
       shape-rendering="crispEdges"/>
-<rect x="{{ ms.x - 4 }}" y="{{ ms.y - 1 }}" width="8" height="8"
+<rect x="{{ ms.mid_x }}" y="{{ ms.mid_y }}" width="{{ ms.mid_size }}" height="{{ ms.mid_size }}"
       fill="var(--dna-chart-milestone-mid, var(--dna-surface))"
       shape-rendering="crispEdges"/>
-<rect x="{{ ms.x - 2 }}" y="{{ ms.y + 1 }}" width="4" height="4"
+<rect x="{{ ms.inner_x }}" y="{{ ms.inner_y }}" width="{{ ms.inner_size }}" height="{{ ms.inner_size }}"
       fill="var(--dna-chart-milestone-inner, var(--dna-ink-primary))"
       shape-rendering="crispEdges"/>
-<text x="{{ ms.x }}" y="{{ ms.y - 10 }}" text-anchor="middle"
+<text x="{{ ms.x }}" y="{{ ms.label_y }}" text-anchor="middle"
       class="hw-chart-milestone-label">{{ ms.label }}</text>

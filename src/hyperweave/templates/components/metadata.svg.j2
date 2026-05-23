@@ -59,7 +59,7 @@
     <hw:approach>{{ reasoning_approach | default('') }}</hw:approach>
     <hw:tradeoffs>{{ reasoning_tradeoffs | default('') }}</hw:tradeoffs>
     <hw:constraints-applied>self-contained, cim-compliant, wcag-aa</hw:constraints-applied>
-    <hw:spatial-notes>{{ width }}x{{ height }} ({{ '%.2f' | format(width / height) }}), left-to-right</hw:spatial-notes>
+    <hw:spatial-notes>{{ width }}x{{ height }} ({{ spatial_aspect_ratio }}), left-to-right</hw:spatial-notes>
   </hw:reasoning>
 {% endif %}
 </metadata>

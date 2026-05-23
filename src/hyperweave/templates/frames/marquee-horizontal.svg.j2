@@ -52,12 +52,12 @@
    accent flows naturally into the bullet. The paradigm YAML's value becomes
    the var() fallback — preserves byte-equality on URLs that don't override
    --dna-signal (bare flagship resolves to its own accent via --dna-signal). #}
-{% set sc = 'var(--dna-signal, ' ~ (separator_color | default('var(--dna-border)')) ~ ')' %}
+{% set sc = separator_fill | default('var(--dna-signal, var(--dna-border))') %}
 {% set tfid = text_fill_gradient_id | default('') %}
 {# Vertical centering: dominant-baseline=central + y=mh/2 puts text mid-height
    regardless of font size. Separator rects are centered via (mh - ssz) / 2. #}
-{% set baseline_y = mh // 2 %}
-{% set sep_rect_y = ((mh - ssz) // 2) %}
+{% set baseline_y = marquee_baseline_y %}
+{% set sep_rect_y = separator_rect_y %}
 
 {# Frame chrome BACKGROUND — paradigm-dispatched. Renders the layers that
    sit BELOW the scroll-track text (envelope-fill+well for chrome, flat slab

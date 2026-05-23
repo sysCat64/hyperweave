@@ -271,11 +271,21 @@ def build_border_overlay(
         "w": w,
         "h": h,
         "rx": rx,
+        "border_rect_x": 0.5,
+        "border_rect_y": 0.5,
+        "border_rect_w": w - 1,
+        "border_rect_h": h - 1,
         "perim": perim,
         "lp_w": lp_w or (w // 2),
         "right_x": right_x or (w // 2 + 5),
         "seam_positions": seam_positions or [],
     }
+    context["rimrun_left_path"] = _rimrun_left_path(rx=rx, h=h, lp_w=int(context["lp_w"]))
+    context["rimrun_right_path"] = _rimrun_right_path(rx=rx, w=w, h=h, right_x=int(context["right_x"]))
+    if seam_positions and len(seam_positions) > 1:
+        context["rimrun_zigzag_path"] = _rimrun_zigzag_path(seam_positions, h)
+    else:
+        context["rimrun_zigzag_path"] = ""
 
     # Motion-specific computed values
     if motion_id == "corner-trace":
@@ -284,7 +294,8 @@ def build_border_overlay(
 
     elif motion_id == "dual-orbit":
         vis = int(perim * 0.15)
-        context.update(vis=vis, gap=perim - vis, half=perim // 2)
+        half = perim // 2
+        context.update(vis=vis, gap=perim - vis, half=half, half_minus_perim=half - perim)
 
     elif motion_id == "entanglement":
         seg = max(int(perim * 0.125), 4)
@@ -294,6 +305,9 @@ def build_border_overlay(
             dash=f"{seg} {seg} {seg} {seg}",
             half=half,
             quarter=quarter,
+            neg_quarter=f"-{quarter}",
+            neg_half=f"-{half}",
+            neg_quarter_plus_half=f"-{quarter + half}",
         )
 
     # The template uses {% set defs %} and {% set overlay %} blocks.
@@ -301,6 +315,29 @@ def build_border_overlay(
     # in render output, we use a marker-based extraction instead.
     # Re-render with explicit output of defs and overlay.
     return _extract_border_parts(motion_id, context)
+
+
+def _rimrun_zigzag_path(seam_positions: list[int], h: int) -> str:
+    d = f"M{seam_positions[0]} 0"
+    for index, sx in enumerate(seam_positions):
+        if index % 2 == 0:
+            d += f" L{sx} 0 L{sx} {h}"
+        else:
+            d += f" L{sx} {h} L{sx} 0"
+        if index < len(seam_positions) - 1:
+            next_sx = seam_positions[index + 1]
+            d += f" L{next_sx} {h if index % 2 == 0 else 0}"
+    return d
+
+
+def _rimrun_left_path(*, rx: float, h: int, lp_w: int) -> str:
+    return f"M{rx} 0 H{lp_w} V{h} H{rx} Q0 {h} 0 {h - rx} V{rx} Q0 0 {rx} 0 Z"
+
+
+def _rimrun_right_path(*, rx: float, w: int, h: int, right_x: int) -> str:
+    right_edge = w - rx
+    bottom_curve_y = h - rx
+    return f"M{right_x} 0 H{right_edge} Q{w} 0 {w} {rx} V{bottom_curve_y} Q{w} {h} {right_edge} {h} H{right_x} Z"
 
 
 def _extract_border_parts(

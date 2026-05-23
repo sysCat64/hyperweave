@@ -267,6 +267,8 @@
   "well_bottom": "#0B1121",
   "icon_well_top": "#0C1E2E",
   "icon_well_bottom": "#06101A",
+  "chrome_icon_inner_stroke": "#000510",
+  "chrome_icon_top_accent": "#6AACC8",
   "highlight_color": "#A8D4F0",
   "highlight_opacity": "0.08",
   "chrome_text_gradient": [

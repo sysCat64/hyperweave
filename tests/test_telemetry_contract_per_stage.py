@@ -121,7 +121,7 @@ def test_per_stage_errors_reconcile_to_tool_summary(contract: dict[str, Any]) ->
 
 def test_existing_stage_fields_still_present(contract: dict[str, Any]) -> None:
     """Phase C patches are additive: existing fields must remain intact
-    so resolve_rhythm_strip and the master-card resolver keep working."""
+    so resolve_rhythm_strip keeps working."""
     for s in contract["stages"]:
         for key in ("label", "dominant_class", "start", "end", "tools", "boundary_score"):
             assert key in s, f"missing pre-existing stage key: {key}"

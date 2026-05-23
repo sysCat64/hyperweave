@@ -1,7 +1,5 @@
 {# HyperWeave Divider Frame — specimen-faithful variants only.
-   Each variant reproduces its specimen SVG with hardcoded specimen colors.
-   Dividers are shared components — they have their own visual identity,
-   NOT genome-colored. Colors come from the specimen, not --dna-* vars.
+   Geometry and palettes are resolved in Python; this template is a stencil.
    Extends document.svg.j2.  Context: ComposeSpec dict.
 
    Specimens (source of truth):
@@ -17,32 +15,24 @@
    DEFS BLOCK — gradients, filters, patterns per variant
    ═══════════════════════════════════════════════ #}
 {% block defs %}
-{% set dw = width | default(700) %}
-{% set dh = height | default(60) %}
-{% set cy = dh // 2 %}
 
 {% if divider_variant == 'block' %}
-  {# ── De Stijl: specimen uses black rule, white bg, primary colors ── #}
+  {# ── De Stijl #}
   <linearGradient id="{{ uid }}-rule-fade" x1="0%" y1="0%" x2="100%" y2="0%">
-    <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
-    <stop offset="20%" stop-color="#000000" stop-opacity="1"/>
-    <stop offset="50%" stop-color="#000000" stop-opacity="1"/>
-    <stop offset="80%" stop-color="#000000" stop-opacity="1"/>
-    <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+{% for stop in divider_rule_fade_stops %}
+    <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}" stop-opacity="{{ stop.opacity }}"/>
+{% endfor %}
   </linearGradient>
-  <pattern id="{{ uid }}-dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-    <circle cx="10" cy="10" r="0.5" fill="#000000" opacity="0.2"/>
+  <pattern id="{{ uid }}-dots" x="{{ divider_pattern_x }}" y="{{ divider_pattern_y }}" width="{{ divider_pattern_w }}" height="{{ divider_pattern_h }}" patternUnits="userSpaceOnUse">
+    <circle cx="{{ divider_dot_cx }}" cy="{{ divider_dot_cy }}" r="{{ divider_dot_r }}" fill="{{ divider_dot_color }}" opacity="0.2"/>
   </pattern>
 
 {% elif divider_variant == 'current' %}
-  {# ── Five Currents: specimen rainbow — red/blue/orange/green/indigo ── #}
+  {# ── Five Currents #}
   <linearGradient id="{{ uid }}-rainbow" x1="0%" y1="0%" x2="100%" y2="0%">
-    <stop offset="0%" stop-color="#ff0000"/>
-    <stop offset="20%" stop-color="#0000ff"/>
-    <stop offset="40%" stop-color="#ff8c00"/>
-    <stop offset="60%" stop-color="#00fa9a"/>
-    <stop offset="80%" stop-color="#4b0082"/>
-    <stop offset="100%" stop-color="#ff0000"/>
+{% for stop in divider_rainbow_stops %}
+    <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}"/>
+{% endfor %}
     <animate attributeName="x1" values="0%;100%;0%" dur="10s" repeatCount="indefinite"/>
   </linearGradient>
   <filter id="{{ uid }}-flow-shadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -58,23 +48,15 @@
   </filter>
 
 {% elif divider_variant == 'takeoff' %}
-  {# ── Rocket: specimen flame gradient — reds/oranges/yellows/white ── #}
+  {# ── Rocket #}
   <linearGradient id="{{ uid }}-escape" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%" stop-color="#FF6B6B">
+{% for stop in divider_escape_stops %}
+    <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}">
       <animate attributeName="stop-color"
-        values="#FF6B6B;#FF4444;#FF0000;#FF6B6B"
+        values="{{ stop.values }}"
         dur="1s" repeatCount="indefinite"/>
     </stop>
-    <stop offset="50%" stop-color="#FFA500">
-      <animate attributeName="stop-color"
-        values="#FFA500;#FF8C00;#FFD700;#FFA500"
-        dur="1s" repeatCount="indefinite"/>
-    </stop>
-    <stop offset="100%" stop-color="#FFFF00">
-      <animate attributeName="stop-color"
-        values="#FFFF00;#FFD700;#FFFFFF;#FFFF00"
-        dur="1s" repeatCount="indefinite"/>
-    </stop>
+{% endfor %}
   </linearGradient>
   <filter id="{{ uid }}-thruster-glow" x="-50%" y="-50%" width="200%" height="200%">
     <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -85,15 +67,11 @@
   </filter>
 
 {% elif divider_variant == 'void' %}
-  {# ── Spectral Terminus: specimen spectral gradient — blue/purple/pink/amber/green ── #}
+  {# ── Spectral Terminus #}
   <linearGradient id="{{ uid }}-flux" x1="0%" y1="0%" x2="100%" y2="0%">
-    <stop offset="0%" stop-color="#3b82f6" stop-opacity="0"/>
-    <stop offset="20%" stop-color="#3b82f6" stop-opacity="0.8"/>
-    <stop offset="40%" stop-color="#8b5cf6" stop-opacity="1"/>
-    <stop offset="50%" stop-color="#ec4899" stop-opacity="1"/>
-    <stop offset="60%" stop-color="#f59e0b" stop-opacity="1"/>
-    <stop offset="80%" stop-color="#10b981" stop-opacity="0.8"/>
-    <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+{% for stop in divider_flux_stops %}
+    <stop offset="{{ stop.offset }}" stop-color="{{ stop.color }}" stop-opacity="{{ stop.opacity }}"/>
+{% endfor %}
   </linearGradient>
   <filter id="{{ uid }}-bloom" x="-50%" y="-200%" width="200%" height="500%">
     <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="glow"/>
@@ -129,77 +107,60 @@
    CONTENT BLOCK — specimen-faithful rendering per variant
    ═══════════════════════════════════════════════ #}
 {% block content %}
-{% set dw = width | default(700) %}
-{% set dh = height | default(60) %}
-{% set cy = dh // 2 %}
 
 {# ═══════════════════════════════════════════════════════════
    VARIANT: block — De Stijl Geometric Composition
    Source: block_divider.svg (700x80)
-   Palette: black rule, #DC143C red block, #0047AB blue block,
-            #FFD700 gold accents, #FAFAFA background, #999 label
    ═══════════════════════════════════════════════════════════ #}
 {% if divider_variant == 'block' %}
-{% set block_size = 20 %}
-{% set block_offset = (dw * 0.357) | int %}
-{% set block_spread = (dw * 0.257) | int %}
 
 {# No background — transparent (matches updated specimen destijl_divider.svg) #}
 
 {# Central thick rule with edge fade #}
-<rect x="0" y="{{ cy - 2 }}" width="{{ dw }}" height="4"
+<rect x="{{ block_rule_x }}" y="{{ block_rule_y }}" width="{{ divider_w }}" height="{{ block_rule_h }}"
       fill="url(#{{ uid }}-rule-fade)"/>
 
 {# De Stijl composition centered #}
 <g transform="translate({{ block_offset }}, 0)">
   {# Left colored block — Mondrian red #}
-  <rect x="0" y="{{ cy - block_size // 2 }}" width="{{ block_size }}" height="{{ block_size }}"
-        fill="#DC143C" opacity="0.9"/>
-  <rect x="0" y="{{ cy - block_size // 2 }}" width="{{ block_size }}" height="{{ block_size }}"
-        fill="none" stroke="#000000" stroke-width="2"/>
+  <rect x="{{ block_rect_x }}" y="{{ block_y }}" width="{{ block_size }}" height="{{ block_size }}"
+        fill="{{ block_red }}" opacity="0.9"/>
+  <rect x="{{ block_rect_x }}" y="{{ block_y }}" width="{{ block_size }}" height="{{ block_size }}"
+        fill="none" stroke="{{ block_black }}" stroke-width="2"/>
 
   {# Right colored block — Mondrian blue #}
-  <rect x="{{ block_spread }}" y="{{ cy - block_size // 2 }}" width="{{ block_size }}" height="{{ block_size }}"
-        fill="#0047AB" opacity="0.9"/>
-  <rect x="{{ block_spread }}" y="{{ cy - block_size // 2 }}" width="{{ block_size }}" height="{{ block_size }}"
-        fill="none" stroke="#000000" stroke-width="2"/>
+  <rect x="{{ block_spread }}" y="{{ block_y }}" width="{{ block_size }}" height="{{ block_size }}"
+        fill="{{ block_blue }}" opacity="0.9"/>
+  <rect x="{{ block_spread }}" y="{{ block_y }}" width="{{ block_size }}" height="{{ block_size }}"
+        fill="none" stroke="{{ block_black }}" stroke-width="2"/>
 
   {# Center § nexus — white box with black border #}
-  <g transform="translate({{ block_spread // 2 }}, {{ cy }})">
-    <rect x="-30" y="-8" width="60" height="16"
-          fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
-    <text x="0" y="4" font-family="'Georgia', serif" font-size="12" font-weight="400"
-          text-anchor="middle" fill="#000000">&#xa7;</text>
+  <g transform="translate({{ block_center_x }}, {{ divider_cy }})">
+    <rect x="{{ block_center_rect_x }}" y="{{ block_center_rect_y }}" width="{{ block_center_rect_w }}" height="{{ block_center_rect_h }}"
+          fill="{{ block_white }}" stroke="{{ block_black }}" stroke-width="2"/>
+    <text x="{{ block_symbol_x }}" y="{{ block_symbol_y }}" font-family="'Georgia', serif" font-size="12" font-weight="400"
+          text-anchor="middle" fill="{{ block_black }}">&#xa7;</text>
   </g>
 </g>
 
 {# Gold accent squares #}
-<rect x="{{ (dw * 0.214) | int }}" y="{{ cy - 4 }}" width="8" height="8"
-      fill="#FFD700"/>
-<rect x="{{ (dw * 0.774) | int }}" y="{{ cy - 4 }}" width="8" height="8"
-      fill="#FFD700"/>
+<rect x="{{ block_gold_left_x }}" y="{{ block_gold_y }}" width="{{ block_gold_size }}" height="{{ block_gold_size }}"
+      fill="{{ block_gold }}"/>
+<rect x="{{ block_gold_right_x }}" y="{{ block_gold_y }}" width="{{ block_gold_size }}" height="{{ block_gold_size }}"
+      fill="{{ block_gold }}"/>
 
 {# Section break label #}
-<text x="{{ dw // 2 }}" y="{{ cy + 25 }}" font-family="'SF Mono', monospace"
-      font-size="9" text-anchor="middle" fill="#999999" opacity="0.7">
+<text x="{{ block_label_x }}" y="{{ block_label_y }}" font-family="'SF Mono', monospace"
+      font-size="9" text-anchor="middle" fill="{{ block_label_color }}" opacity="0.7">
   {{ divider_label | default('SECTION BREAK') | upper }}
 </text>
 
 {# ═══════════════════════════════════════════════════════════
    VARIANT: current — Animated Rainbow Bezier
    Source: current_divider.svg (800x30)
-   Palette: 6-color rainbow gradient (hardcoded), drop shadow
    ═══════════════════════════════════════════════════════════ #}
 {% elif divider_variant == 'current' %}
-{% set p1 = (dw * 0.125) | int %}
-{% set p2 = (dw * 0.25) | int %}
-{% set p3 = (dw * 0.375) | int %}
-{% set p4 = (dw * 0.5) | int %}
-{% set p5 = (dw * 0.625) | int %}
-{% set p6 = (dw * 0.75) | int %}
-{% set p7 = (dw * 0.875) | int %}
-{% set amp = (dh * 0.33) | int %}
-<path d="M0,{{ cy }} C{{ p1 }},{{ cy - amp }} {{ p2 }},{{ cy + amp }} {{ p3 }},{{ cy }} C{{ p4 }},{{ cy - amp }} {{ p5 }},{{ cy + amp }} {{ p6 }},{{ cy }} C{{ p7 }},{{ cy - amp }} {{ dw }},{{ cy }} {{ dw }},{{ cy }}"
+<path d="{{ current_path }}"
       stroke="url(#{{ uid }}-rainbow)" stroke-width="4" stroke-linecap="round"
       fill="none" filter="url(#{{ uid }}-flow-shadow)" stroke-dasharray="20 5">
   <animate attributeName="stroke-dashoffset" from="0" to="25" dur="3s" repeatCount="indefinite"/>
@@ -208,28 +169,24 @@
 {# ═══════════════════════════════════════════════════════════
    VARIANT: takeoff — Rocket Trajectory
    Source: takeoff_divider.svg (800x100)
-   Palette: #FF3333/#CC0000 rocket, #FF4444 trajectory,
-            flame gradient reds/oranges/yellows, #FF0000 boosters
    ═══════════════════════════════════════════════════════════ #}
 {% elif divider_variant == 'takeoff' %}
-{% set rx = dw // 2 %}
-{% set traj_dip = (dh * 0.3) | int %}
 
 {# Trajectory arc — dashed bezier #}
-<path d="M0,{{ cy }} Q{{ dw // 4 }},{{ cy - traj_dip }} {{ rx }},{{ cy }} T{{ dw }},{{ cy }}"
-      fill="none" stroke="#FF4444" stroke-width="1"
+<path d="{{ takeoff_trajectory_path }}"
+      fill="none" stroke="{{ takeoff_trajectory_color }}" stroke-width="1"
       stroke-dasharray="5,5" opacity="0.5"/>
 
 {# Warning zone — full-width glow strip at low opacity #}
-<rect x="0" y="{{ cy - 5 }}" width="{{ dw }}" height="10"
+<rect x="{{ takeoff_warning_x }}" y="{{ takeoff_warning_y }}" width="{{ divider_w }}" height="{{ takeoff_warning_h }}"
       fill="url(#{{ uid }}-escape)" opacity="0.1"/>
 
 {# Rocket group — travels along trajectory #}
-<g transform="translate({{ rx }}, {{ cy }})">
+<g transform="translate({{ takeoff_rocket_x }}, {{ takeoff_rocket_y }})">
   {# Nose cone #}
-  <path d="M-10,0 L0,-15 L10,0 Z" fill="#FF3333"/>
+  <path d="M-10,0 L0,-15 L10,0 Z" fill="{{ takeoff_nose_color }}"/>
   {# Body #}
-  <rect x="-10" y="0" width="20" height="15" fill="#CC0000"/>
+  <rect x="{{ takeoff_body_x }}" y="{{ takeoff_body_y }}" width="{{ takeoff_body_w }}" height="{{ takeoff_body_h }}" fill="{{ takeoff_body_color }}"/>
 
   {# Thruster flames — 3 paths with animated geometry + glow #}
   <g filter="url(#{{ uid }}-thruster-glow)">
@@ -254,22 +211,22 @@
   </g>
 
   {# Emergency boosters — alternating blink #}
-  <circle cx="-15" cy="10" r="2" fill="#FF0000" opacity="0">
+  <circle cx="{{ takeoff_left_booster_cx }}" cy="{{ takeoff_booster_cy }}" r="{{ takeoff_booster_r }}" fill="{{ takeoff_booster_color }}" opacity="0">
     <animate attributeName="opacity" values="0;1;0" dur="0.5s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="15" cy="10" r="2" fill="#FF0000" opacity="0">
+  <circle cx="{{ takeoff_right_booster_cx }}" cy="{{ takeoff_booster_cy }}" r="{{ takeoff_booster_r }}" fill="{{ takeoff_booster_color }}" opacity="0">
     <animate attributeName="opacity" values="0;1;0" dur="0.5s" begin="0.25s" repeatCount="indefinite"/>
   </circle>
 
   {# Rocket travels along trajectory #}
-  <animateMotion path="M-{{ rx }},0 Q-{{ dw // 4 }},-{{ traj_dip }} 0,0 T{{ rx }},0"
+  <animateMotion path="{{ takeoff_motion_path }}"
                  dur="5s" repeatCount="indefinite"/>
 </g>
 
 {# CRITICAL warning label #}
-<text x="{{ dw - 50 }}" y="{{ (dh * 0.2) | int }}"
+<text x="{{ takeoff_warning_label_x }}" y="{{ takeoff_warning_label_y }}"
       font-family="'Courier New', monospace" font-size="10"
-      fill="#FF0000" font-weight="bold">
+      fill="{{ takeoff_booster_color }}" font-weight="bold">
   &#x26a0; {{ divider_label | default('CRITICAL') | upper }}
   <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite"/>
 </text>
@@ -277,12 +234,8 @@
 {# ═══════════════════════════════════════════════════════════
    VARIANT: void — Spectral Terminus
    Source: void_divider.svg (1000x40)
-   Palette: blue/purple/pink/amber/green spectral gradient
    ═══════════════════════════════════════════════════════════ #}
 {% elif divider_variant == 'void' %}
-{% set aura_rx = (dw * 0.45) | int %}
-{% set filament_x = (dw * 0.05) | int %}
-{% set filament_w = (dw * 0.9) | int %}
 
 {# Inline style for void hover interaction #}
 <style>
@@ -323,13 +276,13 @@
 <g class="{{ uid }}-void-root">
   {# Layer 1: Volumetric Glow — the aura #}
   <ellipse class="{{ uid }}-aura"
-           cx="{{ dw // 2 }}" cy="{{ cy }}"
-           rx="{{ aura_rx }}" ry="4"/>
+           cx="{{ aura_cx }}" cy="{{ aura_cy }}"
+           rx="{{ aura_rx }}" ry="{{ aura_ry }}"/>
 
   {# Layer 2: Core Photon Stream — the visible terminus #}
   <rect class="{{ uid }}-filament"
-        x="{{ filament_x }}" y="{{ cy - 1 }}"
-        width="{{ filament_w }}" height="1.5" rx="1"/>
+        x="{{ filament_x }}" y="{{ filament_y }}"
+        width="{{ filament_w }}" height="{{ filament_h }}" rx="{{ filament_rx }}"/>
 </g>
 
 {# ═══════════════════════════════════════════════════════════
@@ -351,35 +304,23 @@
    (primary_main / primary_deep / secondary_main / secondary_deep) so the
    template reads cleanly regardless of which two solo tones the pairing
    grammar composed at request time. #}
-{% set primary_main = cellular_palette.bridge.primary_main %}
-{% set primary_deep = cellular_palette.bridge.primary_alt %}
-{% set secondary_main = cellular_palette.bridge.secondary_main %}
-{% set secondary_deep = cellular_palette.bridge.secondary_alt %}
 {# Center line spans between terminals #}
-<line x1="48" y1="14" x2="{{ dw - 48 }}" y2="14" stroke="{{ primary_main }}" stroke-width="0.6" opacity="0.45"/>
+<line x1="{{ dissolve_line_x1 }}" y1="{{ dissolve_line_y }}" x2="{{ dissolve_line_x2 }}" y2="{{ dissolve_line_y }}" stroke="{{ dissolve_primary_main }}" stroke-width="0.6" opacity="0.45"/>
 {# Left terminal — 4 x 2 primary-tone block grid at full opacity #}
-{% for col in range(4) %}
-  {% for row in range(2) %}
-  {% set tc = primary_main if (col + row) % 2 == 0 else primary_deep %}
-  <rect x="{{ col * 12 }}" y="{{ 2 + row * 12 }}" width="12" height="12" fill="{{ tc }}"/>
-  {% endfor %}
+{% for cell in dissolve_left_cells %}
+  <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.w }}" height="{{ cell.h }}" fill="{{ cell.fill }}"/>
 {% endfor %}
 {# Left scatter — primary tone with per-rect opacity dissolve (inward fade) #}
-{% set left_scatter = [(56, 7, 8, 0.85), (68, 10, 6, 0.7), (80, 5, 7, 0.55), (94, 11, 5, 0.45), (108, 8, 5, 0.3), (122, 12, 3, 0.2), (58, 17, 6, 0.7), (70, 18, 5, 0.55), (84, 16, 7, 0.4), (100, 15, 4, 0.25)] %}
-{% for pos in left_scatter %}
-<rect x="{{ pos[0] }}" y="{{ pos[1] }}" width="{{ pos[2] }}" height="{{ pos[2] }}" fill="{{ primary_main }}" opacity="{{ pos[3] }}"/>
+{% for pos in dissolve_left_scatter %}
+<rect x="{{ pos.x }}" y="{{ pos.y }}" width="{{ pos.size }}" height="{{ pos.size }}" fill="{{ dissolve_primary_main }}" opacity="{{ pos.opacity }}"/>
 {% endfor %}
 {# Right scatter — secondary tone mirror (inward fade) #}
-{% set right_scatter = [(dw - 124, 12, 3, 0.2), (dw - 110, 8, 5, 0.3), (dw - 96, 11, 5, 0.45), (dw - 84, 5, 7, 0.55), (dw - 72, 10, 6, 0.7), (dw - 62, 7, 8, 0.85), (dw - 102, 15, 4, 0.25), (dw - 88, 18, 5, 0.4), (dw - 76, 16, 7, 0.55), (dw - 64, 17, 6, 0.7)] %}
-{% for pos in right_scatter %}
-<rect x="{{ pos[0] }}" y="{{ pos[1] }}" width="{{ pos[2] }}" height="{{ pos[2] }}" fill="{{ secondary_main }}" opacity="{{ pos[3] }}"/>
+{% for pos in dissolve_right_scatter %}
+<rect x="{{ pos.x }}" y="{{ pos.y }}" width="{{ pos.size }}" height="{{ pos.size }}" fill="{{ dissolve_secondary_main }}" opacity="{{ pos.opacity }}"/>
 {% endfor %}
 {# Right terminal — 4 x 2 secondary-tone block grid at full opacity #}
-{% for col in range(4) %}
-  {% for row in range(2) %}
-  {% set ac = secondary_main if (col + row) % 2 == 0 else secondary_deep %}
-  <rect x="{{ dw - 48 + col * 12 }}" y="{{ 2 + row * 12 }}" width="12" height="12" fill="{{ ac }}"/>
-  {% endfor %}
+{% for cell in dissolve_right_cells %}
+  <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.w }}" height="{{ cell.h }}" fill="{{ cell.fill }}"/>
 {% endfor %}
 
 {# ═══════════════════════════════════════════════════════════
@@ -389,23 +330,21 @@
      - surface_deep — substrate endpoint + nexus inner well
      - accent_complement — aurora halo (intermediate stops)
      - accent — aurora peak + nexus outer ring
-   Label tint is genome-neutral mid-gray; ``var(--dna-ink-secondary, #666666)``
-   would also work but a plain hex matches the editorial generics' neutral-label
-   convention (block divider line 178, takeoff line 264).
+   Label tint comes from resolver context to keep this template literal-free.
    ═══════════════════════════════════════════════════════════ #}
 {% else %}
 {# Aurora rule — full width 2px line #}
-<rect fill="url(#{{ uid }}-aurora)" height="2" width="{{ dw }}" x="0" y="{{ cy - 1 }}"/>
+<rect fill="url(#{{ uid }}-aurora)" height="{{ zeropoint_line_h }}" width="{{ divider_w }}" x="{{ zeropoint_line_x }}" y="{{ zeropoint_line_y }}"/>
 
 {# Nexus beacon — variant accent outer, variant substrate inner #}
-<circle cx="{{ dw // 2 }}" cy="{{ cy }}" r="4" fill="{{ accent }}"/>
-<circle cx="{{ dw // 2 }}" cy="{{ cy }}" r="2" fill="{{ surface_deep }}"/>
+<circle cx="{{ divider_cx }}" cy="{{ divider_cy }}" r="{{ zeropoint_outer_r }}" fill="{{ accent }}"/>
+<circle cx="{{ divider_cx }}" cy="{{ divider_cy }}" r="{{ zeropoint_inner_r }}" fill="{{ surface_deep }}"/>
 
 {# Label #}
 {% if divider_label %}
-<text x="{{ dw // 2 }}" y="{{ cy + 14 }}" text-anchor="middle"
+<text x="{{ zeropoint_label_x }}" y="{{ zeropoint_label_y }}" text-anchor="middle"
       font-family="'SF Mono','JetBrains Mono',monospace"
-      font-size="7" fill="#666666" opacity="0.5"
+      font-size="7" fill="{{ zeropoint_label_color }}" opacity="0.5"
       letter-spacing="0.15em">{{ divider_label | upper }}</text>
 {% endif %}
 

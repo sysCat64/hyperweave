@@ -20,14 +20,7 @@
    (right) — the prior compound "HYPERWEAVE · STAR HISTORY" footer text is
    gone since the header band already states the chart class. #}
 
-{% set cw = width | default(680) %}
-{% set ch = height | default(380) %}
-{% set vx = chart_viewport_x | default(72) %}
-{% set vy = chart_viewport_y | default(80) %}
-{% set vw = chart_viewport_w | default(580) %}
-{% set vh = chart_viewport_h | default(246) %}
 {% set _surface = surface_0 | default('var(--dna-surface)') %}
-{% set _band_h = chart_header_band_height | default(64) %}
 {% set _accent = chart_info_accent %}
 {% set chart_levels = cellular_palette.primary.chart_levels %}
 
@@ -40,7 +33,7 @@
 <g clip-path="url(#{{ uid }}-clip)">
 
 {# Void ground — pure surface color, no cell substrate. #}
-<rect width="{{ cw }}" height="{{ ch }}" fill="{{ _surface }}"/>
+<rect width="{{ chart_layout.width }}" height="{{ chart_layout.height }}" fill="{{ _surface }}"/>
 
 {# HEADER BAND (y=0..header_band_height). Vertical gradient from canvas_top
    to canvas_bottom — same material language as the stat card's header
@@ -52,8 +45,12 @@
    cell grid). All text inside the band routes through the HUD filter so
    labels lift from the gradient fill. #}
 <g data-hw-zone="header-band">
-  <rect width="{{ cw }}" height="{{ _band_h }}" fill="url(#{{ uid }}-top-grad)"/>
-  <line x1="0" y1="{{ _band_h }}" x2="{{ cw }}" y2="{{ _band_h }}" stroke="{{ _accent }}" stroke-opacity="0.12" stroke-width="0.5"/>
+  <rect x="{{ chart_layout.rects.cellular_header_band.x }}" y="{{ chart_layout.rects.cellular_header_band.y }}"
+        width="{{ chart_layout.rects.cellular_header_band.w }}" height="{{ chart_layout.rects.cellular_header_band.h }}"
+        fill="url(#{{ uid }}-top-grad)"/>
+  <line x1="{{ chart_layout.lines.cellular_header_rule.x1 }}" y1="{{ chart_layout.lines.cellular_header_rule.y1 }}"
+        x2="{{ chart_layout.lines.cellular_header_rule.x2 }}" y2="{{ chart_layout.lines.cellular_header_rule.y2 }}"
+        stroke="{{ _accent }}" stroke-opacity="0.12" stroke-width="0.5"/>
 </g>
 {# Header text positions tune the two pairs for VISIBLE-GAP coherence,
    not strict pair-center or baseline-shared alignment. Forcing both pairs
@@ -73,10 +70,10 @@
    matches the v2 prototype's same proportions (hero y=32, subtitle y=50,
    18 baseline / 12 visible gap). #}
 <g data-hw-zone="header-text" filter="url(#{{ uid }}-hud)">
-  <text x="22" y="22" class="{{ uid }}-hdr-user">{{ chart_repo | default('repo') | upper }}</text>
-  <text x="22" y="44" class="{{ uid }}-title-main">STAR HISTORY</text>
-  <text x="{{ cw - 22 }}" y="36" class="{{ uid }}-hero-value" text-anchor="end">{{ chart_current_stars | default('--') }}</text>
-  <text x="{{ cw - 22 }}" y="54" class="{{ uid }}-hero-label" text-anchor="end">CURRENT STARS</text>
+  <text x="{{ chart_layout.texts.cellular_repo.x }}" y="{{ chart_layout.texts.cellular_repo.y }}" class="{{ uid }}-hdr-user">{{ chart_repo | default('repo') | upper }}</text>
+  <text x="{{ chart_layout.texts.cellular_title.x }}" y="{{ chart_layout.texts.cellular_title.y }}" class="{{ uid }}-title-main">STAR HISTORY</text>
+  <text x="{{ chart_layout.texts.cellular_hero_value.x }}" y="{{ chart_layout.texts.cellular_hero_value.y }}" class="{{ uid }}-hero-value" text-anchor="{{ chart_layout.texts.cellular_hero_value.anchor }}">{{ chart_current_stars | default('--') }}</text>
+  <text x="{{ chart_layout.texts.cellular_hero_label.x }}" y="{{ chart_layout.texts.cellular_hero_label.y }}" class="{{ uid }}-hero-label" text-anchor="{{ chart_layout.texts.cellular_hero_label.anchor }}">CURRENT STARS</text>
 </g>
 
 {# CHART zone — layered render order: dormant (full viewport, no anim) →
@@ -131,15 +128,15 @@
     {%- if m.is_endpoint %}
     {%- set _fill = chart_levels[5] %}
     <g transform="translate({{ m.x }},{{ m.y }})">
-      <rect x="-4" y="-4" width="8" height="8" transform="rotate(45 0 0)"
-            fill="{{ _fill }}" stroke="#FFFFFF" stroke-width="1"
+      <rect x="{{ m.cellular_neg_half }}" y="{{ m.cellular_neg_half }}" width="{{ m.size }}" height="{{ m.size }}" transform="rotate(45 0 0)"
+            fill="{{ _fill }}" stroke="var(--dna-chart-marker-stroke, var(--dna-ink-primary))" stroke-width="1"
             filter="drop-shadow(0 0 5px {{ _fill }})"/>
     </g>
     {%- else %}
     {%- set _fill = cellular_marker_colors[loop.index0] if cellular_marker_colors and loop.index0 < (cellular_marker_colors | length) else chart_levels[3] %}
     <g transform="translate({{ m.x }},{{ m.y }})">
-      <rect x="-4" y="-4" width="8" height="8" transform="rotate(45 0 0)"
-            fill="{{ _fill }}" stroke="#FFFFFF" stroke-width="1"
+      <rect x="{{ m.cellular_neg_half }}" y="{{ m.cellular_neg_half }}" width="{{ m.size }}" height="{{ m.size }}" transform="rotate(45 0 0)"
+            fill="{{ _fill }}" stroke="var(--dna-chart-marker-stroke, var(--dna-ink-primary))" stroke-width="1"
             filter="drop-shadow(0 0 5px {{ _fill }})"/>
     </g>
     {%- endif %}
@@ -169,14 +166,14 @@
    left edge of the chart. #}
 <g data-hw-zone="y-axis" filter="url(#{{ uid }}-hud)">
   {% for label in chart_y_labels %}
-  <text class="{{ uid }}-axis-y" x="{{ vx - 10 }}" y="{{ label.y + 4 }}" text-anchor="end">{{ label.text }}</text>
+  <text class="{{ uid }}-axis-y" x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}">{{ label.text }}</text>
   {% endfor %}
 </g>
 
 {# X-axis — year labels below the chart. #}
 <g data-hw-zone="x-axis" filter="url(#{{ uid }}-hud)">
   {% for label in chart_x_labels %}
-  <text class="{{ uid }}-axis-x" x="{{ label.x }}" y="{{ vy + vh + 22 }}" text-anchor="{{ label.anchor | default('middle') }}">{{ label.text }}</text>
+  <text class="{{ uid }}-axis-x" x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}">{{ label.text }}</text>
   {% endfor %}
 </g>
 
@@ -184,10 +181,12 @@
    stamp (right, info_accent very quiet). The chart class label is gone —
    the header band already establishes "STAR HISTORY" so the footer doesn't
    restate it. #}
-<line x1="16" y1="{{ ch - 30 }}" x2="{{ cw - 16 }}" y2="{{ ch - 30 }}" stroke="{{ _accent }}" stroke-opacity="0.06" stroke-width="0.5"/>
+<line x1="{{ chart_layout.lines.cellular_footer_rule.x1 }}" y1="{{ chart_layout.lines.cellular_footer_rule.y1 }}"
+      x2="{{ chart_layout.lines.cellular_footer_rule.x2 }}" y2="{{ chart_layout.lines.cellular_footer_rule.y2 }}"
+      stroke="{{ _accent }}" stroke-opacity="0.06" stroke-width="0.5"/>
 <g data-hw-zone="footer" filter="url(#{{ uid }}-hud)">
-  <text x="22" y="{{ ch - 14 }}" class="{{ uid }}-foot">github.com/{{ chart_repo | default('') }}</text>
-  <text x="{{ cw - 22 }}" y="{{ ch - 14 }}" class="{{ uid }}-foot-brand" text-anchor="end">HYPERWEAVE</text>
+  <text x="{{ chart_layout.texts.cellular_footer_url.x }}" y="{{ chart_layout.texts.cellular_footer_url.y }}" class="{{ uid }}-foot">github.com/{{ chart_repo | default('') }}</text>
+  <text x="{{ chart_layout.texts.cellular_footer_brand.x }}" y="{{ chart_layout.texts.cellular_footer_brand.y }}" class="{{ uid }}-foot-brand" text-anchor="{{ chart_layout.texts.cellular_footer_brand.anchor }}">HYPERWEAVE</text>
 </g>
 
 </g>{# end outer rounded-corner clip #}
@@ -196,4 +195,6 @@
    info_accent at very low opacity. Drawn OUTSIDE the clip group so the
    stroke isn't itself clipped at the corners. Reads as a deliberate
    artifact edge framing the composition. #}
-<rect x="0.5" y="0.5" width="{{ cw - 1 }}" height="{{ ch - 1 }}" rx="10" fill="none" stroke="{{ _accent }}" stroke-opacity="0.10" stroke-width="1"/>
+<rect x="{{ chart_layout.cellular_outer_rect.x }}" y="{{ chart_layout.cellular_outer_rect.y }}"
+      width="{{ chart_layout.cellular_outer_rect.w }}" height="{{ chart_layout.cellular_outer_rect.h }}"
+      rx="{{ chart_layout.cellular_outer_rect.rx }}" fill="none" stroke="{{ _accent }}" stroke-opacity="0.10" stroke-width="1"/>

@@ -6,12 +6,12 @@
 {# Main phase bar #}
 <rect x="{{ seg_x }}" y="{{ seg_y }}"
       width="{{ seg_w }}" height="{{ seg_h }}"
-      rx="{{ 2 if seg_h > 30 else 1 }}"
+      rx="{{ seg_rx | default(1) }}"
       fill="url(#{{ uid }}-{{ seg_tool_class }})"/>
 
 {# Phase color strip (3-4px, below main bar) #}
 {% if show_phase_strip | default(true) %}
-<rect x="{{ seg_x }}" y="{{ seg_strip_y | default(seg_y + seg_h + 2) }}"
-      width="{{ seg_w }}" height="{{ seg_strip_h | default(3) }}" rx="1"
+<rect x="{{ seg_x }}" y="{{ seg_strip_y | default(seg_y) }}"
+      width="{{ seg_w }}" height="{{ seg_strip_h | default(3) }}" rx="{{ seg_strip_rx | default(1) }}"
       fill="var(--dna-tool-{{ seg_tool_class }})" opacity="0.4"/>
 {% endif %}

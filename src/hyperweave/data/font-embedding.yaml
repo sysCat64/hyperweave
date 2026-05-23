@@ -23,7 +23,6 @@ defaults:
   marquee-horizontal: []
   receipt: []
   rhythm-strip: []
-  master-card: []
   catalog: []
   icon: []
   divider: []
@@ -48,7 +47,6 @@ genomes:
     marquee-horizontal: [orbitron]
     receipt: [jetbrains-mono, orbitron]
     rhythm-strip: [jetbrains-mono, orbitron]
-    master-card: [jetbrains-mono, orbitron]
   automata:
     # Badge cellular-content.j2:94,104 references Orbitron + Chakra Petch.
     # JetBrains Mono is declared in automata.json but never bound to a
@@ -62,7 +60,6 @@ genomes:
     marquee-horizontal: [orbitron]
     receipt: [jetbrains-mono, orbitron, chakra-petch]
     rhythm-strip: [jetbrains-mono, orbitron, chakra-petch]
-    master-card: [jetbrains-mono, orbitron, chakra-petch]
 
 # Documentation only in v0.3.7 — no runtime consumer. When CJK
 # rendering becomes in-scope, plumb a `locale` field through
