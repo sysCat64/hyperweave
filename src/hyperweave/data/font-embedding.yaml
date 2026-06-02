@@ -38,6 +38,11 @@ genomes:
     strip: [jetbrains-mono, barlow-condensed-700, barlow-condensed-900]
     stats: [jetbrains-mono, barlow-condensed-700, barlow-condensed-900]
     chart: [jetbrains-mono, barlow-condensed-700, barlow-condensed-900]
+    # Marquee value row is Barlow Condensed (matching the stat-card hero +
+    # brutalist-marquee-celadon.svg); the small label row is JetBrains Mono.
+    # Without this the marquee embedded nothing and Barlow fell back to a
+    # system serif (the off-font in the rendered marquee).
+    marquee-horizontal: [jetbrains-mono, barlow-condensed-700, barlow-condensed-900]
   chrome:
     badge: [jetbrains-mono, orbitron]
     strip: [jetbrains-mono, orbitron]

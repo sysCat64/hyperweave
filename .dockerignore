@@ -11,6 +11,12 @@ specs/
 docs/
 tests/
 outputs/
+tier2/
+v03/
+assets/
+scripts/
+AGENTS.md
+CLAUDE.md
 .coverage*
 htmlcov/
 *.egg-info

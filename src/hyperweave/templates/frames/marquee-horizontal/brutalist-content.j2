@@ -1,8 +1,14 @@
-{# Brutalist horizontal-marquee BACKGROUND layer — sits BELOW the scroll-track text.
-   Specimen: brutalist-marquee-v1.svg.
-   Layer 0: flat slab fill from genome.surface_hex.
-   The PERIMETER and ACCENT BAR live in brutalist-overlay.j2 so they render
-   ABOVE the scroll text — text scrolls UNDER them at the edges.
-   v0.2.16: LIVE block, divider, and LIVE label deleted entirely.
+{# Brutalist horizontal-marquee BACKGROUND — sits BELOW the scroll modules.
+   v0.3.12 module instrument panel. Specimen: brutalist-marquee-celadon.svg.
+     Layer 0: flat slab fill (genome.surface_hex).
+     Layer 1: static engineering grid — vertical hairlines on an 88px pitch
+              (positions precomputed by the resolver: liveness_grid).
+   The grid runs at an independent period from the moving modules, reading as
+   an instrument scaffold. The END-CAPS, bottom accent rail and perimeter live
+   in brutalist-overlay.j2 so they render ABOVE the modules. All geometry is
+   resolver-supplied — zero coordinate arithmetic / literals here.
 #}
 <rect width="{{ mw }}" height="{{ mh }}" fill="{{ surface_hex }}"/>
+<g data-hw-zone="grid" shape-rendering="crispEdges">
+{% for g in liveness_grid %}<rect x="{{ g.x }}" y="{{ liveness_grid_y }}" width="{{ liveness.grid_line_w }}" height="{{ liveness_grid_h }}" fill="{{ signal_hex }}" opacity="0.08"/>{% endfor %}
+</g>

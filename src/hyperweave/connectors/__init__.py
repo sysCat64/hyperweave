@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from hyperweave.connectors import arxiv, github
+from hyperweave.connectors import arxiv, dora, github, scorecard
 from hyperweave.connectors.base import (
     CircuitBreaker,
     CircuitState,
@@ -15,6 +15,7 @@ from hyperweave.connectors.base import (
 )
 from hyperweave.connectors.cache import ConnectorCache
 from hyperweave.connectors.rest import (
+    crates_fetch_metric,
     docker_fetch_metric,
     hf_fetch_metric,
     npm_fetch_metric,
@@ -35,6 +36,9 @@ _CONNECTORS: dict[str, Any] = {
     "huggingface": hf_fetch_metric,
     "hf": hf_fetch_metric,
     "docker": docker_fetch_metric,
+    "crates": crates_fetch_metric,
+    "scorecard": scorecard.fetch_metric,
+    "dora": dora.fetch_metric,
 }
 
 

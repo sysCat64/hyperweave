@@ -678,7 +678,11 @@ class ParadigmMarqueeConfig(FrozenModel):
     height: int = 40
     """Marquee canvas height in pixels. Chrome: 56. Brutalist: 32."""
     font_size: int = 13
-    """Scroll-text font size in pixels. Chrome: 22 (Orbitron). Brutalist: 12 (JBM)."""
+    """Scroll-text VALUE font size in pixels. Chrome: 11 (Orbitron). Automata: 16."""
+    label_font_size: int = 0
+    """Ribbon LABEL font size in pixels (smaller than the value per the
+    prototypes — chrome 6, automata 9). Zero falls back to ``font_size`` (label
+    and value share one size). Module layout uses ``module_label_font_size``."""
     font_weight: str = ""
     """Scroll-text font weight. Empty string falls back to per-item override
     (resolver's bold-pattern logic). Chrome: '900'. Brutalist: '800'."""
@@ -696,11 +700,21 @@ class ParadigmMarqueeConfig(FrozenModel):
     take priority — see resolver). Empty list keeps the default
     ``ink-primary/ink-secondary`` alternation."""
     separator_glyph: str = "■"
-    """Separator character when ``separator_kind == "glyph"``. Cellular: ◆.
-    Chrome: ·. Default: ■."""
+    """Separator character when ``separator_kind == "glyph"``. Cellular: ▪
+    (neutral, label-sized). Default: ■. (Chrome no longer uses a glyph — its
+    item_layout is ``module``, whose dividers replace inter-item glyphs.)"""
     separator_color: str = ""
     """Separator color (hex). Empty string falls back to the resolver's
-    profile-driven ``var(--dna-border)`` default."""
+    profile-driven ``var(--dna-border)`` default. Only consulted when
+    ``separator_fill`` is unset (it is the fallback inside the
+    ``var(--dna-signal, …)`` wrapper)."""
+    separator_fill: str = ""
+    """Explicit separator paint expression, bypassing the default
+    ``var(--dna-signal, separator_color)`` wrapper. Set this when a paradigm's
+    separators must NOT follow the variant signal accent — cellular uses
+    ``var(--dna-ink-muted)`` so its bullets recede like the bone prototype's
+    neutral ▪ instead of popping as a gold/cyan accent. Empty = use the
+    signal-following wrapper (brutalist's per-variant emerald divider)."""
     separator_kind: Literal["glyph", "rect"] = "glyph"
     """How separators render: ``glyph`` emits a ``<tspan>`` of the
     ``separator_glyph`` character; ``rect`` emits a square ``<rect>`` of size
@@ -740,6 +754,51 @@ class ParadigmMarqueeConfig(FrozenModel):
     clip_rx: float = 0
     """Corner radius for the scroll-track clip rect. Chrome: 2.6 (matches well
     rx). Brutalist/cellular: 0 (sharp corners)."""
+
+    # ── v0.3.12 scroll-item layout dispatch ──────────────────────────────
+    # The scroll-item layout is selected by this CONFIG VALUE, never by a
+    # paradigm-slug branch (Invariant 12). The template resolves
+    # `frames/marquee-horizontal/item-{item_layout}.j2`, so chrome + cellular
+    # both pick `item-ribbon.j2` while brutalist picks `item-module.j2`. Two
+    # paradigms can resolve to the same partial.
+    item_layout: Literal["ribbon", "module"] = "ribbon"
+    """``ribbon``: inline label+value at one absolute x (chrome/cellular).
+    ``module``: a fixed-width cast cell — small mono label stacked over a
+    bold condensed value, bounded by a full-height divider (brutalist
+    instrument-panel grammar). Dispatches the item partial; never branch on
+    the paradigm slug."""
+    hero_font_size: int = 0
+    """Font size (px) for the hero (first volume) cell's value. Zero defers
+    to ``font_size`` (no hero emphasis). Brutalist module: 22 (vs 20 body)."""
+    # Module-layout geometry (consumed only when item_layout == "module").
+    module_min_width: int = 0
+    """Aesthetic floor for the computed uniform module pitch (px). The engine
+    sizes the module from MEASURED content (widest label/value + 2*inset),
+    then clamps up to this floor. Brutalist: 110. Zero disables the floor."""
+    module_text_inset: int = 16
+    """Left inset (px) of the label/value text from the module's left edge."""
+    module_label_y: int = 14
+    """Baseline y of the module's small mono label."""
+    module_value_y: int = 35
+    """Baseline y of the module's bold condensed value (stacked below label)."""
+    module_label_font_size: int = 8
+    """Font size (px) of the module label. Brutalist: 8."""
+    module_label_font_family: str = ""
+    """Module label font stack (mono). Empty falls back to ``font_family``."""
+    module_label_letter_spacing: str = "0.12em"
+    """CSS letter-spacing for the module label."""
+    module_value_font_family: str = ""
+    """Module value font stack. Brutalist: Barlow Condensed (an instrument-
+    panel condensed face distinct from the genome's mono identity — a
+    paradigm-level typographic choice, like ParadigmBadgeConfig.value_font_family).
+    Empty falls back to ``font_family``. Measured with its first component so
+    the uniform module pitch matches the rendered value width."""
+    module_divider_w: int = 2
+    """Width (px) of the full-height divider at each module's right boundary."""
+    module_divider_y: int = 6
+    """Top y of the module divider."""
+    module_divider_h: int = 32
+    """Height (px) of the module divider."""
 
 
 class ParadigmSpec(FrozenModel):

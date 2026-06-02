@@ -1,8 +1,9 @@
 """Per-variant chromatic, geometric, and var-routing pins for brutalist dark badges.
 
-Asserts every of the six dark-substrate variants (celadon, carbon, alloy,
-temper, pigment, ember) emits the prototype-derived hex values AND that the
-badge template routes each visual role through the correct semantic CSS var.
+Asserts every of the eight dark-substrate variants (celadon, carbon, alloy,
+temper, pigment, ember, umber, onyx) emits the prototype-derived hex values AND
+that the badge template routes each visual role through the correct semantic CSS
+var.
 
 v0.3.3 field hierarchy (post badge regression remediation):
 
@@ -108,6 +109,33 @@ PROTOTYPE_VARIANTS: list[dict[str, str]] = [
         "pass_bit": "#d8b868",
         "warn_sep": "#c8a020",
         "fail_sep": "#e04840",
+    },
+    {
+        # v0.3.12 — raw sienna / fired clay. 7-stop highlight→void ramp.
+        "variant": "umber",
+        "canvas": "#120c04",
+        "elevated": "#281808",
+        "signal": "#b07040",
+        "ink_primary": "#f0e0d0",
+        "label_text": "#805020",
+        "badge_value_text": "#d09860",
+        "pass_bit": "#c88850",
+        "warn_sep": "#c8a020",
+        "fail_sep": "#e05040",
+    },
+    {
+        # v0.3.12 — pure achromatic / polished obsidian. Mass without hue;
+        # the only chroma is the semantic warn/fail state register.
+        "variant": "onyx",
+        "canvas": "#0a0a0a",
+        "elevated": "#1e1e1e",
+        "signal": "#787878",
+        "ink_primary": "#d0d0d0",
+        "label_text": "#505050",
+        "badge_value_text": "#a8a8a8",
+        "pass_bit": "#989898",
+        "warn_sep": "#c8a020",
+        "fail_sep": "#d84848",
     },
 ]
 

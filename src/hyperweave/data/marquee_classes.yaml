@@ -1,0 +1,59 @@
+# Marquee metric → category map (genome-neutral, v0.3.12).
+#
+# Drives marquee auto-grouping ORDER (volume → activity → identity) and
+# hero-eligibility. Keyed by token-grammar METRIC name (the `.metric` of a
+# live token, e.g. `gh:owner/repo.stars` → "stars") and by common kv labels
+# (lowercased) so `kv:BUILD=passing` categorizes too. NOT label pattern-
+# matching — exact-key lookup only. A metric absent from every list falls
+# back to `default_category`. Missing file → all-volume fail-safe.
+#
+# References no genome — color/role treatment is applied per-genome downstream
+# (volume → bright ink + hero-eligible; activity → stateful via the cascade
+# bridge; identity → muted ink_sub).
+
+default_category: volume
+
+categories:
+  # Magnitudes — bright ink, hero-eligible. First volume cell becomes the hero.
+  volume:
+    - stars
+    - forks
+    - watchers
+    - downloads
+    - contributors
+    - pull_count
+    - star_count
+    - likes
+    - recent_downloads
+  # Stateful — value tinted by the state cascade (passing/warning/critical).
+  activity:
+    - build
+    - coverage
+    - tests
+    - issues
+    - prs
+    - pull_requests
+    - last_push
+    - last_modified
+    - last_updated
+    - deploy_frequency
+    - lead_time
+    - change_failure_rate
+    - mttr
+    - score
+    - vulnerabilities
+    - maintained
+    - code_review
+  # Descriptors — muted ink_sub, never stateful.
+  identity:
+    - version
+    - language
+    - license
+    - python_requires
+    - gated
+    - doi
+    - journal_ref
+    - updated
+    - title
+    - pipeline_tag
+    - library_name

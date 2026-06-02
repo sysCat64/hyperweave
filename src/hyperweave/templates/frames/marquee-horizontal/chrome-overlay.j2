@@ -1,27 +1,49 @@
-{# Chrome horizontal-marquee OVERLAY layers — sit ABOVE the scroll-track text.
-   Renders the perimeter chrome elements that should occlude scrolling text
-   at the frame edges (so text appears to slide UNDER the perimeter instead
-   of over it). Specimen: chrome-marquees-v2.
-   Layer order (rendered on top of text):
-     3a. opaque backing rect at env-rail position (well gradient — matches
-         surrounding well so the env-rail blends seamlessly; this hides
-         text bleed-through under the 0.85-opacity env-rail above it)
-     3b. inner hairline rect (rx=3.2, inset 1px)
-     4.  6px env-rail at x=4 (vertical envelope sliver, opacity 0.85)
-     5.  0.6-unit top accent hairline (specular_light @ 0.16)
-     6.  rim-sweep stroke (rx=3.2, inset 1px, sw=1.0, animated)
+{# Chrome horizontal-marquee OVERLAY — perimeter metallic detail above the
+   scroll text. v0.3.12-fix: reconciled to marquee-dense-chrome.svg's actual
+   frame group (not just dims). The scroll text is clipped to the readout
+   window (clip_inset_left=92), so none of these layers occlude it — they
+   render above purely for edge crispness. ALL geometry comes from
+   marquee_geom / liveness (spatial-stencil contract: zero literals / hex /
+   arithmetic in the template).
+
+   Layer order (prototype mq-C frame group, top→bottom of z-stack):
+     1. inner hairline   · dark seam, envelope↔well (sw 0.6)
+     2. left edge sliver · 3.5px envelope edge (prototype's thin metallic edge,
+                           NOT the prior 6px rail that read as a thick border)
+     3. top specular     · static milled highlight line
+     4. top sheen        · faint white edge
+     5. bottom shadow    · band that seats the well into the envelope
+     6. corner rivets    · 1px machined accents
+     7. rim sweep        · animated travelling chrome highlight (chrome motion
+                           signature; retained alongside the static specular)
+     8. LIVE panel       · decorative liveness in the reserved left inset
 #}
-{# Opaque backing under env-rail. The env-rail at opacity 0.85 (preserved
-   from the v2 specimen for its metallic feel) lets 15% of any pixel behind
-   it show through — including scrolling text passing through x=4..10 on its
-   way to the clip boundary at x=4. Filling with the well gradient ensures
-   the env-rail's translucent blend matches the surrounding well visually
-   while completely occluding text. #}
-<rect x="{{ marquee_geom.chrome_rail_x }}" y="{{ marquee_geom.chrome_rail_y }}" width="{{ marquee_geom.chrome_rail_w }}" height="{{ chrome_rail_h }}" fill="url(#{{ uid }}-well)"/>
-<rect x="{{ marquee_geom.chrome_inner_x }}" y="{{ marquee_geom.chrome_inner_y }}" width="{{ chrome_inner_w }}" height="{{ chrome_inner_h }}" rx="{{ marquee_geom.chrome_inner_rx }}" fill="none" stroke="var(--dna-chrome-inner-stroke, var(--dna-surface-deep))" stroke-width=".8"/>
-{# Left rail · 6px env-rail vertical sliver · card-family signature #}
+{# 1 · inner hairline #}
+<rect x="{{ marquee_geom.chrome_inner_x }}" y="{{ marquee_geom.chrome_inner_y }}" width="{{ chrome_inner_w }}" height="{{ chrome_inner_h }}" rx="{{ marquee_geom.chrome_inner_rx }}" fill="none" stroke="var(--dna-chrome-inner-stroke, var(--dna-surface-deep))" stroke-width="0.6"/>
+{# 2 · left edge sliver (envelope gradient, 0.85) #}
 <rect x="{{ marquee_geom.chrome_rail_x }}" y="{{ marquee_geom.chrome_rail_y }}" width="{{ marquee_geom.chrome_rail_w }}" height="{{ chrome_rail_h }}" fill="url(#{{ uid }}-env-rail)" opacity="0.85"/>
-{# Top accent hairline · milled-edge detail at the rail's right edge #}
-<rect x="{{ marquee_geom.chrome_top_accent_x }}" y="{{ marquee_geom.chrome_top_accent_y }}" width="{{ chrome_top_accent_w }}" height="{{ marquee_geom.chrome_top_accent_h }}" fill="{{ specular_light }}" opacity="0.16"/>
-{# Rim sweep · animated travelling chrome highlight on the inner perimeter #}
+{# 3 · top specular line #}
+<rect x="{{ marquee_geom.chrome_specular_x }}" y="{{ marquee_geom.chrome_specular_y }}" width="{{ chrome_specular_w }}" height="{{ marquee_geom.chrome_specular_h }}" fill="url(#{{ uid }}-specular)" opacity="0.9"/>
+{# 4 · top white sheen #}
+<rect x="{{ marquee_geom.chrome_sheen_x }}" y="{{ marquee_geom.chrome_sheen_y }}" width="{{ chrome_sheen_w }}" height="{{ marquee_geom.chrome_sheen_h }}" fill="{{ specular_light }}" opacity="0.07"/>
+{# 5 · bottom shadow band #}
+<rect x="{{ marquee_geom.chrome_shadow_band_x }}" y="{{ marquee_geom.chrome_shadow_band_y }}" width="{{ chrome_shadow_band_w }}" height="{{ marquee_geom.chrome_shadow_band_h }}" fill="url(#{{ uid }}-shadow-band)" opacity="0.7"/>
+{# 6 · corner rivets #}
+<g fill="var(--dna-signal)" opacity="0.55">
+{% for r in marquee_geom.chrome_rivets %}<rect x="{{ r.x }}" y="{{ r.y }}" width="{{ marquee_geom.chrome_rivet_size }}" height="{{ marquee_geom.chrome_rivet_size }}"/>{% endfor %}
+</g>
+{# 7 · rim sweep · animated travelling chrome highlight on the inner perimeter #}
 <rect x="{{ marquee_geom.chrome_inner_x }}" y="{{ marquee_geom.chrome_inner_y }}" width="{{ chrome_inner_w }}" height="{{ chrome_inner_h }}" rx="{{ marquee_geom.chrome_inner_rx }}" fill="none" stroke="url(#{{ uid }}-rim)" stroke-width="1.0"/>
+{# 8 · LIVE panel — DECORATIVE liveness (own @keyframes in chrome-defs.j2,
+   no data-hw-status, not the state cascade). LIVE wordmark + pulsing diamond,
+   sealed by a hairline rule. Sits in the clip's reserved left inset
+   (clip_inset_left=92). Diamond housing/stroke/highlight come from chrome's
+   --dna-diamond-* / --dna-highlight vars; geometry from the resolver's
+   `liveness` dict. #}
+<text x="{{ liveness.live_text_x }}" y="{{ liveness.live_text_y }}" text-anchor="middle" font-family="{{ ff }}" font-size="10" letter-spacing="0.28em" fill="url(#{{ uid }}-{{ tfid }})">LIVE</text>
+<g transform="translate({{ liveness.diamond_cx }}, {{ liveness.diamond_cy }})">
+  <rect x="{{ liveness.diamond_housing_x }}" y="{{ liveness.diamond_housing_y }}" width="{{ liveness.diamond_housing_w }}" height="{{ liveness.diamond_housing_w }}" rx="{{ liveness.diamond_rx }}" transform="rotate(45)" fill="var(--dna-diamond-housing)"/>
+  <rect x="{{ liveness.diamond_housing_x }}" y="{{ liveness.diamond_housing_y }}" width="{{ liveness.diamond_housing_w }}" height="{{ liveness.diamond_housing_w }}" rx="{{ liveness.diamond_rx }}" transform="rotate(45)" fill="none" stroke="var(--dna-diamond-stroke)" stroke-width="0.4"/>
+  <rect class="hw-mq-diamond" x="{{ liveness.diamond_inner_x }}" y="{{ liveness.diamond_inner_y }}" width="{{ liveness.diamond_inner_w }}" height="{{ liveness.diamond_inner_w }}" rx="{{ liveness.diamond_inner_rx }}" transform="rotate(45)" fill="var(--dna-signal)"/>
+</g>
+<line x1="{{ liveness.sep_x }}" y1="{{ liveness.sep_y1 }}" x2="{{ liveness.sep_x }}" y2="{{ liveness.sep_y2 }}" stroke="url(#{{ uid }}-sep)" stroke-width="0.75"/>

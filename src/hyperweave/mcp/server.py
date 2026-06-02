@@ -84,6 +84,7 @@ async def hw_compose(
       gh:owner/repo.metric — GitHub
       pypi:pkg.metric      — PyPI
       npm:pkg.metric / hf:org/model.metric / arxiv:id.metric / docker:owner/image.metric
+      crates:pkg.metric / scorecard:owner/repo.metric / dora:owner/repo.metric
 
     Multiple tokens are separated by ``,``. Embedded commas in text/kv
     payloads escape as ``\\,``. When ``data`` is set, this tool fetches live
@@ -177,9 +178,12 @@ async def hw_live(
     discoverable than the colon/dot DSL for first-time agents. New code
     should prefer ``hw_compose`` with the unified ``data`` parameter.
 
-    provider: gh | github | pypi | npm | arxiv | huggingface | hf | docker
-    identifier: owner/repo (github), package-name (pypi/npm), paper-id (arxiv)
-    metric: stars | forks | version | downloads | likes | pull_count
+    provider: gh | github | pypi | npm | arxiv | huggingface | hf | docker |
+              crates | cargo | scorecard | dora
+    identifier: owner/repo (github/scorecard/dora), package-name (pypi/npm/crates),
+                paper-id (arxiv)
+    metric: stars | forks | version | downloads | likes | pull_count |
+            score (scorecard) | deploy_frequency (dora)
     """
     return await hw_compose(
         type="badge",
@@ -260,7 +264,8 @@ async def hw_discover(
         data_grammar = (
             "Comma-separated tokens: text:STRING | kv:KEY=VALUE | "
             "gh:owner/repo.metric | pypi:pkg.metric | npm:pkg.metric | "
-            "hf:org/model.metric | arxiv:id.metric | docker:owner/image.metric. "
+            "hf:org/model.metric | arxiv:id.metric | docker:owner/image.metric | "
+            "crates:pkg.metric | scorecard:owner/repo.metric | dora:owner/repo.metric. "
             "Embedded commas in text/kv payloads escape as \\,."
         )
         result["url_grammar"] = {

@@ -8,10 +8,12 @@ import math
 import re
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlencode
 
 from hyperweave.connectors.base import (
     CircuitOpenError,
     ConnectorError,
+    fetch,
     fetch_graphql,
     fetch_json,
     fetch_text,
@@ -61,6 +63,7 @@ _METRIC_MAP: dict[str, str] = {
     "issues": "open_issues_count",
     "license": "license",
     "language": "language",
+    "last_push": "pushed_at",
 }
 
 
@@ -125,6 +128,98 @@ async def _fetch_build_status(identifier: str) -> dict[str, Any]:
     return result
 
 
+def _format_relative_time(iso_ts: str) -> str:
+    """Compact relative-time label from an ISO-8601 timestamp (e.g. ``3H AGO``).
+
+    ``last_push`` is a human-facing recency signal, not a raw timestamp, so the
+    connector formats it at fetch time (the same way ``build`` returns
+    ``passing`` rather than a raw conclusion). The 5-min cache TTL is coarser
+    than the formatting granularity, so a cached label never visibly drifts.
+    Minutes spell out as ``MIN`` to avoid colliding with ``MO`` (months).
+    """
+    try:
+        then = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+    except (ValueError, AttributeError, TypeError):
+        return "unknown"
+    secs = (datetime.now(UTC) - then).total_seconds()
+    if secs < 60:
+        return "JUST NOW"
+    if secs < 3600:
+        return f"{int(secs // 60)}MIN AGO"
+    if secs < 86_400:
+        return f"{int(secs // 3600)}H AGO"
+    if secs < 2_592_000:  # 30 days
+        return f"{int(secs // 86_400)}D AGO"
+    if secs < 31_536_000:  # 365 days
+        return f"{int(secs // 2_592_000)}MO AGO"
+    return f"{int(secs // 31_536_000)}Y AGO"
+
+
+async def _fetch_contributors_count(identifier: str) -> dict[str, Any]:
+    """Contributor count via the ``Link``-header last-page trick.
+
+    The contributors API exposes no count field. Requesting ``per_page=1`` and
+    reading the ``rel="last"`` page index from the ``Link`` header yields the
+    count in a single request instead of paginating the whole list. Repos with
+    <=1 contributor carry no ``Link`` header, so we fall back to the body
+    length. Routed through the core REST breaker.
+    """
+    cache = get_cache()
+    cache_key = f"{_CACHE_NS}:{identifier}:contributors"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[no-any-return]
+
+    url = f"https://api.github.com/repos/{identifier}/contributors?per_page=1&anon=true"
+    response = await fetch(url, provider=_PROVIDER_CORE)
+    match = re.search(r'[?&]page=(\d+)>;\s*rel="last"', response.headers.get("Link", ""))
+    if match:
+        count: Any = int(match.group(1))
+    else:
+        body = response.json()
+        count = len(body) if isinstance(body, list) else 0
+
+    result: dict[str, Any] = {
+        "provider": _CACHE_NS,
+        "identifier": identifier,
+        "metric": "contributors",
+        "value": count,
+        "ttl": CACHE_TTL,
+    }
+    cache.set(cache_key, result, CACHE_TTL)
+    return result
+
+
+async def _fetch_open_pr_count(identifier: str) -> dict[str, Any]:
+    """Open pull-request count via the Search API.
+
+    ``open_issues_count`` (the ``issues`` metric) conflates issues AND PRs, so
+    a true open-PR count needs the search endpoint. Routed through the dedicated
+    ``github-search`` breaker so a search rate-limit 403 can't trip the core
+    REST endpoints that power badges, strips, and charts.
+    """
+    cache = get_cache()
+    cache_key = f"{_CACHE_NS}:{identifier}:pull_requests"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[no-any-return]
+
+    params = urlencode({"q": f"repo:{identifier} type:pr state:open", "per_page": 1})
+    url = f"https://api.github.com/search/issues?{params}"
+    data = await fetch_json(url, provider=_PROVIDER_SEARCH)
+    count = data.get("total_count", 0)
+
+    result: dict[str, Any] = {
+        "provider": _CACHE_NS,
+        "identifier": identifier,
+        "metric": "pull_requests",
+        "value": count,
+        "ttl": CACHE_TTL,
+    }
+    cache.set(cache_key, result, CACHE_TTL)
+    return result
+
+
 async def fetch_metric(identifier: str, metric: str) -> dict[str, Any]:
     """Fetch a single metric from GitHub."""
     if "/" not in identifier:
@@ -133,6 +228,12 @@ async def fetch_metric(identifier: str, metric: str) -> dict[str, Any]:
     # Build status uses a separate API endpoint
     if metric == "build":
         return await _fetch_build_status(identifier)
+    # Contributor count + open-PR count each need a dedicated endpoint — the
+    # basic repo payload carries neither (open_issues_count conflates the two).
+    if metric == "contributors":
+        return await _fetch_contributors_count(identifier)
+    if metric == "pull_requests":
+        return await _fetch_open_pr_count(identifier)
 
     cache = get_cache()
     cache_key = f"{_CACHE_NS}:{identifier}:{metric}"
@@ -145,13 +246,18 @@ async def fetch_metric(identifier: str, metric: str) -> dict[str, Any]:
 
     api_key = _METRIC_MAP.get(metric)
     if api_key is None:
-        raise ValueError(f"Unknown GitHub metric {metric!r}. Available: {sorted([*_METRIC_MAP, 'build'])}")
+        available = sorted([*_METRIC_MAP, "build", "contributors", "pull_requests"])
+        raise ValueError(f"Unknown GitHub metric {metric!r}. Available: {available}")
 
     raw_value = data.get(api_key)
 
     # License is nested
     if metric == "license" and isinstance(raw_value, dict):
         raw_value = raw_value.get("spdx_id", raw_value.get("name", "Unknown"))
+
+    # last_push is a recency signal, not a raw timestamp
+    if metric == "last_push" and isinstance(raw_value, str):
+        raw_value = _format_relative_time(raw_value)
 
     result: dict[str, Any] = {
         "provider": _CACHE_NS,

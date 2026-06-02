@@ -20,3 +20,13 @@
 
 {# Bottom hairline #}
 <rect x="{{ marquee_geom.cellular_hairline_x }}" y="{{ cellular_bottom_hairline_y }}" width="{{ mw }}" height="{{ marquee_geom.cellular_hairline_h }}" fill="{{ hairline }}" opacity="0.2"/>
+
+{# v0.3.12 — DECORATIVE travelling-wave baseline rail (automata signature).
+   Cells on a 6px pitch across the full width, each phase-delayed by its x so a
+   bright band propagates left→right. Genome's mid_accent tone; the cells encode
+   nothing — the scrolling tokens carry the data. Own @keyframes (.hw-mq-wv in
+   cellular-defs.j2), not the state cascade. Positions + per-cell delays are
+   resolver-supplied (liveness_rail) — zero arithmetic / literals here. #}
+<g data-hw-zone="rail" shape-rendering="crispEdges">
+{% for c in liveness_rail %}<rect class="hw-mq-wv" x="{{ c.x }}" y="{{ liveness_rail_y }}" width="{{ liveness_rail_w }}" height="{{ liveness_rail_h }}" fill="{{ hairline }}" style="animation-delay:{{ c.delay }}s"/>{% endfor %}
+</g>

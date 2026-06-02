@@ -12,6 +12,10 @@ PROVIDER_TTLS: dict[str, int] = {
     "arxiv": 1800,
     "huggingface": 600,
     "docker": 600,
+    "crates": 600,
+    # Scorecard recomputes weekly; DORA aggregates are expensive + slow-moving.
+    "scorecard": 21600,
+    "dora": 3600,
 }
 
 DEFAULT_TTL: int = 600

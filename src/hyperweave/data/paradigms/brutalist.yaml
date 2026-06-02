@@ -173,49 +173,66 @@ icon:
   default_shape: square
 
 marquee:
-  # Specimen: brutalist-marquee-v1.svg (720×32). Flat slab with 4px
-  # emerald accent bar; pure scroll band — no LIVE label panel after v0.2.16.
-  width: 720
-  height: 32
-  # JetBrains Mono at 12px/800 with 0.28em tracking. Mono + tight tracking
-  # is the brutalist voice (CTA scroll band) per the specimen's Page 9
-  # extraction.
-  font_size: 12
-  font_weight: "800"
-  letter_spacing: "0.28em"
-  font_family: "JetBrains Mono, 'SF Mono', Consolas, ui-monospace, monospace"
-  # Brutalism's K-override forbids physics-inspired separator glyphs; the
-  # specimen uses a 6×6 emerald square as a hard "bullet" between items.
-  separator_kind: rect
+  # v0.3.12 — MODULAR scrolling instrument panel. Prototype:
+  # brutalist-marquee-celadon.svg (800×44). Each metric is a fixed-width cast
+  # module: a small mono label STACKED OVER a bold condensed value, bounded by
+  # a 2px full-height divider at every module boundary — the same stacked-cell
+  # grammar as the dashboard strip and stats card, set in motion. The 136px
+  # module of the prototype is a REFERENCE output; the engine computes the
+  # uniform module pitch from measured content (widest label/value + 2*inset),
+  # clamped to module_min_width.
+  width: 800
+  height: 44
+  item_layout: module
+  # Value + label typography are GENOME-SOURCED via CSS vars (v0.3.12 fix), so
+  # the marquee renders the same faces as the brutalist badge/strip — the CSS
+  # bridge resolves both to JetBrains Mono. _resolve_font_for_measurement is
+  # genome-aware, so measurement uses the same face (no cram). The hero (first
+  # volume) cell renders one step larger at hero_font_size.
+  font_size: 20
+  hero_font_size: 22
+  font_weight: "700"
+  letter_spacing: "0.01em"
+  # font_family / label_font_size / separator_* drive the RIBBON path, used for
+  # FREE-TEXT marquees (no label+value to stack → inline flow, per brutalist-
+  # celadon-marquee-scroll-v2.svg: Barlow text + heavy ▮ bar separators). DATA
+  # marquees use the module_* fields below and ignore these.
+  font_family: "Barlow Condensed, 'Oswald', 'Arial Narrow', sans-serif"
+  label_font_size: 14
+  # Value = Barlow Condensed, the same condensed display face as the stat-card
+  # hero and brutalist-marquee-celadon.svg (the module prototype). var(--dna-
+  # font-display) resolves to JetBrains Mono for brutalist, which is why the
+  # value previously read as the wrong font; the cards hardcode Barlow the same
+  # way (paradigm stats.value_font_family). Embedded via font-embedding.yaml.
+  module_value_font_family: "Barlow Condensed, 'Oswald', 'Arial Narrow', sans-serif"
+  # Label typography — small mono caps over the value.
+  module_label_font_family: "var(--dna-font-mono, 'JetBrains Mono', ui-monospace, monospace)"
+  module_label_font_size: 8
+  module_label_letter_spacing: "0.12em"
+  module_text_inset: 16
+  module_label_y: 14
+  module_value_y: 35
+  # Heavy 2px divider at each module's right boundary, y6→38.
+  module_divider_w: 2
+  module_divider_y: 6
+  module_divider_h: 32
+  # Fixed cast-module width (brutalist-marquee-celadon.svg: 136px uniform).
+  # The cram-proof clamp grows it only if content exceeds 136; normal metrics
+  # leave left-aligned air inside the module (the prototype's cast-repetition
+  # principle), giving a provably seamless loop with no width-estimate drift.
+  module_min_width: 136
+  # Ribbon-path separator (free-text marquees): a heavy ▮ bar at the ribbon
+  # separator size, accent-toned via --dna-signal — the scroll-v2 inline
+  # separator. The module layout draws its own per-module dividers
+  # (module_divider_*) and ignores separator_*.
+  separator_kind: glyph
+  separator_glyph: "▮"
   separator_size: 6
-  # separator_color is the FALLBACK; the marquee template wraps this in
-  # var(--dna-signal, separator_color) — variant overrides cascade through
-  # --dna-signal automatically, the hex below is only the resolution fallback
-  # for renderers that don't honor CSS variables (Quick Look, some Slack
-  # previewers). Don't replace with var() — would double-wrap into
-  # var(--dna-signal, var(--dna-signal)).
   separator_color: "#10B981"
-  # Items rotate through [ink, info, ink, info, …] colors per position —
-  # the two-stop chromatic hierarchy (substrate vs info stops). Use CSS
-  # var() references (NOT hardcoded hex) so per-variant overrides flow
-  # through: carbon's text cycles cool gray-purple, pulse cycles paper +
-  # gold, etc. Hardcoded hex was the v0.3.2 emerald-bleed bug class —
-  # base genome's emerald #D1FAE5/#34D399 baked into every variant's
-  # marquee regardless of variant_overrides.
-  text_fill_mode: cycle
-  # v0.3.2 regression fix: was ["var(--dna-ink-bright)", "var(--dna-signal)"] —
-  # but ink_bright for dark variants resolves to the DARK surface color (e.g.,
-  # celadon ink_bright=#06140C = surface_0), making marquee text dark-on-dark
-  # invisible. Switched to ink_primary which carries the polarity-correct
-  # text color per variant (paper-bright on dark substrates, dark-ink on
-  # light substrates). Restores v0.3.1 celadon legibility AND adds light-
-  # variant correctness across all 12 brutalist variants.
-  text_fill_cycle: ["var(--dna-ink-primary)", "var(--dna-signal)"]
-  # Scroll-track clip: exclude the 4px emerald accent bar (left) and the 1px
-  # perimeter stroke (right/top/bottom). Sharp corners (rx=0) match the
-  # brutalist K-override (no rounded geometry).
-  clip_inset_left: 4
-  clip_inset_right: 1
-  clip_inset_top: 1
-  clip_inset_bottom: 1
+  # Scroll-track clip: the monolithic end-caps (left strobe-node, right seal)
+  # occupy x0–38 and x762–800, so the module stream is clipped to that window.
+  clip_inset_left: 38
+  clip_inset_right: 38
+  clip_inset_top: 0
+  clip_inset_bottom: 0
   clip_rx: 0

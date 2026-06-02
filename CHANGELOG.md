@@ -5,6 +5,28 @@ All notable changes to HyperWeave are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2026-06-01
+
+v0.3.12 widens HyperWeave's data reach with three new connectors, adds two dark brutalist palettes, rebuilds the horizontal marquee as a categorized instrument panel, and splits the install so the CLI stays lean.
+
+### Added
+
+- **Rust crates connector** &mdash; version, downloads, recent downloads, and license via `crates:` (alias `cargo:`).
+- **OpenSSF Scorecard connector** &mdash; keyless supply-chain trust score and per-check sub-scores via `scorecard:owner/repo`.
+- **GitHub Actions DORA connector** &mdash; deploy frequency, lead time, change failure rate, and MTTR over a 30-day window via `dora:owner/repo`.
+- **More provider fields** &mdash; GitHub contributors, open pull requests, and last-push recency; Hugging Face last-modified, gated status, and license; arXiv updated date, journal reference, and DOI.
+- **Brutalist umber + onyx** &mdash; fired-clay and achromatic-obsidian dark variants join the brutalist palette.
+- **Optional install extras** &mdash; the base install is CLI + render only; `pip install hyperweave[serve]` adds the HTTP server and `[mcp]` adds the MCP server.
+
+### Changed
+
+- **Horizontal marquee** &mdash; metrics auto-group into volume, activity, and identity zones, the first volume metric becomes the hero, activity values carry state color, and download counts are labeled with their period (all-time, weekly). Each genome's marquee frame was redesigned to fit the new layout and styling rules.
+
+### Fixed
+
+- **Strip text bleed** &mdash; directly-viewed served SVGs now load their own embedded fonts, so condensed identity text no longer overflows the next slot (every genome and frame, not just strips).
+- **PyPI downloads** &mdash; the `downloads` metric now reads from pepy.tech (keyless, reliable) instead of returning `--` when the prior source rate-limited.
+
 ## [0.3.11] - 2026-05-27
 
 v0.3.11 expands HyperWeave data cards to multi-source signals. Stats cards and charts now read from Hugging Face, PyPI, arXiv, npm, and Docker alongside GitHub, while established GitHub layouts and self-contained SVG output are preserved.

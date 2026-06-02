@@ -155,41 +155,74 @@ stats:
 icon:
   supported_shapes: [square, circle]
   default_shape: circle
-  # Internal viewBox = 120 (the v2 specimens' tuned coordinate system) while
-  # rendered width/height stays at 64. Lets the chrome icon templates use the
-  # specimen's r=46/r=42 bezel, 96×96 card, 6-unit rail, 0.6-unit hairlines
-  # at compact 64px display. shape-rendering: geometricPrecision keeps the
-  # subpixel hairlines (0.6-unit → 0.32px) anti-aliasing as fine machined
-  # edge rather than visual bug.
-  viewbox_w: 120
-  viewbox_h: 120
+  # Internal viewBox = 108 (the v2 specimens' tuned coordinate system, trimmed
+  # of excess padding) while rendered width/height stays at 64. The material
+  # stack is unchanged — specimen r=46/r=42 bezel, 96×96 card, 6-unit rail,
+  # 0.6-unit hairlines — but the frame now fills the box at the same ~85-89%
+  # the other genomes do (automata 100%, brutalist 94%) instead of floating in
+  # a 120-unit field at 77-80%. 108 keeps the bevel's 8% filter bleed (7.68u)
+  # inside the 6-8u margins; group origins recenter in the resolver
+  # (chrome_circle_group 54, chrome_square_group 6). shape-rendering:
+  # geometricPrecision keeps the subpixel hairlines (0.6-unit → 0.36px)
+  # anti-aliasing as fine machined edge rather than visual bug.
+  viewbox_w: 108
+  viewbox_h: 108
 
 marquee:
-  # Specimen: chrome-marquee-horizontal.svg (1040×56). Pure scroll
-  # band — no LIVE label panel after v0.2.16 (LIVE block deleted entirely).
-  width: 1040
-  height: 56
-  # Orbitron at 22px/900 with 0.18em tracking is the marquee voice for chrome
-  # (the magazine page-8 ribbon of identity). Resolver converts em→px when
-  # measuring content width via measure_text.
-  font_size: 22
+  # v0.3.12 — reconciled to marquee-dense-chrome.svg (800×44): a dense scroll
+  # band with a LIVE wordmark + pulsing diamond in the left inset. The prototype
+  # stacks each metric as a SMALL label (y=15) over a bold value (y=31) — the
+  # instrument-panel "module" grammar, NOT an inline ribbon. v0.3.12-fix sets
+  # item_layout=module (it was previously unset → silently fell through to the
+  # inline ribbon, which is what shipped). Orbitron 11px value / 6px label,
+  # 0.18em tracking. The prototype has NO inter-cell dividers (only the single
+  # LIVE-panel rule at x=82, rendered by the liveness overlay), so
+  # module_divider_w=0 — modules read as spaced stacked cells.
+  item_layout: module
+  width: 800
+  height: 44
+  font_size: 11
+  label_font_size: 6
   font_weight: "900"
-  letter_spacing: "0.18em"
+  # Value-row tracking (0.06em) matches the prototype's .mq-v-* classes; the
+  # label row tracks wider (module_label_letter_spacing=0.18em, like .mq-label).
+  letter_spacing: "0.06em"
   font_family: "Orbitron, 'Space Grotesk', system-ui, sans-serif"
-  # Specimen separator is the middle-dot at #60E0FF (electric cyan) — a
-  # paradigm signature that ties this marquee to the chrome family.
-  separator_glyph: "·"
+  # Module stacked-cell geometry (prototype: label baseline y=15, value y=31 in
+  # the 44-tall band). Orbitron for both rows (chrome marquee embeds Orbitron
+  # only); the small 6px label tracks at 0.18em like the prototype's mq-label.
+  # divider_w=0 → no inter-cell rule (prototype spaces cells; the only rule is
+  # the LIVE-panel separator drawn by the overlay). hero cell bumps to 13px.
+  hero_font_size: 13
+  module_label_font_size: 6
+  module_label_y: 15
+  module_value_y: 31
+  module_label_letter_spacing: "0.18em"
+  module_text_inset: 14
+  # Prototype cell pitch ≈ 89px (892px scroll ÷ 10 cells). 90 matches that
+  # density (vs the prior over-spaced clamp) while keeping a short one-item
+  # marquee's repeated period above the 800px viewport floor for a seamless loop.
+  module_min_width: 90
+  module_divider_w: 0
+  module_divider_y: 6
+  module_divider_h: 32
+  # Separator fields drive the RIBBON path used for FREE-TEXT chrome marquees
+  # (data marquees use the stacked module + its own dividers). The chrome family
+  # middle-dot (·) at the accent tone, instead of the resolver's ■ default.
   separator_color: "#60E0FF"
   separator_kind: glyph
+  separator_glyph: "·"
   # Every scroll item uses the chrome-text gradient (#5A8AAA→…→#FFFFFF→…→
   # #5A8AAA). The gradient itself lives in marquee-horizontal/chrome-defs.j2
   # under id "{{ uid }}-ct"; the resolver constructs the full url(#…) string.
   text_fill_mode: gradient
   text_fill_gradient_id: ct
-  # Scroll-track clip: exclude the 4px chrome bezel zones at all four edges
-  # so scrolling text disappears under the bezel instead of rendering on top
-  # of it. rx=2.6 matches the well rect's rx for a clean clip boundary.
-  clip_inset_left: 4
+  # Scroll-track clip: exclude the 4px chrome bezel (right/top/bottom) so
+  # scrolling text disappears under the bezel instead of rendering on top of
+  # it. v0.3.12 — the LEFT inset (92) reserves the decorative LIVE + diamond
+  # panel (chrome-overlay.j2) so modules scroll in past it. rx=2.6 matches the
+  # well rect's rx for a clean clip boundary.
+  clip_inset_left: 92
   clip_inset_right: 4
   clip_inset_top: 4
   clip_inset_bottom: 4

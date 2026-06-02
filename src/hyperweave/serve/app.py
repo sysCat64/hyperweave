@@ -113,7 +113,15 @@ async def svg_camo_headers(request: Request, call_next):  # type: ignore[no-unty
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Vary"] = "Accept"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"
+        # font-src data: permits the woff2 faces embedded directly in the SVG
+        # (@font-face src=url(data:font/woff2;...)). Without it, font-src inherits
+        # default-src 'none' and the browser refuses the SVG's OWN embedded fonts
+        # on the direct-served route — the display font silently falls back to a
+        # wider system face, overflowing tight slots (the brutalist strip identity
+        # bleed). A CSP must permit the fonts its own response embeds; this is
+        # server-wide (the middleware wraps every SVG), so one directive fixes
+        # every genome/frame. Invariant: tests/test_serve_font_csp.py.
+        response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; font-src data:"
     return response
 
 
@@ -262,7 +270,8 @@ async def compose_badge_data_url(
         Query(
             description=(
                 "Required. Data tokens, comma-separated. Forms: text:STRING | "
-                "kv:KEY=VALUE | gh:owner/repo.metric | pypi:pkg.metric | etc. "
+                "kv:KEY=VALUE | gh:owner/repo.metric | pypi:pkg.metric | npm | hf | "
+                "arxiv | docker | crates | scorecard:owner/repo | dora:owner/repo. "
                 "Embedded commas in text/kv payloads escape as \\,."
             )
         ),
@@ -544,9 +553,10 @@ async def compose_marquee_url(
         Query(
             description=(
                 "Data tokens, comma-separated. Forms: text:STRING | kv:KEY=VALUE | "
-                "gh:owner/repo.metric | pypi:pkg.metric | etc. When set, the title "
-                "param is ignored as a data source — tokens drive the scroll. Embedded "
-                "commas in text/kv payloads escape as \\,."
+                "gh:owner/repo.metric | pypi | npm | hf | arxiv | docker | crates | "
+                "scorecard | dora | etc. When set, the title param is ignored as a data "
+                "source — tokens drive the scroll. Embedded commas in text/kv payloads "
+                "escape as \\,."
             )
         ),
     ] = "",

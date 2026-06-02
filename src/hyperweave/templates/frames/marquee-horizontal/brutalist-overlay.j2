@@ -1,12 +1,28 @@
-{# Brutalist horizontal-marquee OVERLAY layers — sit ABOVE the scroll-track text.
-   Renders the perimeter stroke + 4px left accent bar so they occlude scrolling
-   text at the frame edges (text appears to slide UNDER the perimeter and
-   accent bar instead of over them). Specimen: brutalist-marquee-v1.svg.
-   Layer order (rendered on top of text):
-     1. 1px perimeter stroke (genome.signal_hex @ opacity 0.4)
-     2. 4px left accent bar (genome.signal_hex solid)
-   Brutalism's K-override: flat slab, sharp corners (rx=0), one accent bar.
+{# Brutalist horizontal-marquee OVERLAY — sits ABOVE the scroll modules.
+   v0.3.12 module instrument panel. Specimen: brutalist-marquee-celadon.svg.
+   Monolithic end-caps bracket the module stream and occlude modules sliding
+   under them at the readout-window edges. The LEFT cap holds a square-in-square
+   strobing LIVE NODE (decorative, own @keyframes in brutalist-defs.j2, no
+   data-hw-status); the RIGHT cap holds a static square seal. A 3px bottom
+   accent rail is the foundation; a 1px perimeter frames the band.
+
+   ALL geometry is resolver-supplied (the `liveness` context dict) — zero
+   coordinate arithmetic / literals here (spatial stencil contract).
 #}
-<rect x="{{ marquee_geom.brutalist_border_x }}" y="{{ marquee_geom.brutalist_border_y }}" width="{{ marquee_perimeter_w }}" height="{{ marquee_perimeter_h }}"
-      fill="none" stroke="{{ signal_hex }}" stroke-width="1" opacity="0.4"/>
-<rect x="{{ marquee_geom.brutalist_accent_x }}" y="{{ marquee_geom.brutalist_accent_y }}" width="{{ marquee_geom.brutalist_accent_w }}" height="{{ mh }}" fill="{{ signal_hex }}"/>
+{% if liveness.cap_l_w %}
+<g data-hw-zone="cap-left">
+  <rect x="{{ liveness.origin }}" y="{{ liveness.origin }}" width="{{ liveness.cap_l_w }}" height="{{ liveness.cap_h }}" fill="{{ surface_hex }}"/>
+  <rect x="{{ liveness.cube_outer_x }}" y="{{ liveness.cube_outer_y }}" width="{{ liveness.cube_outer_w }}" height="{{ liveness.cube_outer_w }}" fill="none" stroke="{{ signal_hex }}" stroke-width="1.5"/>
+  <rect x="{{ liveness.cube_inner_x }}" y="{{ liveness.cube_inner_y }}" width="{{ liveness.cube_inner_w }}" height="{{ liveness.cube_inner_w }}" class="hw-mq-cube" fill="{{ signal_hex }}"/>
+  <rect x="{{ liveness.cap_l_rail_x }}" y="{{ liveness.origin }}" width="{{ liveness.cap_rail_w }}" height="{{ liveness.cap_h }}" fill="{{ signal_hex }}"/>
+</g>
+{% endif %}
+{% if liveness.cap_r_w %}
+<g data-hw-zone="cap-right">
+  <rect x="{{ liveness.cap_r_x }}" y="{{ liveness.origin }}" width="{{ liveness.cap_r_w }}" height="{{ liveness.cap_h }}" fill="{{ surface_hex }}"/>
+  <rect x="{{ liveness.cap_r_x }}" y="{{ liveness.origin }}" width="{{ liveness.cap_rail_w }}" height="{{ liveness.cap_h }}" fill="{{ signal_hex }}"/>
+  <rect x="{{ liveness.seal_x }}" y="{{ liveness.seal_y }}" width="{{ liveness.seal_w }}" height="{{ liveness.seal_w }}" fill="{{ signal_hex }}"/>
+</g>
+{% endif %}
+<rect x="{{ liveness.origin }}" y="{{ liveness.bottom_rail_y }}" width="{{ mw }}" height="{{ liveness.bottom_rail_h }}" fill="{{ signal_hex }}" shape-rendering="crispEdges"/>
+<rect x="{{ liveness.perimeter_x }}" y="{{ liveness.perimeter_y }}" width="{{ liveness.perimeter_w }}" height="{{ liveness.perimeter_h }}" fill="none" stroke="{{ signal_hex }}" stroke-opacity="0.30" stroke-width="1" shape-rendering="crispEdges"/>

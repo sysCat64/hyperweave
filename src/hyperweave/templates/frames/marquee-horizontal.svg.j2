@@ -1,21 +1,25 @@
 {# HyperWeave Horizontal Marquee — paradigm-driven scrolling band.
 
-   v0.2.16: LIVE label panel removed entirely. The shared template now
-   renders ONLY the paradigm chrome (envelope/slab/perimeter — see
-   {paradigm}-content.j2) plus the scrolling track. Scroll items carry
-   ABSOLUTE x positions computed by the resolver from font metrics, so
-   text doesn't overlap regardless of content length or token source
-   (raw text, ?data= tokens). Set-A and Set-B duplicate the same items;
-   Set-B is offset by scroll_distance so the SMIL animateTransform
-   (translate from 0 to -scroll_distance) produces a seamless loop.
+   v0.3.12: scroll-item layout is dispatched by the CONFIG VALUE item_layout
+   (ribbon | module), never a `paradigm == ...` branch — chrome + cellular
+   share item-ribbon.j2, brutalist uses item-module.j2. Category grouping,
+   per-cell state colors (via the state-signal-cascade bridge), and role-based
+   hero are all computed in the resolver from the existing ?data= tokens.
+
+   Scroll items carry ABSOLUTE x positions (and, for module layout, divider x)
+   computed by the resolver from font metrics, so text never overlaps
+   regardless of content length. Set-A and Set-B duplicate the same items;
+   Set-B is offset by scroll_distance so the SMIL animateTransform produces a
+   seamless loop. Per-paradigm DECORATIVE liveness (chrome diamond+LIVE,
+   brutalist strobe-cube cap, cellular wave-rail) lives in {paradigm}-content/
+   overlay/defs.j2 with its OWN @keyframes — never the state cascade.
 
    Profile-dispatched: paradigm context var routes
-     {paradigm}-defs.j2     — paradigm-specific gradients/filters
-     {paradigm}-content.j2  — paradigm-specific frame chrome (no LIVE block)
+     {paradigm}-defs.j2     — paradigm-specific gradients/filters/liveness defs
+     {paradigm}-content.j2  — frame chrome BELOW the scroll text
+     {paradigm}-overlay.j2  — frame chrome + liveness ABOVE the scroll text
 
-   Extends document.svg.j2. Context: see compose/context.py:_ctx_marquee
-   for default keys; see compose/resolver.py:_resolve_horizontal for the
-   paradigm-driven values that override them.
+   Extends document.svg.j2. Context: compose/resolver.py:_resolve_horizontal.
 #}
 {% extends "document.svg.j2" %}
 
@@ -23,16 +27,16 @@
 {% set mw = width | default(800) %}
 {% set mh = height | default(40) %}
   {# Scroll-track clip — paradigm-inset rect that excludes the perimeter
-     zones (chrome bezel, accent bar, hairlines). Combined with the layered
-     render order (background -> text -> overlay), this makes characters
-     disappear cleanly under the perimeter elements at the edges instead of
-     showing on top of them. clip_x/y/w/h/rx come from ParadigmMarqueeConfig
-     (defaults to full viewport for paradigms with no perimeter to mask). #}
+     zones (chrome bezel, accent bar, hairlines, brutalist end-caps). #}
   <clipPath id="{{ uid }}-scroll-clip">
     <rect x="{{ clip_x | default(0) }}" y="{{ clip_y | default(0) }}"
           width="{{ clip_w | default(mw) }}" height="{{ clip_h | default(mh) }}"
           rx="{{ clip_rx | default(0) }}"/>
   </clipPath>
+  {# State-signal cascade — binds data-hw-status → var(--hw-state-value) from
+     the genome's state_* hexes so stateful (activity) cells tint their value.
+     Wrapped in <style> because the partial emits bare CSS rules. #}
+  <style>{% include "partials/state-signal-cascade.j2" %}</style>
 {% include "frames/marquee-horizontal/" ~ (paradigm | default("default")) ~ "-defs.j2" %}
 {% endblock %}
 
@@ -42,94 +46,42 @@
 {% set sd = scroll_distance | default(1000) %}
 {% set dur = scroll_dur | default(11.09) %}
 {% set fs = font_size | default(13) %}
+{% set lfs = label_font_size | default(fs) %}
 {% set fw = font_weight | default('') %}
 {% set ls = letter_spacing | default('.5') %}
 {% set ff = scroll_font_family | default('var(--dna-font-mono, ui-monospace, monospace)') %}
 {% set sk = separator_kind | default('glyph') %}
 {% set ssz = separator_size | default(6) %}
 {% set sg = separator_glyph | default('■') %}
-{# Separator color cascades through --dna-signal so each chrome variant's
-   accent flows naturally into the bullet. The paradigm YAML's value becomes
-   the var() fallback — preserves byte-equality on URLs that don't override
-   --dna-signal (bare flagship resolves to its own accent via --dna-signal). #}
+{# Separator/divider color cascades through --dna-signal so each variant's
+   accent flows naturally into the bullet / module divider. #}
 {% set sc = separator_fill | default('var(--dna-signal, var(--dna-border))') %}
 {% set tfid = text_fill_gradient_id | default('') %}
-{# Vertical centering: dominant-baseline=central + y=mh/2 puts text mid-height
-   regardless of font size. Separator rects are centered via (mh - ssz) / 2. #}
+{# Ribbon vertical centering: dominant-baseline=central + y=mh/2. #}
 {% set baseline_y = marquee_baseline_y %}
 {% set sep_rect_y = separator_rect_y %}
 
-{# Frame chrome BACKGROUND — paradigm-dispatched. Renders the layers that
-   sit BELOW the scroll-track text (envelope-fill+well for chrome, flat slab
-   for brutalist, void ground for cellular). The PERIMETER layers (hairlines,
-   rail, accent bar, rim sweep) are rendered AFTER the scroll text via the
-   {paradigm}-overlay.j2 partial below — that split lets text visually scroll
-   UNDER the perimeter elements at the frame edges instead of overlapping
-   them with passing characters. No LIVE label panel after v0.2.16. #}
+{# Frame chrome BACKGROUND — paradigm-dispatched. Renders the layers BELOW the
+   scroll text (envelope+well for chrome, flat slab + engineering grid for
+   brutalist, void ground for cellular). PERIMETER + liveness layers render
+   AFTER the scroll text via {paradigm}-overlay.j2. #}
 {% include "frames/marquee-horizontal/" ~ (paradigm | default("default")) ~ "-content.j2" %}
 
-{# Scrolling track — clipped to scroll-clip; SMIL animateTransform translates
-   from 0 to -scroll_distance over scroll_dur seconds, infinite loop. Set-A
-   and Set-B are sibling groups; Set-B is offset by scroll_distance so it
-   trails Set-A and slides into the viewport as Set-A leaves. Same item list
-   rendered in both groups. #}
+{# Scrolling track — clipped; SMIL translate from 0 to -scroll_distance over
+   scroll_dur seconds, infinite loop. The Set-A/Set-B groups are rendered by
+   the item-layout partial selected by item_layout (ribbon | module) — two
+   paradigms may resolve to the same partial; the layout is a data value, not
+   a paradigm-slug branch (Invariant 12). #}
 <g clip-path="url(#{{ uid }}-scroll-clip)">
   <g data-hw-zone="scroll-track">
     <animateTransform attributeName="transform" type="translate"
         from="0 0" to="-{{ sd }} 0"
         dur="{{ dur }}s" repeatCount="indefinite"/>
-
-    {# ── Set A ── items at their absolute x positions from the resolver ── #}
-    <g data-hw-zone="set-a">
-{% for entry in scroll_items %}
-{% if entry.type == 'text' %}
-{% set it = entry.item %}
-      <text x="{{ entry.x }}" y="{{ baseline_y }}" dominant-baseline="central"
-            font-family="{{ ff }}" font-size="{{ fs }}" letter-spacing="{{ ls }}"{% if it.font_weight %} font-weight="{{ it.font_weight }}"{% elif fw %} font-weight="{{ fw }}"{% endif %}>{% if it.label %}<tspan{% if it.label_color %} fill="{{ it.label_color }}"{% else %} fill="url(#{{ uid }}-{{ tfid }})"{% endif %}>{{ it.label }}</tspan><tspan dx="8"{% if it.value_color %} fill="{{ it.value_color }}"{% else %} fill="url(#{{ uid }}-{{ tfid }})"{% endif %}>{{ it.value }}</tspan>{% else %}<tspan{% if it.value_color %} fill="{{ it.value_color }}"{% else %} fill="url(#{{ uid }}-{{ tfid }})"{% endif %}>{{ it.value }}</tspan>{% endif %}</text>
-{% elif entry.type == 'separator-glyph' %}
-      <text x="{{ entry.x }}" y="{{ baseline_y }}" dominant-baseline="central"
-            font-family="{{ ff }}" font-size="{{ fs }}"
-            fill="{{ sc }}">{{ sg }}</text>
-{% elif entry.type == 'separator-rect' %}
-      <rect x="{{ entry.x }}" y="{{ sep_rect_y }}" width="{{ ssz }}" height="{{ ssz }}"
-            fill="{{ sc }}" shape-rendering="crispEdges"/>
-{% endif %}
-{% endfor %}
-    </g>
-
-    {# ── Set B ── identical items shifted by scroll_distance for seamless loop.
-       Text colors read item.value_color_set_b / label_color_set_b instead of
-       the Set-A colors so the loop boundary alternates correctly when the
-       per-item color cycle doesn't divide evenly into the total item count.
-       Resolver pre-computes _set_b colors with offset = total_items so
-       Set B picks up the cycle one position ahead and Set-A's last color
-       differs from Set-B's first color. ── #}
-    <g data-hw-zone="set-b" transform="translate({{ sd }}, 0)" aria-hidden="true">
-{% for entry in scroll_items %}
-{% if entry.type == 'text' %}
-{% set it = entry.item %}
-{% set vcb = it.value_color_set_b | default(it.value_color) %}
-{% set lcb = it.label_color_set_b | default(it.label_color) %}
-      <text x="{{ entry.x }}" y="{{ baseline_y }}" dominant-baseline="central"
-            font-family="{{ ff }}" font-size="{{ fs }}" letter-spacing="{{ ls }}"{% if it.font_weight %} font-weight="{{ it.font_weight }}"{% elif fw %} font-weight="{{ fw }}"{% endif %}>{% if it.label %}<tspan{% if lcb %} fill="{{ lcb }}"{% else %} fill="url(#{{ uid }}-{{ tfid }})"{% endif %}>{{ it.label }}</tspan><tspan dx="8"{% if vcb %} fill="{{ vcb }}"{% else %} fill="url(#{{ uid }}-{{ tfid }})"{% endif %}>{{ it.value }}</tspan>{% else %}<tspan{% if vcb %} fill="{{ vcb }}"{% else %} fill="url(#{{ uid }}-{{ tfid }})"{% endif %}>{{ it.value }}</tspan>{% endif %}</text>
-{% elif entry.type == 'separator-glyph' %}
-      <text x="{{ entry.x }}" y="{{ baseline_y }}" dominant-baseline="central"
-            font-family="{{ ff }}" font-size="{{ fs }}"
-            fill="{{ sc }}">{{ sg }}</text>
-{% elif entry.type == 'separator-rect' %}
-      <rect x="{{ entry.x }}" y="{{ sep_rect_y }}" width="{{ ssz }}" height="{{ ssz }}"
-            fill="{{ sc }}" shape-rendering="crispEdges"/>
-{% endif %}
-{% endfor %}
-    </g>
+{% include "frames/marquee-horizontal/item-" ~ (item_layout | default("ribbon")) ~ ".j2" %}
   </g>
 </g>
 
-{# Frame chrome OVERLAY — paradigm-dispatched. Renders the perimeter elements
-   (inner hairline, env-rail, top accent, rim sweep for chrome; perimeter +
-   accent bar for brutalist; top + bottom hairlines for cellular) ABOVE the
-   scroll-track so passing text visually slides UNDER them at the frame edges
-   instead of overlapping. The `ignore missing` lets paradigms that don't need
-   an overlay (default) opt out without an empty file. #}
+{# Frame chrome + liveness OVERLAY — paradigm-dispatched, ABOVE the scroll
+   text so passing text slides UNDER the perimeter and the liveness markup. #}
 {% include "frames/marquee-horizontal/" ~ (paradigm | default("default")) ~ "-overlay.j2" ignore missing %}
 {% endblock %}

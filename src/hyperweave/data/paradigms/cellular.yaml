@@ -168,25 +168,31 @@ icon:
   outer_border_rx: 6
 
 marquee:
-  # v0.3.0 cellular marquee refresh — 800×32 monofamily strip with mid_accent
-  # hairlines (top + bottom) and info_accent scroll text. Replaces the prior
-  # bifamily teal/amethyst tspan_palette: paired variants no longer split
-  # bifamily on the marquee — the hairlines are 0.5px at 0.2 opacity, too
-  # subtle for a chromatic split to register, so the marquee adopts the
-  # primary tone's mid_accent and lets paired-variant signature express
-  # through scroll text + cell colors in other frames.
+  # v0.3.12 — reconciled to automata-bone-marquee-v4.svg (800×44): an inline
+  # single-baseline scroll line over a travelling-wave cell-rail, with
+  # mid_accent hairlines. Value 16px / label 9px (the prototype's typographic
+  # hierarchy, replacing the prior 800×32 / flat-11px strip). Paired variants
+  # no longer split bifamily on the marquee — the hairlines are too subtle for
+  # a chromatic split to register, so it adopts the primary tone's mid_accent
+  # and lets paired-variant signature express through other frames.
   width: 800
-  height: 32
-  font_size: 11
+  height: 44
+  font_size: 16
+  label_font_size: 9
   font_weight: "700"
   font_family: "Orbitron, sans-serif"
   letter_spacing: "0.18em"
-  # Separator glyph between scroll items. Cellular specimen uses diamonds (◆)
-  # at 5px sized (smaller than scroll text), filled with mid_accent (resolver
-  # routes the tone-specific value; this default is the v0.3.0 amber prototype's
-  # mid stop, only used when resolver fallback fires).
-  separator_glyph: "◆"
+  # Separator glyph between scroll items. automata-bone-marquee-v4.svg uses a
+  # small filled square (▪, U+25AA) rendered at the LABEL size (9px, quieter
+  # than the 16px value) and filled with a neutral ink tone (#928D7C) — NOT the
+  # variant accent. separator_fill routes it to var(--dna-ink-muted) so the
+  # bullet recedes like the prototype's, instead of popping as the gold/cyan
+  # accent diamond the prior ◆ + var(--dna-signal) wrapper produced.
+  # separator_color stays as the wrapper fallback (unused while separator_fill
+  # is set).
+  separator_glyph: "▪"
   separator_color: "#B89800"
+  separator_fill: "var(--dna-ink-muted)"
   # Cellular always renders without a LIVE label panel; v0.2.16 deleted the
   # LIVE-block infrastructure entirely so this is now the universal default.
   # Scroll-track clip: exclude the 0.5px top and bottom hairlines (no left/

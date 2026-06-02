@@ -11,7 +11,13 @@
   {# Embed Orbitron + JetBrains Mono via @font-face base64 data URIs so the
      marquee renders consistently in any context (Camo proxy, Finder Quick
      Look, email) without depending on system-installed fonts. #}
-  <style>{{ font_faces | safe }}</style>
+  <style>{{ font_faces | safe }}
+  {# v0.3.12 — DECORATIVE LIVE diamond pulse (own @keyframes, phi-timed; not the
+     state cascade, no data-hw-status). prefers-reduced-motion freezes it. #}
+  .hw-mq-diamond { will-change: opacity; animation: hw-mq-pulse 2.618s ease-in-out infinite; }
+  @keyframes hw-mq-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.15 } }
+  @media (prefers-reduced-motion: reduce) { .hw-mq-diamond { animation: none !important; opacity: 0.8; } }
+  </style>
 
   {# 11-stop chrome envelope · drift-animated 6.854s (φ⁴) on the body fill #}
   <linearGradient id="{{ uid }}-envelope" x1="0" x2="0" y1="{{ gradient_y_neg_005 }}" y2="{{ gradient_y_095 }}">
@@ -65,14 +71,36 @@
       calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
   </linearGradient>
 
-  {# Specular bevel · feDropShadow + feSpecularLighting at azimuth 225° / elevation 45°
-     with arithmetic composite. Replaces the simple drop-shadow filter that
-     was {{ uid }}-shadow in v0.2.14 and earlier. #}
-  <filter id="{{ uid }}-bevel" x="-2%" y="-3%" width="104%" height="108%">
-    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="{{ bevel_shadow_color }}" flood-opacity="0.5"/>
-    <feSpecularLighting in="SourceAlpha" surfaceScale="1.2" specularConstant="0.5" specularExponent="22" lighting-color="{{ specular_light }}" result="spec">
-      <feDistantLight azimuth="225" elevation="45"/>
-    </feSpecularLighting>
-    <feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn"/>
-    <feComposite in="SourceGraphic" in2="specIn" operator="arithmetic" k1="0" k2="1" k3="0.2" k4="0"/>
+  {# Top specular · static horizontal milled highlight (prototype mq-C-specular).
+     The 1px top line reads as a machined edge without the glare of a full
+     feSpecularLighting pass. #}
+  <linearGradient id="{{ uid }}-specular" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="{{ specular_light }}" stop-opacity="0"/>
+    <stop offset="50%" stop-color="{{ specular_light }}" stop-opacity="0.18"/>
+    <stop offset="100%" stop-color="{{ specular_light }}" stop-opacity="0"/>
+  </linearGradient>
+
+  {# Bottom shadow band · static vertical darkening (prototype mq-C-shadow-band)
+     that seats the well into the envelope. #}
+  <linearGradient id="{{ uid }}-shadow-band" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="{{ bevel_shadow_color }}" stop-opacity="0"/>
+    <stop offset="100%" stop-color="{{ bevel_shadow_color }}" stop-opacity="0.45"/>
+  </linearGradient>
+
+  {# LIVE-zone seam · subtle gradient stroke that fades to nothing at both ends
+     (prototype mq-C-sep). Replaces a solid --dna-highlight line that read as a
+     hard "|"; the 0 -> 0.45 -> 0 vertical fade matches the prototype's soft
+     seam between the fixed LIVE panel and the scroll track. #}
+  <linearGradient id="{{ uid }}-sep" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="var(--dna-highlight, var(--dna-signal))" stop-opacity="0"/>
+    <stop offset="50%" stop-color="var(--dna-highlight, var(--dna-signal))" stop-opacity="0.45"/>
+    <stop offset="100%" stop-color="var(--dna-highlight, var(--dna-signal))" stop-opacity="0"/>
+  </linearGradient>
+
+  {# Frame shadow · flat drop shadow (prototype mq-C-shadow). v0.3.12-fix:
+     replaces the feSpecularLighting bevel, whose 3D edge highlight thickened
+     the border and blurs under mobile rasterization (badge drop-shadow-only
+     discipline is the reference). id stays {{ uid }}-bevel for the content rect. #}
+  <filter id="{{ uid }}-bevel" x="-1%" y="-4%" width="102%" height="112%">
+    <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="{{ bevel_shadow_color }}" flood-opacity="0.30"/>
   </filter>

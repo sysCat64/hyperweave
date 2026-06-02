@@ -142,13 +142,15 @@ def test_cellular_icon_dimensions() -> None:
 
 
 def test_cellular_marquee_dimensions() -> None:
-    """v0.3.0 visual refresh: marquee compacts to 800x32 with Orbitron-only
-    font payload and monofamily mid_accent hairlines."""
+    """v0.3.12: marquee reconciled to automata-bone-marquee-v4.svg (800x44) with
+    a 16px value / 9px label hierarchy (was 800x32 / flat 11px). Orbitron-only
+    font payload and monofamily mid_accent hairlines retained."""
     cellular = get_paradigms()["cellular"]
     assert cellular.marquee.width == 800
-    assert cellular.marquee.height == 32
+    assert cellular.marquee.height == 44
     assert cellular.marquee.font_family == "Orbitron, sans-serif"
-    assert cellular.marquee.font_size == 11
+    assert cellular.marquee.font_size == 16
+    assert cellular.marquee.label_font_size == 9
 
 
 def test_cellular_heatmap_fits_card_height() -> None:

@@ -30,6 +30,8 @@ archive/
 outputs/
 tier2/experiments/
 
+assets/banners/hyperweave-banner-chirp-caps.svg
+assets/banners/hyperweave-banner-clean.svg
 assets/cards/butterfly-mcp.svg
 assets/cards/card-moon.svg
 assets/cards/cards-2x2-v2.svg

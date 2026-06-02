@@ -1,11 +1,14 @@
 {# Chrome horizontal-marquee BACKGROUND layers — sit BELOW the scroll-track text.
-   Specimen: chrome-marquees-v2 + production marquee-horizontal.svg.
+   Specimen: marquee-dense-chrome.svg (v0.3.12 frame reconciliation).
    Layer order:
-     1. envelope-fill rect with bevel filter (rx=4, full mw x mh)
-     2. well rect (rx=2.6, inset 4px, dark interior)
-   The PERIMETER layers (inner hairline, env-rail, top accent, rim sweep)
-   live in chrome-overlay.j2 so they render ABOVE the scroll text — text
-   then visually scrolls UNDER them at the edges instead of over them.
+     1. envelope-fill rect with the {{ uid }}-bevel FLAT DROP SHADOW (rx=4, full
+        mw x mh) — v0.3.12-fix replaced the feSpecularLighting bevel that
+        brightened/thickened the border.
+     2. well rect (rx=2.5, inset 2px — prototype's thin border, was 4px).
+   The PERIMETER metallic layers (inner hairline, 3.5px left edge sliver, top
+   specular line, white sheen, bottom shadow band, corner rivets, rim sweep)
+   live in chrome-overlay.j2 so they render ABOVE the scroll text — text then
+   visually scrolls UNDER them at the edges instead of over them.
 #}
 <g filter="url(#{{ uid }}-bevel)">
   <rect width="{{ mw }}" height="{{ mh }}" rx="{{ marquee_geom.chrome_outer_rx }}" fill="url(#{{ uid }}-envelope)"/>

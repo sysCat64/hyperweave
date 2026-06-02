@@ -54,6 +54,20 @@ def test_parse_pypi_live_token() -> None:
     assert tokens == [DataToken(kind="live", provider="pypi", identifier="hyperweave", metric="downloads")]
 
 
+def test_parse_cargo_aliases_to_crates() -> None:
+    tokens = parse_data_tokens("cargo:serde.version")
+    assert tokens == [DataToken(kind="live", provider="crates", identifier="serde", metric="version")]
+
+
+def test_parse_scorecard_and_dora_slash_identifiers() -> None:
+    """v0.3.12 providers carry owner/repo identifiers; last-dot split applies."""
+    tokens = parse_data_tokens("scorecard:tokio-rs/tokio.score,dora:fastapi/fastapi.mttr")
+    assert tokens == [
+        DataToken(kind="live", provider="scorecard", identifier="tokio-rs/tokio", metric="score"),
+        DataToken(kind="live", provider="dora", identifier="fastapi/fastapi", metric="mttr"),
+    ]
+
+
 def test_parse_arxiv_token_with_dotted_identifier() -> None:
     """The parser splits on the LAST dot so dotted arxiv IDs survive."""
     tokens = parse_data_tokens("arxiv:2310.06825.citations")

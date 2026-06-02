@@ -30,17 +30,19 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries",
     "Topic :: Multimedia :: Graphics",
+    "Framework :: FastAPI",
     "Typing :: Typed",
 ]
+# Core install (CLI + render engine). The compose / render / connector modules
+# import none of fastapi / uvicorn / fastmcp — those live behind the optional
+# extras below so `pip install hyperweave` stays lean for the badge/render use
+# case. The HTTP server and MCP server are opt-in (`[serve]` / `[mcp]`).
 dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.34",
     "typer[all]>=0.15",
     "jinja2>=3.1",
     "httpx[http2]>=0.28",
-    "fastmcp>=3.0",
     "pyyaml>=6.0",
     # Font subsetting (v0.3.7). Runtime — not dev-only — because
     # render/fonts.py imports fontTools at module top-level, which
@@ -51,8 +53,17 @@ dependencies = [
     "brotli>=1.2.0",
 ]
 
+[project.optional-dependencies]
+# HTTP server (`hyperweave serve`). serve/app.py is the only fastapi user.
+serve = ["fastapi>=0.115", "uvicorn[standard]>=0.34"]
+# MCP server (`hyperweave mcp`, stdio). mcp/server.py is the only fastmcp user.
+mcp = ["fastmcp>=3.0"]
+# Convenience: both servers.
+all = ["hyperweave[serve,mcp]"]
+
 [project.urls]
-# Documentation = "https://hyperweave.app/docs"
+Homepage = "https://hyperweave.app"
+Documentation = "https://hyperweave.app/docs"
 Repository = "https://github.com/InnerAura/hyperweave"
 Issues = "https://github.com/InnerAura/hyperweave/issues"
 Discord = "https://discord.gg/wVmcAZPQZ8"
@@ -76,6 +87,12 @@ packages = ["src/hyperweave"]
 
 [dependency-groups]
 dev = [
+    # Runtime server extras — kept OUT of the core install (pyproject
+    # [serve]/[mcp]) but installed for dev/CI so the full suite can test
+    # serve/app.py + mcp/server.py via `uv run pytest`.
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "fastmcp>=3.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",

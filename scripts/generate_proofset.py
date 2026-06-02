@@ -1364,7 +1364,7 @@ def generate_readme(total: int, live_total: int) -> None:
         "Quick-reference proofset for the three production genomes plus telemetry "
         "and parity surfaces. Per-variant artifact matrices live in dedicated files:",
         "",
-        "- [README_BRUTALIST.md](README_BRUTALIST.md) — 12 brutalist variants (6 dark monochromes + 6 light scholars)",
+        "- [README_BRUTALIST.md](README_BRUTALIST.md) — 14 brutalist variants (8 dark monochromes + 6 light scholars)",
         "- [README_CHROME.md](README_CHROME.md) — 5 chrome material identities "
         "(horizon, abyssal, lightning, graphite, moth)",
         "- [README_AUTOMATA.md](README_AUTOMATA.md) — 16 automata solo tones plus pairing-grammar showcase",
@@ -1732,6 +1732,8 @@ _BRUTALIST_DARK_PHENOMENOLOGY: list[tuple[str, str]] = [
     ("temper", "heat-treated tin — toughness achieved through stress"),
     ("pigment", "amethyst ground to powder — color as physical material"),
     ("ember", "warm metal cooling — luminance held in mass"),
+    ("umber", "fired clay holding the kiln's last heat — raw sienna substrate"),
+    ("onyx", "polished obsidian — mass without hue; chroma only in the state register"),
 ]
 _BRUTALIST_LIGHT_PHENOMENOLOGY: list[tuple[str, str]] = [
     ("archive", "knowledge preserved — paper as memory substrate"),
@@ -1755,14 +1757,14 @@ _CHROME_PHENOMENOLOGY: list[tuple[str, str]] = [
 
 
 def _emit_brutalist_readme() -> None:
-    """Emit outputs/README_BRUTALIST.md with the full 12-variant matrix.
+    """Emit outputs/README_BRUTALIST.md with the full 14-variant matrix.
 
     Mirrors README_AUTOMATA's structure: each variant renders its full
     artifact suite (badge default, icon, strip, marquee, divider seam,
     stats card, star chart, 5 badge states) as inline image embeds.
 
     Brutalist differs from automata in two ways:
-    1. Two substrate polarities — 6 dark monochromes (substrate materials)
+    1. Two substrate polarities — 8 dark monochromes (substrate materials)
        and 6 light scholars (functional roles) — split into two README
        sections so the substrate distinction is structural, not buried in
        prose.
@@ -1779,13 +1781,14 @@ def _emit_brutalist_readme() -> None:
         return
 
     lines: list[str] = [
-        "# HyperWeave Brutalist — 12-Variant Substrate Matrix",
+        "# HyperWeave Brutalist — 14-Variant Substrate Matrix",
         "",
-        "Brutalist is the only genome with two substrate polarities: **6 dark monochromes** "
-        "(substrate materials — `celadon`, `carbon`, `alloy`, `temper`, `pigment`, `ember`) "
-        "and **6 light scholars** (functional roles — `archive`, `signal`, `pulse`, `depth`, "
-        '`afterimage`, `primer`). Each variant declares `substrate_kind: "dark" | "light"` '
-        "driving template include dispatch — same paradigm, two material identities.",
+        "Brutalist is the only genome with two substrate polarities: **8 dark monochromes** "
+        "(substrate materials — `celadon`, `carbon`, `alloy`, `temper`, `pigment`, `ember`, "
+        "`umber`, `onyx`) and **6 light scholars** (functional roles — `archive`, `signal`, "
+        "`pulse`, `depth`, `afterimage`, `primer`). Each variant declares `substrate_kind: "
+        '"dark" | "light"` driving template include dispatch — same paradigm, two material '
+        "identities.",
         "",
         "The dark monochromes follow brutalist material vocabulary: matte surfaces, sharp "
         "zero-radius corners, JetBrains Mono typography, no glow. Each name captures a "
@@ -2010,7 +2013,7 @@ def _emit_chrome_readme() -> None:
             "## Cross-reference",
             "",
             "- [Main README](../README.md) — installation, compose grammar, all genomes",
-            "- [Brutalist README](README_BRUTALIST.md) — 12-variant substrate matrix",
+            "- [Brutalist README](README_BRUTALIST.md) — 14-variant substrate matrix",
             "- [Automata README](README_AUTOMATA.md) — 16-tone cellular matrix",
             "",
         ]
@@ -2148,6 +2151,34 @@ DATA_PROJECTS: dict[str, list[tuple[str, ...]]] = {
         ("2602.15763", "title"),
         ("2602.15763", "authors"),
     ],
+    # v0.3.12 connectors. crates.io (Rust packages) + OpenSSF Scorecard
+    # (supply-chain trust, keyless) + GitHub Actions DORA (computed delivery
+    # metrics). tokio is reliably in the weekly Scorecard scan set, so score is
+    # always present (a 404 from an unscanned repo would render nothing).
+    "crates": [
+        ("serde", "version"),
+        ("serde", "downloads"),
+        ("serde", "recent_downloads"),
+        ("serde", "license"),
+    ],
+    "scorecard": [
+        ("tokio-rs/tokio", "score"),
+        ("tokio-rs/tokio", "code_review"),
+        ("tokio-rs/tokio", "maintained"),
+        ("tokio-rs/tokio", "token_permissions"),
+        # Two distinct n/a causes covered by the all-Scorecard card:
+        #   vulnerabilities — ABSENT from tokio's variable-length checks[]
+        #   signed_releases — PRESENT but scored -1 (did not run / inconclusive)
+        # Both must render "n/a", never 0 or a negative gauge.
+        ("tokio-rs/tokio", "vulnerabilities"),
+        ("tokio-rs/tokio", "signed_releases"),
+    ],
+    # DORA's paginated fan-out rides the isolated github-actions breaker, so a
+    # rate-limit can't trip the badge/star github-core breaker. Needs
+    # HW_GITHUB_TOKENS for a real value; degrades to "--" otherwise.
+    "dora": [
+        ("fastapi/fastapi", "deploy_frequency"),
+    ],
 }
 
 
@@ -2157,8 +2188,11 @@ def _fmt_count(value: Any) -> str:
     Strings (versions, titles) pass through unchanged. None/missing becomes
     ``--`` (v0.3.9: was ``?``; the new sentinel reads as 'unavailable' rather
     than 'unknown question'). Integers compact to ``k``/``M`` for badge
-    readability. The same formatter runs for direct/http/mcp inputs so all
-    three paths render the identical value string.
+    readability. Sub-1000 fractional floats (OpenSSF Scorecard score 6.9, DORA
+    rates 3.27) keep up to two decimals — these metrics are inherently
+    non-integer and truncating them to int misrepresents the signal. The same
+    formatter runs for direct/http/mcp inputs so all three paths render the
+    identical value string.
     """
     if value is None:
         return "--"
@@ -2168,6 +2202,10 @@ def _fmt_count(value: Any) -> str:
         n = int(value)
     except (TypeError, ValueError):
         return str(value)
+    # Preserve fractional precision for sub-1000 floats; integer-valued inputs
+    # (incl. float 312.0) and large compacted counts keep their integer display.
+    if isinstance(value, float) and value != n and abs(value) < 1_000:
+        return f"{value:.2f}".rstrip("0").rstrip(".")
     if n >= 1_000_000:
         return f"{n / 1_000_000:.1f}M"
     if n >= 1_000:
@@ -2533,6 +2571,43 @@ def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[An
             "violet",
             "automata.static",
         ),
+        # v0.3.12 — crates.io across genomes.
+        ("crates-serde-downloads", "crates:serde.downloads", "CRATES-DL", "chrome", "moth", "chrome.static"),
+        ("crates-serde-version", "crates:serde.version", "VERSION", "brutalist", "celadon", "brutalist.static"),
+        ("crates-serde-recent", "crates:serde.recent_downloads", "RECENT", "chrome", "graphite", "chrome.static"),
+        ("crates-serde-license", "crates:serde.license", "LICENSE", "automata", "teal", "automata.static"),
+        # v0.3.12 — OpenSSF Scorecard. score=TRUST + a check sub-score, plus the
+        # n/a edge (vulnerabilities is absent from tokio's checks[] → "n/a").
+        ("scorecard-tokio-trust", "scorecard:tokio-rs/tokio.score", "TRUST", "chrome", "moth", "chrome.static"),
+        (
+            "scorecard-tokio-review",
+            "scorecard:tokio-rs/tokio.code_review",
+            "REVIEW",
+            "brutalist",
+            "signal",
+            "brutalist.static",
+        ),
+        (
+            "scorecard-tokio-maintained",
+            "scorecard:tokio-rs/tokio.maintained",
+            "MAINTAINED",
+            "automata",
+            "amber",
+            "automata.static",
+        ),
+        # The Vulnerabilities n/a edge (absent check) is shown via the connector
+        # STRIP below, not a path-route badge: "n/a" contains "/", which the
+        # 3-segment /v1/badge/{title}/{value}/... path cannot carry (404s). The
+        # strip's ?value= query param handles it cleanly.
+        # v0.3.12 — GitHub Actions DORA (needs HW_GITHUB_TOKENS; degrades to --).
+        (
+            "dora-fastapi-deploy-freq",
+            "dora:fastapi/fastapi.deploy_frequency",
+            "DEPLOY FREQ",
+            "chrome",
+            "lightning",
+            "chrome.static",
+        ),
     ]
     for spec_id, token, title, genome, variant, http_gm in _real_data_badges:
         value_str = _fmt_count(rd.get(token))
@@ -2558,6 +2633,119 @@ def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[An
                 },
             )
         )
+
+    # ── v0.3.12 connectors across frames ────────────────────────────────
+    # Connectors are frame-agnostic — the same tokens drive any frame.
+    from hyperweave.serve.data_tokens import ResolvedToken as _RT
+
+    # all-crates card (item 6): the full crates.io output in one strip, rendered
+    # in the rust-appropriate brutalist UMBER variant (fired clay). License is a
+    # string with spaces, so http_path values are URL-encoded.
+    crates_all = (
+        f"VERSION:{_fmt_count(rd.get('crates:serde.version'))},"
+        f"DOWNLOADS:{_fmt_count(rd.get('crates:serde.downloads'))},"
+        f"RECENT:{_fmt_count(rd.get('crates:serde.recent_downloads'))},"
+        f"LICENSE:{_fmt_count(rd.get('crates:serde.license'))}"
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="crates-all-strip",
+            compose_spec=ComposeSpec(
+                type="strip", genome_id="brutalist", variant="umber", title="serde", value=crates_all
+            ),
+            http_path=f"/v1/strip/serde/brutalist.static?value={_urlquote(crates_all, safe='')}&variant=umber",
+            mcp_args={
+                "type": "strip",
+                "title": "serde",
+                "value": crates_all,
+                "genome": "brutalist",
+                "variant": "umber",
+            },
+        )
+    )
+
+    # all-Scorecard card (item 6): the full OpenSSF Scorecard output in one
+    # strip, brutalist ONYX. Shows real scores (TRUST/REVIEW/MAINTAINED), a real
+    # ZERO (token_permissions=0, NOT n/a), and TWO n/a causes — vulnerabilities
+    # (absent from checks[]) and signed_releases (present but scored -1).
+    scorecard_all = (
+        f"TRUST:{_fmt_count(rd.get('scorecard:tokio-rs/tokio.score'))},"
+        f"REVIEW:{_fmt_count(rd.get('scorecard:tokio-rs/tokio.code_review'))},"
+        f"MAINTAINED:{_fmt_count(rd.get('scorecard:tokio-rs/tokio.maintained'))},"
+        f"TOKEN:{_fmt_count(rd.get('scorecard:tokio-rs/tokio.token_permissions'))},"
+        f"VULNS:{_fmt_count(rd.get('scorecard:tokio-rs/tokio.vulnerabilities'))},"
+        f"SIGNED:{_fmt_count(rd.get('scorecard:tokio-rs/tokio.signed_releases'))}"
+    )
+    specs.append(
+        ParitySpec(
+            spec_id="scorecard-all-strip",
+            compose_spec=ComposeSpec(
+                type="strip", genome_id="brutalist", variant="onyx", title="tokio", value=scorecard_all
+            ),
+            http_path=f"/v1/strip/tokio/brutalist.static?value={_urlquote(scorecard_all, safe='')}&variant=onyx",
+            mcp_args={
+                "type": "strip",
+                "title": "tokio",
+                "value": scorecard_all,
+                "genome": "brutalist",
+                "variant": "onyx",
+            },
+        )
+    )
+
+    # Full-band marquees per genome (item 5): volume + activity + identity in one
+    # scroll, so the resolver's auto-group (volume→activity→identity), role-based
+    # hero, state coloring (passing/warning/critical), and missing-value (--)
+    # rendering are ALL visible in the regen. A real connector downloads value
+    # rides in as a volume cell so the band also surfaces connector health.
+    # kv tokens are deterministic → parity-safe across all three paths.
+    def _fullband_marquee(spec_id: str, genome: str, variant: str, gm: str, dl_token: str) -> ParitySpec:
+        from hyperweave.serve.data_tokens import _download_window
+
+        # The download-window subtitle is derived from the dl_token's
+        # (provider, metric) — pypi/crates downloads are ALL-TIME, npm is 7D — so
+        # the period is self-describing and matches the live path exactly.
+        dl_window = _download_window(dl_token.split(":", 1)[0], dl_token.rsplit(".", 1)[-1])
+        pairs = [
+            ("STARS", "2907", ""),  # volume → hero (first volume cell)
+            ("DOWNLOADS", _fmt_count(rd.get(dl_token)), dl_window),  # volume → real value + window
+            ("BUILD", "passing", ""),  # activity → passing (green)
+            ("COVERAGE", "72%", ""),  # activity → warning (yellow)
+            ("TESTS", "failing", ""),  # activity → critical (red)
+            ("ISSUES", "--", ""),  # activity → missing value (no state color)
+            ("VERSION", "2.1.0", ""),  # identity → muted
+            ("LICENSE", "MIT", ""),  # identity → muted
+        ]
+        toks = [_RT(kind="kv", label=k, value=v, ttl=0, window=w) for k, v, w in pairs]
+        data = ",".join(f"kv:{k}={v}~{w}" if w else f"kv:{k}={v}" for k, v, w in pairs)
+        return ParitySpec(
+            spec_id=spec_id,
+            # title is metadata-only (data_tokens drive content); it must match
+            # the http path segment so <title>/dc:title agree across paths.
+            compose_spec=ComposeSpec(
+                type="marquee-horizontal", genome_id=genome, variant=variant, title="HYPERWEAVE", data_tokens=toks
+            ),
+            http_path=f"/v1/marquee/HYPERWEAVE/{gm}?variant={variant}&data={_urlquote(data, safe='')}",
+            mcp_args={
+                "type": "marquee-horizontal",
+                "title": "HYPERWEAVE",
+                "genome": genome,
+                "variant": variant,
+                "data": data,
+            },
+        )
+
+    specs.append(
+        _fullband_marquee(
+            "marquee-fullband-brutalist", "brutalist", "celadon", "brutalist.static", "pypi:langchain.downloads"
+        )
+    )
+    specs.append(
+        _fullband_marquee("marquee-fullband-chrome", "chrome", "moth", "chrome.static", "crates:serde.downloads")
+    )
+    specs.append(
+        _fullband_marquee("marquee-fullband-automata", "automata", "bone", "automata.static", "npm:n8n.downloads")
+    )
 
     # ── Real-data strips: long namespace + multi-metric ─────────────────
     # AutoGPT exercises long-namespace identity text + 3-metric strip;
@@ -3418,8 +3606,12 @@ def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[An
             f"VERSION:{n8n_version},NPM-DL:{n8n_npm_dl}",
         ),
         (
-            "strip-glyph-openai-chrome",
-            "openai",
+            # v0.3.12 fix: was glyph="openai" on a claude-code identity (a
+            # mismatched proofset entry — the engine faithfully rendered the
+            # requested OpenAI mark for a Claude project). claude-code's correct
+            # mark is the Anthropic glyph.
+            "strip-glyph-anthropic-chrome",
+            "anthropic",
             "chrome",
             "moth",
             "chrome.static",
@@ -3452,9 +3644,11 @@ def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[An
             )
         )
 
-    # --- D4: Marquee stress (3 specs) ---
-    # Text-only pipe-separated, data-flavored (titles only), and mixed.
-    # Marquees consume the title field as the scrolling text content.
+    # --- D4: Marquee stress — FREE-TEXT variations (inline ribbon for every
+    # genome via the content-aware layout: no label+value to stack, so text
+    # scrolls as a clean flow). Brutalist uses Barlow + ▮ bars, automata its
+    # mid_accent ▪, chrome the · dot. Counterpart STACKED-DATA marquees are the
+    # full-band specs above + the data-flavored kv spec below. #}
     _marquee_specs = [
         (
             "marquee-text-only-pipe",
@@ -3462,13 +3656,6 @@ def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[An
             "",
             "brutalist.static",
             "DEPLOYMENTS | INCIDENTS | UPTIME | LATENCY | THROUGHPUT",
-        ),
-        (
-            "marquee-data-flavored",
-            "chrome",
-            "horizon",
-            "chrome.static",
-            f"STARS:{autogpt_stars} · PYPI:{vllm_pypi_dl} · DOCKER:{ollama_pulls}",
         ),
         (
             "marquee-mixed-content",
@@ -3498,6 +3685,35 @@ def _build_parity_matrix(resolved_data: dict[str, Any] | None = None) -> list[An
                 },
             )
         )
+
+    # Data-flavored chrome marquee — real connector values as kv LABEL+VALUE
+    # pairs so they STACK in chrome's dense-data module (consistent with the
+    # full-band specs), instead of the prior inline "PYPI:78.3M" text-with-colons
+    # that read as an ambiguous second chrome layout. Counterpart to the
+    # free-text examples above: same genome, the other content mode.
+    _df_pairs = [("STARS", autogpt_stars), ("PYPI", vllm_pypi_dl), ("DOCKER", ollama_pulls)]
+    _df_toks = [_RT(kind="kv", label=k, value=v, ttl=0) for k, v in _df_pairs]
+    _df_data = ",".join(f"kv:{k}={v}" for k, v in _df_pairs)
+    specs.append(
+        ParitySpec(
+            spec_id="marquee-data-flavored",
+            compose_spec=ComposeSpec(
+                type="marquee-horizontal",
+                genome_id="chrome",
+                variant="horizon",
+                title="HYPERWEAVE",
+                data_tokens=_df_toks,
+            ),
+            http_path=f"/v1/marquee/HYPERWEAVE/chrome.static?variant=horizon&data={_urlquote(_df_data, safe='')}",
+            mcp_args={
+                "type": "marquee-horizontal",
+                "title": "HYPERWEAVE",
+                "genome": "chrome",
+                "variant": "horizon",
+                "data": _df_data,
+            },
+        )
+    )
 
     # Stats card + star chart stress are generated as STATIC artifacts via
     # _generate_data_cards (each genome x variant), not through the parity
@@ -4273,15 +4489,15 @@ _EDGE_CASE_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
             ("strip-glyph-python-chrome", "Python glyph in identity (chrome horizon) — vllm + 2 metrics"),
             ("strip-glyph-docker-automata", "Docker glyph in identity (automata teal) — ollama + 2 metrics"),
             ("strip-glyph-npm-brutalist", "npm glyph in identity (brutalist) — n8n version + downloads"),
-            ("strip-glyph-openai-chrome", "OpenAI glyph in identity (chrome moth) — claude-code + 2 metrics"),
+            ("strip-glyph-anthropic-chrome", "Anthropic glyph for claude-code identity (chrome moth) — 2 metrics"),
         ],
     ),
     (
         "Marquee stress",
         [
-            ("marquee-text-only-pipe", "Pipe-separated text items (brutalist)"),
-            ("marquee-data-flavored", "Data-flavored connector tokens (chrome horizon)"),
-            ("marquee-mixed-content", "Mixed text + data + symbols (automata violet-teal)"),
+            ("marquee-text-only-pipe", "Free text → inline ribbon (brutalist celadon — Barlow + ▮ bars)"),
+            ("marquee-data-flavored", "Connector data → stacked module (chrome horizon)"),
+            ("marquee-mixed-content", "Mixed text + symbols → inline ribbon (automata violet-teal)"),
         ],
     ),
     # ── Spatial Matrix ──
@@ -4473,6 +4689,66 @@ _EDGE_CASE_GROUPS: list[tuple[str, list[tuple[str, str]]]] = [
         [
             ("arxiv-mistral-brutalist-celadon", "arxiv:2310.06825 Mistral 7B — brutalist celadon"),
             ("arxiv-deepseek-chrome-abyssal", "arxiv:2501.12948 DeepSeek-R1 — chrome abyssal"),
+        ],
+    ),
+    # ── v0.3.12 connectors: crates.io / OpenSSF Scorecard / GitHub Actions DORA ──
+    (
+        "Real-data badges — crates.io",
+        [
+            ("crates-serde-downloads", "crates:serde total downloads — chrome moth"),
+            ("crates-serde-version", "crates:serde max-stable version — brutalist celadon"),
+            ("crates-serde-recent", "crates:serde 90-day recent downloads — chrome graphite"),
+            ("crates-serde-license", "crates:serde license (versions[0]) — automata teal"),
+        ],
+    ),
+    (
+        "Real-data badges — OpenSSF Scorecard",
+        [
+            ("scorecard-tokio-trust", "scorecard:tokio-rs/tokio aggregate trust score 0-10 — chrome moth"),
+            ("scorecard-tokio-review", "scorecard:tokio-rs/tokio Code-Review check — brutalist signal (light)"),
+            ("scorecard-tokio-maintained", "scorecard:tokio-rs/tokio Maintained check — automata amber"),
+        ],
+    ),
+    (
+        "Real-data badges — GitHub Actions DORA",
+        [
+            (
+                "dora-fastapi-deploy-freq",
+                "dora:fastapi/fastapi deploy frequency /day, 30-day window "
+                "(needs HW_GITHUB_TOKENS; degrades to --) — chrome lightning",
+            ),
+        ],
+    ),
+    (
+        "Full connector cards — all-crates + all-Scorecard",
+        [
+            (
+                "crates-all-strip",
+                "all crates.io output (VERSION/DOWNLOADS/RECENT/LICENSE) in one strip — rust card in brutalist UMBER",
+            ),
+            (
+                "scorecard-all-strip",
+                "all OpenSSF Scorecard output — real scores + a real ZERO (TOKEN) + TWO n/a "
+                "causes (VULNS absent, SIGNED scored -1) — brutalist ONYX",
+            ),
+        ],
+    ),
+    (
+        "Full-band marquees — category + state + empty-value coverage",
+        [
+            (
+                "marquee-fullband-brutalist",
+                "volume(hero STARS + pypi DOWNLOADS) / activity(BUILD pass, COVERAGE warn, "
+                "TESTS crit, ISSUES --) / identity — brutalist celadon (module)",
+            ),
+            (
+                "marquee-fullband-chrome",
+                "same full band, crates DOWNLOADS volume cell — chrome moth (module)",
+            ),
+            (
+                "marquee-fullband-automata",
+                "same full band, npm DOWNLOADS volume cell — automata bone (ribbon)",
+            ),
         ],
     ),
     # ── State badges with real CI/CD titles ──

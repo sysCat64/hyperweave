@@ -10,17 +10,25 @@ Token forms
 ``text:STRING``
     Raw display text. Marquee-horizontal scrolls these as bullets.
 
-``kv:KEY=VALUE``
+``kv:KEY=VALUE`` (optionally ``kv:KEY=VALUE~WINDOW``)
     Static literal, role-tagged. Useful when a frame slot needs a labeled
-    value with no live fetch (e.g. ``kv:VERSION=0.6.9``).
+    value with no live fetch (e.g. ``kv:VERSION=0.6.9``). A trailing
+    ``~WINDOW`` records a period qualifier for download-type cells
+    (``kv:DOWNLOADS=847K~ALL-TIME``) so the marquee can render the window
+    subtitle deterministically across all three transport paths — the live
+    path derives the same window from ``(provider, metric)``. ``~`` is an
+    RFC-3986 unreserved char (survives URL-quoting); a VALUE that must
+    contain a literal ``~`` is not currently expressible (no download value
+    uses one).
 
 ``<provider>:<identifier>.<metric>``
     Live token. Resolved through :func:`hyperweave.connectors.fetch_metric`.
     Providers: ``gh`` / ``github``, ``pypi``, ``npm``, ``hf`` /
-    ``huggingface``, ``arxiv``, ``docker``. The identifier may contain
-    slashes (``owner/repo``); the parser splits on the **last** ``.`` to
-    separate identifier from metric so ``arxiv:2310.06825.citations``
-    parses correctly.
+    ``huggingface``, ``arxiv``, ``docker``, ``crates`` / ``cargo``,
+    ``scorecard`` (OpenSSF supply-chain trust), ``dora`` (GitHub Actions
+    delivery metrics). The identifier may contain slashes (``owner/repo``);
+    the parser splits on the **last** ``.`` to separate identifier from
+    metric so ``arxiv:2310.06825.citations`` parses correctly.
 
 Comma escaping
 --------------
@@ -43,9 +51,24 @@ from typing import Any, Literal
 _DEFAULT_TTL = 300
 _FAILURE_TTL = 60
 
-_PROVIDERS: frozenset[str] = frozenset({"gh", "github", "pypi", "npm", "hf", "huggingface", "arxiv", "docker"})
+_PROVIDERS: frozenset[str] = frozenset(
+    {
+        "gh",
+        "github",
+        "pypi",
+        "npm",
+        "hf",
+        "huggingface",
+        "arxiv",
+        "docker",
+        "crates",
+        "cargo",
+        "scorecard",
+        "dora",
+    }
+)
 
-_PROVIDER_ALIASES: dict[str, str] = {"gh": "github", "hf": "huggingface"}
+_PROVIDER_ALIASES: dict[str, str] = {"gh": "github", "hf": "huggingface", "cargo": "crates"}
 
 
 @dataclass(frozen=True)
@@ -65,6 +88,10 @@ class DataToken:
     """For ``live``: the identifier (e.g. ``owner/repo``, ``2310.06825``)."""
     metric: str = ""
     """For ``live``: the metric (e.g. ``stars``, ``downloads``)."""
+    window: str = ""
+    """Period qualifier for download-type cells. For ``kv``: parsed from a
+    trailing ``~WINDOW`` on the value. For ``live``: populated by the resolver
+    from :data:`_DOWNLOAD_WINDOWS`. Empty for non-download cells."""
 
 
 @dataclass(frozen=True)
@@ -86,6 +113,11 @@ class ResolvedToken:
     """Raw provider metric for live tokens; empty for text/kv tokens."""
     raw_value: object = field(default=None, compare=False)
     """Unformatted connector value for live tokens when available."""
+    window: str = field(default="", compare=False)
+    """Period qualifier ("ALL-TIME", "30D", "7D", "90D") for download-type
+    cells — rendered as a dim subtitle after the value in the marquee. Derived
+    from :data:`_DOWNLOAD_WINDOWS` for live tokens, or carried from a kv token's
+    ``~WINDOW`` suffix. Empty for every non-download cell."""
 
 
 def _split_unescaped_commas(data: str) -> list[str]:
@@ -147,7 +179,12 @@ def _parse_one(raw: str) -> DataToken:
         key = key.strip()
         if not key:
             raise ValueError(f"kv: token has empty KEY: {raw!r}")
-        return DataToken(kind="kv", key=key, literal_value=value)
+        # Optional trailing ``~WINDOW`` period qualifier (download cells):
+        # ``kv:DOWNLOADS=847K~ALL-TIME`` → value="847K", window="ALL-TIME".
+        window = ""
+        if "~" in value:
+            value, window = value.rsplit("~", 1)
+        return DataToken(kind="kv", key=key, literal_value=value, window=window)
 
     # Anything else is a live token: provider:identifier.metric
     if kind_str not in _PROVIDERS:
@@ -206,10 +243,31 @@ _METRIC_DISPLAY_LABELS: dict[str, str] = {
     "subscribers_count": "WATCHERS",
     "open_issues": "ISSUES",
     "open_issues_count": "ISSUES",
+    "pull_requests": "PRS",
+    "last_push": "LAST PUSH",
     "latest_release": "VERSION",
     "last_modified": "UPDATED",
     "citation_count": "CITATIONS",
     "citations_count": "CITATIONS",
+    # crates.io
+    "recent_downloads": "RECENT",
+    # HuggingFace (audit-surfaced)
+    "gated": "GATED",
+    # OpenSSF Scorecard — short labels for the noisy snake_case check names.
+    "score": "TRUST",
+    "code_review": "REVIEW",
+    "vulnerabilities": "VULNS",
+    "branch_protection": "BRANCH",
+    "dangerous_workflow": "WORKFLOW",
+    "pinned_dependencies": "PINNED-DEPS",
+    "token_permissions": "TOKEN-PERMS",
+    "security_policy": "SEC-POLICY",
+    "dependency_update": "DEP-UPDATE",
+    # GitHub Actions DORA
+    "deploy_frequency": "DEPLOY FREQ",
+    "lead_time": "LEAD TIME",
+    "change_failure_rate": "CFR",
+    "mttr": "MTTR",
 }
 
 
@@ -221,6 +279,27 @@ def _display_label(metric: str) -> str:
     """
     key = (metric or "").strip().lower()
     return _METRIC_DISPLAY_LABELS.get(key, key.upper())
+
+
+# Period qualifier for download-type metrics, keyed by (provider, metric). The
+# window is a fixed property of which API/endpoint the connector reads — making
+# the otherwise-ambiguous download count self-describing. pypi routes through
+# pepy.tech total_downloads (all-time; the pypistats month fallback is a rare
+# degraded path); crates `downloads` is the all-time crate total while
+# `recent_downloads` is its 90-day window; npm's point API reads last-week.
+# Any (provider, metric) absent here yields no window — non-download cells stay
+# subtitle-free.
+_DOWNLOAD_WINDOWS: dict[tuple[str, str], str] = {
+    ("pypi", "downloads"): "ALL-TIME",
+    ("crates", "downloads"): "ALL-TIME",
+    ("crates", "recent_downloads"): "90D",
+    ("npm", "downloads"): "7D",
+}
+
+
+def _download_window(provider: str, metric: str) -> str:
+    """Period qualifier for a live download metric, or empty for non-downloads."""
+    return _DOWNLOAD_WINDOWS.get(((provider or "").strip().lower(), (metric or "").strip().lower()), "")
 
 
 async def resolve_data_tokens(tokens: list[DataToken]) -> tuple[list[ResolvedToken], int]:
@@ -259,6 +338,7 @@ async def resolve_data_tokens(tokens: list[DataToken]) -> tuple[list[ResolvedTok
                     label=tok.key.upper(),
                     value=tok.literal_value,
                     ttl=0,
+                    window=tok.window,
                 )
             )
             continue
@@ -276,6 +356,7 @@ async def resolve_data_tokens(tokens: list[DataToken]) -> tuple[list[ResolvedTok
                     provider=tok.provider,
                     identifier=tok.identifier,
                     metric=tok.metric,
+                    window=_download_window(tok.provider, tok.metric),
                 )
             )
             min_ttl = min(min_ttl, _FAILURE_TTL)
@@ -294,6 +375,7 @@ async def resolve_data_tokens(tokens: list[DataToken]) -> tuple[list[ResolvedTok
                 identifier=tok.identifier,
                 metric=tok.metric,
                 raw_value=raw_value,
+                window=_download_window(tok.provider, tok.metric),
             )
         )
         min_ttl = min(min_ttl, ttl)
@@ -363,12 +445,17 @@ def format_for_marquee(tokens: list[ResolvedToken]) -> list[dict[str, Any]]:
             "role": "text" | "kv" | "live",
             "label": "STARS" | "" (empty for text role),
             "raw_value": "1234" | "" (empty for text role),
+            "metric": "stars" | "" (token-grammar metric; empty for text/kv),
         }
+
+    ``metric`` carries the live token's grammar metric (``gh:o/r.stars`` →
+    ``"stars"``) so the marquee resolver can categorize cells (volume /
+    activity / identity) by exact metric key rather than fuzzy label matching.
     """
     items: list[dict[str, Any]] = []
     for tok in tokens:
         if tok.kind == "text":
-            items.append({"text": tok.value, "role": "text", "label": "", "raw_value": ""})
+            items.append({"text": tok.value, "role": "text", "label": "", "raw_value": "", "metric": ""})
             continue
         # kv / live render as "LABEL VALUE" by default; resolvers may
         # split label+value into separate tspans for two-stop chromatic
@@ -379,6 +466,8 @@ def format_for_marquee(tokens: list[ResolvedToken]) -> list[dict[str, Any]]:
                 "role": tok.kind,
                 "label": tok.label,
                 "raw_value": tok.value,
+                "metric": tok.metric,
+                "window": tok.window,
             }
         )
     return items

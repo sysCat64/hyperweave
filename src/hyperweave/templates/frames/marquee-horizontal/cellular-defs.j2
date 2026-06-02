@@ -10,4 +10,10 @@
 @media(prefers-reduced-motion:reduce){
   [data-hw-zone="scroll-track"]{animation:none!important}
 }
+{# v0.3.12 — DECORATIVE travelling-wave rail (own @keyframes; not the state
+   cascade). Each baseline cell is phase-delayed by its x so a bright band
+   propagates left→right along the scroll axis. prefers-reduced-motion stills it. #}
+.hw-mq-wv { opacity: 0.12; will-change: opacity; animation: hw-mq-wave 3.2s linear infinite; }
+@keyframes hw-mq-wave { 0% { opacity: 0.10 } 8% { opacity: 0.85 } 22% { opacity: 0.18 } 100% { opacity: 0.10 } }
+@media (prefers-reduced-motion: reduce) { .hw-mq-wv { animation: none !important; opacity: 0.3 !important; } }
 </style>

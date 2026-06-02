@@ -69,7 +69,14 @@
    benefits from extra breathing room before the small subtitle starts —
    matches the v2 prototype's same proportions (hero y=32, subtitle y=50,
    18 baseline / 12 visible gap). #}
-<g data-hw-zone="header-text" filter="url(#{{ uid }}-hud)">
+{# v0.3.12-fix: NO HUD filter on the header text. The header band (above) already
+   backs these labels for legibility — the same way the stat-card header sits on
+   its band with no filter. Applying the feGaussianBlur HUD halo here forced the
+   browser to rasterize the glyphs into a filter buffer, which softens on mobile
+   (device-pixel-ratio handling) while the unfiltered stat-card header stays
+   crisp. The HUD filter is retained ONLY on the axis / milestone / footer labels
+   below, which sit directly on the cell substrate with no band. #}
+<g data-hw-zone="header-text">
   <text x="{{ chart_layout.texts.cellular_repo.x }}" y="{{ chart_layout.texts.cellular_repo.y }}" class="{{ uid }}-hdr-user">{{ chart_repo | default('repo') | upper }}</text>
   <text x="{{ chart_layout.texts.cellular_title.x }}" y="{{ chart_layout.texts.cellular_title.y }}" class="{{ uid }}-title-main">{{ chart_series_title | default('STAR HISTORY') }}</text>
   <text x="{{ chart_layout.texts.cellular_hero_value.x }}" y="{{ chart_layout.texts.cellular_hero_value.y }}" class="{{ uid }}-hero-value" text-anchor="{{ chart_layout.texts.cellular_hero_value.anchor }}">{{ chart_current_stars | default('--') }}</text>

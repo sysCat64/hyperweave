@@ -1446,8 +1446,8 @@ def resolve_icon(
                 )
 
     icon_geometry = {
-        "chrome_square_group_x": 12,
-        "chrome_square_group_y": 12,
+        "chrome_square_group_x": 6,
+        "chrome_square_group_y": 6,
         "chrome_square_outer_w": 96,
         "chrome_square_outer_h": 96,
         "chrome_square_outer_rx": 6,
@@ -1472,8 +1472,8 @@ def resolve_icon(
         "chrome_square_glyph_x": 30,
         "chrome_square_glyph_y": 30,
         "chrome_square_glyph_size": 36,
-        "chrome_circle_group_x": 60,
-        "chrome_circle_group_y": 60,
+        "chrome_circle_group_x": 54,
+        "chrome_circle_group_y": 54,
         "chrome_circle_outer_r": 46,
         "chrome_circle_well_r": 42,
         "chrome_circle_glyph_x": -24,
@@ -1921,6 +1921,12 @@ def resolve_marquee(
         "primary_info_accent": primary_info_accent,
         "primary_mid_accent": primary_mid_accent,
         "is_paired": cellular_palette.get("is_paired", False),
+        # Genome fonts for genome-aware measurement (v0.3.12): a marquee
+        # font_family of var(--dna-font-display) must measure with the GENOME's
+        # display face (brutalist JetBrains Mono, chrome/automata Orbitron),
+        # not a hardcoded Orbitron — else measured≠rendered (the cram bug).
+        "genome_display_font": genome.get("font_display", ""),
+        "genome_mono_font": genome.get("font_mono", ""),
     }
 
     # Paradigm-declared marquee config — separator glyph, palette, live-block
@@ -1939,35 +1945,72 @@ def resolve_marquee(
     if primary_mid_accent and "context" in result:
         result["context"]["separator_color"] = primary_mid_accent
 
+    # v0.3.12 — state cascade fields so the marquee's included
+    # state-signal-cascade.j2 binds data-hw-status → var(--hw-state-value) from
+    # each genome's state_* hexes (used by stateful activity cells). Genome
+    # state_* fields are unchanged from badges/strips — marquee state colors
+    # are approximate vs the prototype by design (exact per-variant harmony is
+    # schema-blocked and deferred).
+    if "context" in result:
+        for status in ("passing", "warning", "critical", "building", "offline"):
+            result["context"][f"state_{status}_core"] = genome.get(f"state_{status}_core", "")
+            result["context"][f"state_{status}_bright"] = genome.get(f"state_{status}_bright", "")
+
     return result
 
 
-def _resolve_font_for_measurement(font_family_css: str) -> str:
+# Uniform marquee reading rate (px/s) — chrome's prototype rate
+# (loop_distance 892 ÷ duration 30.0 = 29.7), applied to EVERY genome so a
+# brutalist module stream and a chrome ribbon scroll at the same calm reading
+# pace. ``scroll_dur = scroll_distance ÷ CHROME_PX_PER_SEC``. Prototype `dur`
+# literals (brutalist 33s, automata 23.5s) are NOT copied.
+CHROME_PX_PER_SEC: float = 29.7
+
+
+def _first_font(font_stack_css: str) -> str:
+    """Return the first concrete component of a CSS font stack.
+
+    ``"'Barlow Condensed','Oswald',sans-serif"`` → ``"Barlow Condensed"``.
+    Empty string in → empty string out (caller supplies the fallback).
+    """
+    s = (font_stack_css or "").strip()
+    if not s:
+        return ""
+    return s.split(",")[0].strip().strip("'\"")
+
+
+def _resolve_font_for_measurement(
+    font_family_css: str,
+    *,
+    genome_display_font: str = "",
+    genome_mono_font: str = "",
+) -> str:
     """Map a CSS font-family expression to a registry-resolvable font name.
 
     The browser resolves ``var(--dna-font-mono, ui-monospace, monospace)`` at
-    runtime to the actual font (via the genome's CSS bridge — typically
-    JetBrains Mono for chrome/brutalist/cellular genomes), but
+    runtime to the actual font (via the genome's CSS bridge), but
     :func:`hyperweave.core.text.measure_text` can't see CSS variables. If a
     paradigm doesn't declare an explicit ``font_family`` in its marquee
     config, the resolver falls back to the profile's CSS-var-bearing default,
     measure_text fails to resolve it, and silently uses Inter metrics — which
     are ~20-30% narrower than monospace fonts. Layout positions then come out
-    too tight, producing visible bullet-vs-text overlap.
+    too tight, producing visible bullet-vs-text overlap (the "cram" bug).
 
     This helper closes that gap. It detects ``var(--dna-font-X, ...)``
-    expressions and maps them to the actual font the browser will resolve to
-    (per the genome's CSS bridge convention shipped in compose/assembler.py):
+    expressions and maps them to the actual font the browser will resolve to.
+    v0.3.12: GENOME-AWARE — ``--dna-font-display`` resolves to the GENOME's
+    declared display font (``genome_display_font``), not a hardcoded
+    ``Orbitron``. Brutalist's display is JetBrains Mono, chrome/automata's is
+    Orbitron; measuring with the wrong face reintroduces the cram bug. The
+    hardcoded names remain only as the no-genome-supplied fallback.
 
-      ``var(--dna-font-display, ...)`` → ``Orbitron``
-      ``var(--dna-font-mono, ...)``    → ``JetBrains Mono``
+      ``var(--dna-font-display, ...)`` → genome_display_font OR ``Orbitron``
+      ``var(--dna-font-mono, ...)``    → genome_mono_font    OR ``JetBrains Mono``
       anything else                    → first non-var fallback OR ``Inter``
 
-    Non-var inputs pass through unchanged. Called at the boundary inside
-    :func:`_layout_marquee_items` so EVERY layout call benefits — paradigms
-    that already declare explicit fonts (chrome, brutalist) are unaffected;
-    paradigms that fall through to the var() default (cellular, future ones)
-    automatically get correct measurement.
+    Non-var inputs pass through unchanged (first stack component). Called at
+    the boundary inside the marquee layout helpers so every layout call
+    benefits.
     """
     s = (font_family_css or "").strip()
     if not s:
@@ -1976,11 +2019,11 @@ def _resolve_font_for_measurement(font_family_css: str) -> str:
         # Already a real font stack — return first comma-separated component
         # for measure_text (which handles the rest of the stack lookup).
         return s.split(",")[0].strip().strip("'\"")
-    # var(--name, fallback...) — map by var name first.
+    # var(--name, fallback...) — map by var name first, genome font preferred.
     if "--dna-font-display" in s:
-        return "Orbitron"
+        return _first_font(genome_display_font) or "Orbitron"
     if "--dna-font-mono" in s:
-        return "JetBrains Mono"
+        return _first_font(genome_mono_font) or "JetBrains Mono"
     # Generic var() with a non-DNA name — extract the CSS fallback list.
     open_paren = s.find("(")
     close_paren = s.rfind(")")
@@ -2028,6 +2071,14 @@ def _parse_letter_spacing_px(letter_spacing: str, font_size: float) -> float:
         return 0.0
 
 
+# Intra-cell tspan-flow gaps, single-sourced so the resolver's reserved width
+# always equals the template's rendered ``dx`` — a mismatch would desync the
+# seamless-loop period. Used for width accounting in _layout_marquee_* AND
+# emitted to the template context (item-ribbon/item-module render the dx).
+_MARQUEE_LABEL_VALUE_GAP = 8  # label tspan -> value tspan (ribbon)
+_MARQUEE_WINDOW_GAP = 4  # value -> download-window subtitle tspan (ribbon + module)
+
+
 def _layout_marquee_items(
     items: list[dict[str, Any]],
     *,
@@ -2041,6 +2092,9 @@ def _layout_marquee_items(
     separator_kind: str,
     separator_size: int,
     separator_glyph: str,
+    label_font_size: int = 0,
+    genome_display_font: str = "",
+    genome_mono_font: str = "",
 ) -> tuple[list[dict[str, Any]], int]:
     """Lay out marquee scroll items at absolute x positions.
 
@@ -2074,24 +2128,29 @@ def _layout_marquee_items(
     # paradigms that fall through to the profile's var(--dna-font-mono) default
     # measure with Inter (silent fallback), then render with JetBrains Mono at
     # runtime — the 20-30% width mismatch causes visible bullet/text overlap.
-    measurement_font = _resolve_font_for_measurement(font_family)
+    measurement_font = _resolve_font_for_measurement(
+        font_family, genome_display_font=genome_display_font, genome_mono_font=genome_mono_font
+    )
 
     laid: list[dict[str, Any]] = []
     x = float(start_x)
 
-    def _w(text: str) -> float:
+    def _w(text: str, size: int) -> float:
         # Wrap measure_text so call-sites stay short. font_weight is a single
         # value across the whole marquee (paradigm declares it); per-item
         # font-weight overrides are applied via the rendered tspan, not via
         # measurement (which doesn't change appreciably between 700 and 900).
+        # The label is measured at label_font_size, the value at font_size, so a
+        # smaller label (chrome 6px / automata 9px) reserves its true width.
         return measure_text(
             text,
             font_family=measurement_font,
-            font_size=float(font_size),
+            font_size=float(size),
             font_weight=font_weight,
             letter_spacing_em=letter_spacing_px / float(font_size) if font_size else 0.0,
         )
 
+    label_size = label_font_size or font_size
     for item in items:
         label = item.get("label", "")
         value = item["value"]
@@ -2102,9 +2161,15 @@ def _layout_marquee_items(
 
         # Width contribution: label + (gap + value) when label present, else value alone.
         if label:
-            x += _w(label) + label_value_gap + _w(value)
+            x += _w(label, label_size) + label_value_gap + _w(value, font_size)
         else:
-            x += _w(value)
+            x += _w(value, font_size)
+        # Download-window subtitle trails the value as a small dim tspan
+        # (item-ribbon.j2 renders it at label_size with a 4px dx). Reserve its
+        # measured width so the period label never crams the separator.
+        window = str(item.get("window", "") or "")
+        if window:
+            x += _MARQUEE_WINDOW_GAP + _w(window, label_size)
         # Inter-item breathing room (before separator).
         x += item_gap
 
@@ -2116,9 +2181,161 @@ def _layout_marquee_items(
         if separator_kind == "rect":
             x += separator_size + item_gap
         else:
-            x += _w(separator_glyph) + item_gap
+            # Glyph separators render at the LABEL size (item-ribbon.j2 uses
+            # ``lfs``), not the value size — the bone prototype's ▪ is 10px
+            # against a 16px value. Measure at label_size so the advance matches
+            # the rendered width (a 16px-measured ▪ would over-reserve, drifting
+            # the next cell right and breaking the seamless loop period).
+            x += _w(separator_glyph, label_size) + item_gap
 
     return laid, int(x)
+
+
+_CATEGORY_RANK: dict[str, int] = {"volume": 0, "activity": 1, "identity": 2}
+
+
+def _annotate_marquee_items(structured: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Tag each scroll item with category / per-cell state / hero, then group.
+
+    Genome-neutral. Category comes from ``marquee_classes.yaml`` keyed by the
+    token-grammar metric (live tokens) or the lowercased label (kv tokens).
+    Per-cell state reuses ``core.state.infer_state`` — the exact classifier
+    strips use — gated by the ``badge_modes.yaml`` stateful allowlist, applied
+    ONLY to activity cells. Items are stable-sorted volume→activity→identity
+    (order only), and the first volume cell (kv/live, not raw text) becomes the
+    hero. No color is assigned here — that's a role→CSS-var decision in
+    ``_resolve_horizontal``; this keeps classification genome-neutral and the
+    color path on the per-genome cascade bridge.
+    """
+    from hyperweave.compose.layout import normalize_title
+    from hyperweave.config.loader import load_badge_modes, load_marquee_classes
+    from hyperweave.core.state import infer_state
+
+    metric_to_category, default_category = load_marquee_classes()
+    allowlist = load_badge_modes()
+
+    annotated: list[dict[str, Any]] = []
+    for item in structured:
+        metric = str(item.get("metric") or "").strip().lower()
+        label = str(item.get("label") or "").strip().lower()
+        key = metric or label
+        category = metric_to_category.get(key, default_category)
+
+        # Per-cell state: activity cells only, gated by the stateful allowlist.
+        state = ""
+        item_label = str(item.get("label") or "")
+        if category == "activity" and item_label and normalize_title(item_label) in allowlist:
+            inferred = infer_state(item_label, str(item.get("value", "")))
+            if inferred != "active":
+                state = inferred
+
+        annotated.append({**item, "category": category, "state": state})
+
+    # Stable sort by category rank — governs ORDER only (volume → activity →
+    # identity). Within a category, input order is preserved.
+    annotated.sort(key=lambda it: _CATEGORY_RANK.get(str(it.get("category")), 0))
+
+    # Hero = first volume cell carrying real data (kv/live), brightest-ink
+    # treatment downstream. Raw-text items are not hero-eligible.
+    hero_assigned = False
+    for it in annotated:
+        is_hero = not hero_assigned and it.get("category") == "volume" and it.get("role") != "text"
+        it["is_hero"] = is_hero
+        if is_hero:
+            hero_assigned = True
+    return annotated
+
+
+def _layout_marquee_modules(
+    items: list[dict[str, Any]],
+    *,
+    label_font: str,
+    label_font_size: int,
+    label_letter_spacing_px: float,
+    value_font: str,
+    value_font_size: int,
+    hero_font_size: int,
+    value_weight: int,
+    value_letter_spacing_px: float,
+    inset: int,
+    start_x: int,
+    min_width: int,
+    divider_w: int,
+) -> tuple[list[dict[str, Any]], int, int]:
+    """Lay out items as fixed-width cast MODULES (brutalist instrument panel).
+
+    Each module is a uniform-width cell: a small mono label stacked over a bold
+    condensed value (both left-aligned at ``module_left + inset``), bounded by a
+    full-height divider at the module's right boundary. The uniform module pitch
+    is computed from MEASURED content — ``max(widest label, widest value) +
+    2*inset`` clamped to ``min_width`` — so the prototype's 136px is reproduced
+    for its content but the layout adapts to any token set (the cram-proof
+    cast-repetition principle: short values just leave left-aligned air inside
+    their module). Returns ``(laid, content_end_x, module_width)``.
+    """
+    from hyperweave.core.text import measure_text
+
+    widest = 0.0
+    for it in items:
+        label = str(it.get("label", "") or "")
+        value = str(it.get("value", ""))
+        vfs = hero_font_size if (it.get("is_hero") and hero_font_size) else value_font_size
+        lw = measure_text(
+            label,
+            font_family=label_font,
+            font_size=float(label_font_size),
+            font_weight=600,
+            letter_spacing_em=label_letter_spacing_px / label_font_size if label_font_size else 0.0,
+        )
+        vw = measure_text(
+            value,
+            font_family=value_font,
+            font_size=float(vfs),
+            font_weight=value_weight,
+            letter_spacing_em=value_letter_spacing_px / value_font_size if value_font_size else 0.0,
+        )
+        # Download-window subtitle trails the value (item-module.j2 renders it at
+        # label_font_size with a 4px dx — the same gap the ribbon uses, and in
+        # the label font). Fold its width into the value-row width so the module
+        # pitch widens to hold it — the cram-proof clamp covers it.
+        window = str(it.get("window", "") or "")
+        if window:
+            vw += _MARQUEE_WINDOW_GAP + measure_text(
+                window,
+                font_family=label_font,
+                font_size=float(label_font_size),
+                font_weight=600,
+                letter_spacing_em=label_letter_spacing_px / label_font_size if label_font_size else 0.0,
+            )
+        widest = max(widest, lw, vw)
+
+    import math
+
+    module_width = max(math.ceil(widest) + 2 * inset, min_width)
+
+    laid: list[dict[str, Any]] = []
+    x = start_x
+    for it in items:
+        module_left = x
+        vfs = hero_font_size if (it.get("is_hero") and hero_font_size) else value_font_size
+        laid.append(
+            {
+                "type": "module",
+                "x": module_left + inset,
+                "divider_x": module_left + module_width - divider_w,
+                "label": it.get("label", ""),
+                "value": it.get("value", ""),
+                "value_color": it.get("value_color", ""),
+                "label_color": it.get("label_color", ""),
+                "data_hw_status": it.get("data_hw_status", ""),
+                "value_font_size": vfs,
+                "font_weight": it.get("font_weight", ""),
+                "is_hero": it.get("is_hero", False),
+                "window": str(it.get("window", "") or ""),
+            }
+        )
+        x += module_width
+    return laid, x, module_width
 
 
 def _resolve_horizontal(
@@ -2174,6 +2391,7 @@ def _resolve_horizontal(
         width = int(marquee_cfg.width) or 800
         height = int(marquee_cfg.height) or 40
         font_size = int(marquee_cfg.font_size) or 13
+        label_font_size = int(marquee_cfg.label_font_size) or font_size
         font_weight_str = marquee_cfg.font_weight or ""
         letter_spacing_css = marquee_cfg.letter_spacing or ".5"
         font_family = marquee_cfg.font_family or _prof.get(
@@ -2183,18 +2401,32 @@ def _resolve_horizontal(
         separator_size = int(marquee_cfg.separator_size) or 6
         separator_glyph = marquee_cfg.separator_glyph or "■"
         separator_color = marquee_cfg.separator_color or _prof.get("marquee_separator_color", "var(--dna-border)")
+        separator_fill_override = marquee_cfg.separator_fill or ""
         text_fill_mode = marquee_cfg.text_fill_mode or "per_item"
         text_fill_gradient_id = marquee_cfg.text_fill_gradient_id or ""
-        text_fill_cycle = list(marquee_cfg.text_fill_cycle)
-        tspan_palette = list(marquee_cfg.tspan_palette)
         clip_inset_left = int(marquee_cfg.clip_inset_left)
         clip_inset_right = int(marquee_cfg.clip_inset_right)
         clip_inset_top = int(marquee_cfg.clip_inset_top)
         clip_inset_bottom = int(marquee_cfg.clip_inset_bottom)
         clip_rx = float(marquee_cfg.clip_rx)
+        # v0.3.12 — scroll-item layout dispatch (ribbon | module) + module geom.
+        item_layout = marquee_cfg.item_layout or "ribbon"
+        hero_font_size = int(marquee_cfg.hero_font_size)
+        module_min_width = int(marquee_cfg.module_min_width)
+        module_text_inset = int(marquee_cfg.module_text_inset)
+        module_label_y = int(marquee_cfg.module_label_y)
+        module_value_y = int(marquee_cfg.module_value_y)
+        module_label_font_size = int(marquee_cfg.module_label_font_size)
+        module_label_font_family = marquee_cfg.module_label_font_family or font_family
+        module_label_letter_spacing = marquee_cfg.module_label_letter_spacing or "0"
+        module_value_font_family = marquee_cfg.module_value_font_family or font_family
+        module_divider_w = int(marquee_cfg.module_divider_w)
+        module_divider_y = int(marquee_cfg.module_divider_y)
+        module_divider_h = int(marquee_cfg.module_divider_h)
     else:
         width, height = 800, 40
         font_size = 13
+        label_font_size = 13
         font_weight_str = ""
         letter_spacing_css = ".5"
         font_family = _prof.get("marquee_font_family", "var(--dna-font-mono, ui-monospace, monospace)")
@@ -2202,12 +2434,28 @@ def _resolve_horizontal(
         separator_size = 6
         separator_glyph = _prof.get("marquee_separator", "■")
         separator_color = _prof.get("marquee_separator_color", "var(--dna-border)")
+        separator_fill_override = ""
         text_fill_mode = "per_item"
         text_fill_gradient_id = ""
-        text_fill_cycle = []
-        tspan_palette = []
         clip_inset_left = clip_inset_right = clip_inset_top = clip_inset_bottom = 0
         clip_rx = 0.0
+        item_layout = "ribbon"
+        hero_font_size = 0
+        module_min_width = 0
+        module_text_inset = 16
+        module_label_y = 14
+        module_value_y = 35
+        module_label_font_size = 8
+        module_label_font_family = font_family
+        module_label_letter_spacing = "0"
+        module_value_font_family = font_family
+        module_divider_w = 2
+        module_divider_y = 6
+        module_divider_h = 32
+
+    # Genome fonts for measurement (genome-aware font resolution, v0.3.12).
+    genome_display_font = chrome_ctx.get("genome_display_font", "")
+    genome_mono_font = chrome_ctx.get("genome_mono_font", "")
 
     # Item ingestion: data-tokens preferred, title fallback.
     if spec.data_tokens:
@@ -2215,75 +2463,67 @@ def _resolve_horizontal(
 
         formatted = format_for_marquee(spec.data_tokens)
         structured = [
-            {"role": item["role"], "label": item["label"], "value": item["raw_value"] or item["text"]}
+            {
+                "role": item["role"],
+                "label": item["label"],
+                "value": item["raw_value"] or item["text"],
+                "metric": item.get("metric", ""),
+                "window": item.get("window", ""),
+            }
             for item in formatted
             if item.get("text")
         ]
         if not structured:
-            structured = [{"role": "text", "label": "", "value": "HYPERWEAVE"}]
+            structured = [{"role": "text", "label": "", "value": "HYPERWEAVE", "metric": ""}]
     else:
         items_text = spec.title or ""
         raw_items = [s.strip() for s in items_text.replace("·", "|").split("|") if s.strip()]
         if not raw_items:
             raw_items = [items_text] if items_text else ["HYPERWEAVE"]
-        structured = [{"role": "text", "label": "", "value": t} for t in raw_items]
+        structured = [{"role": "text", "label": "", "value": t, "metric": ""} for t in raw_items]
 
-    # Per-item fills computed by mode. Each item gets its own value_color
-    # (and label_color when label is present). Gradient mode emits the empty
-    # string sentinel — the template substitutes the gradient URL.
-    bold_pattern = _prof.get("marquee_horizontal_bold_pattern", "even")
-    primary_info = chrome_ctx.get("primary_seam_mid", "")
-    secondary_info = chrome_ctx.get("secondary_seam_mid", "")
-    is_paired = chrome_ctx.get("is_paired", False)
-    bifamily_active = is_paired and bool(primary_info) and bool(secondary_info) and bool(tspan_palette)
-    # Cellular monofamily branch (v0.3.0): when chrome_ctx carries a
-    # primary_info_accent (cellular paradigm signal), use it as the uniform
-    # scroll text fill. The v3 prototype's monofamily approach treats every
-    # token in the variant's saturated brand stop, with mid_accent reserved
-    # for separators and hairlines. Both solo and paired cellular variants
-    # follow this rule — the marquee's chromatic bandwidth is too narrow for
-    # bifamily alternation to communicate paired identity.
-    primary_info_accent = chrome_ctx.get("primary_info_accent", "")
-    cellular_mono_active = bool(primary_info_accent) and not bifamily_active
+    # v0.3.12 — auto-group (volume→activity→identity ORDER) + per-cell state +
+    # role-based hero. Genome-neutral classification; color comes from the
+    # cascade bridge below.
+    structured = _annotate_marquee_items(structured)
 
-    # Default font_weight for measurement: paradigm-level value when set,
-    # else 700 for items the bold-pattern picks (matches historic behavior).
-    measure_weight = int(font_weight_str) if font_weight_str.isdigit() else 400
+    # Content-aware layout (v0.3.12-fix). The module/stacked grammar exists to
+    # stack a LABEL over a VALUE — it only makes sense for DATA cells (kv/live
+    # label+value pairs). A free-text marquee ("HYPERWEAVE | LIVING ARTIFACTS")
+    # has no label to stack, so forcing it into uniform module cells produced
+    # the oversized, unevenly-spaced cells. When no item carries a label, fall
+    # back to the inline ribbon for every genome — text scrolls as a clean flow.
+    # Genomes already on ribbon (automata) are unaffected.
+    if item_layout == "module" and not any(str(it.get("label") or "") for it in structured):
+        item_layout = "ribbon"
+
+    # Role-based per-item coloring (v0.3.12). Category + state + hero drive the
+    # value color through the genome's cascade bridge — never a per-paradigm hex
+    # pick, never a `paradigm ==` branch. Single-channel: only activity cells
+    # carry data-hw-status; volume/identity get role color only.
+    #   hero (first volume) → chrome-text gradient if the paradigm declares one,
+    #                         else brightest ink (rendered at hero_font_size)
+    #   volume              → brightest ink (var(--dna-ink-primary))
+    #   activity (stateful) → var(--hw-state-value) + data-hw-status="<state>"
+    #   identity            → muted ink (var(--dna-ink-muted))
+    measure_weight = int(font_weight_str) if font_weight_str.isdigit() else 700
+    item_weight = font_weight_str or "700"
 
     items_for_layout: list[dict[str, Any]] = []
-    for i, item in enumerate(structured):
-        # Mode dispatch — determines value_color / label_color / font_weight.
-        if text_fill_mode == "gradient":
-            # Single uniform gradient applied to every item; the template
-            # constructs `fill="url(#{uid}-{text_fill_gradient_id})"` when
-            # `value_color` is the empty string.
-            value_color = ""
-            label_color = ""
-            fw = font_weight_str
-        elif text_fill_mode == "cycle" and text_fill_cycle:
-            value_color = text_fill_cycle[i % len(text_fill_cycle)]
-            label_color = value_color  # cycle paradigms use one color per item
-            fw = font_weight_str
-        elif bifamily_active:
-            palette = [primary_info, secondary_info]
-            value_color = palette[i % len(palette)]
-            label_color = value_color
-            fw = font_weight_str or "700"
-        elif cellular_mono_active:
-            # Cellular monofamily — every item in the variant's info_accent.
-            # Label color collapses to the same hex (cellular tokens rarely
-            # have separate labels; when they do, splitting label vs value
-            # by tone would compete with the bullet separator's mid_accent).
-            value_color = primary_info_accent
-            label_color = value_color
-            fw = font_weight_str or "700"
-        else:
-            # per_item legacy: ink-primary/secondary alternation, label muted.
-            value_color = "var(--dna-ink-primary)" if i % 2 == 0 else "var(--dna-ink-secondary, var(--dna-ink-muted))"
-            label_color = "var(--dna-ink-muted)"
-            fw = font_weight_str or (
-                "700" if (bold_pattern == "first" and i == 0) or (bold_pattern == "even" and i % 2 == 0) else ""
-            )
+    for item in structured:
+        category = item.get("category", "volume")
+        state = item.get("state", "")
+        is_hero = bool(item.get("is_hero", False))
+        data_hw_status = state if (category == "activity" and state) else ""
+
+        if is_hero and text_fill_gradient_id:
+            value_color = ""  # gradient sentinel — template emits url(#uid-{id})
+        elif data_hw_status:
+            value_color = "var(--hw-state-value)"
+        elif category == "identity":
+            value_color = "var(--dna-ink-muted)"
+        else:  # volume / hero-without-gradient
+            value_color = "var(--dna-ink-primary)"
 
         items_for_layout.append(
             {
@@ -2291,118 +2531,156 @@ def _resolve_horizontal(
                 "label": item["label"],
                 "value": item["value"],
                 "value_color": value_color,
-                "label_color": label_color,
-                "font_weight": fw,
+                "label_color": "var(--dna-ink-muted)",
+                "font_weight": item_weight,
+                "data_hw_status": data_hw_status,
+                "is_hero": is_hero,
+                # Download-window subtitle ("ALL-TIME" / "30D" / "7D" / "90D").
+                # Rendered as a dim trailing tspan after the value; both layout
+                # engines reserve its measured width so the period label never
+                # crams the next cell.
+                "window": str(item.get("window", "") or ""),
             }
         )
 
-    # Layout: compute absolute x positions + content_end_x.
-    letter_spacing_px = _parse_letter_spacing_px(letter_spacing_css, float(font_size))
-    item_gap = 20  # historical inter-item breathing room
-    label_value_gap = 8  # gap between label tspan and value tspan within a kv/live item
-    start_x = 16  # left padding inside the scroll viewport (matches chrome specimen translate(16, …))
-    laid_out, content_end_x = _layout_marquee_items(
-        items_for_layout,
-        font_family=font_family,
-        font_size=font_size,
-        font_weight=measure_weight,
-        letter_spacing_px=letter_spacing_px,
-        item_gap=item_gap,
-        label_value_gap=label_value_gap,
-        start_x=start_x,
-        separator_kind=separator_kind,
-        separator_size=separator_size,
-        separator_glyph=separator_glyph,
-    )
-
-    # Seamless-loop sizing: repeat items inside Set-A enough times that
-    # Set-A's content_end_x covers the viewport. The single-cycle layout
-    # above tells us the natural period; if that period is smaller than the
-    # viewport, we'd otherwise have a visible empty gap at the loop boundary
-    # (Set-A scrolls off, viewport shows empty space until Set-B catches up).
-    # Repeating items so layout_width >= viewport_width keeps the viewport
-    # full at all times; scroll_distance still equals the full layout width
-    # (R x single_period) so Set-B at translate(scroll_distance, 0) picks up
-    # exactly one full Set-A worth of content past Set-A's trailing separator.
     import math
 
-    single_period = max(content_end_x - start_x, 1)
-    repetitions = max(1, math.ceil(width / single_period))
-    if repetitions > 1:
-        items_repeated = items_for_layout * repetitions
-        laid_out, content_end_x = _layout_marquee_items(
-            items_repeated,
-            font_family=font_family,
-            font_size=font_size,
-            font_weight=measure_weight,
-            letter_spacing_px=letter_spacing_px,
-            item_gap=item_gap,
-            label_value_gap=label_value_gap,
-            start_x=start_x,
-            separator_kind=separator_kind,
-            separator_size=separator_size,
-            separator_glyph=separator_glyph,
+    letter_spacing_px = _parse_letter_spacing_px(letter_spacing_css, float(font_size))
+    clip_width = max(width - clip_inset_left - clip_inset_right, 1)
+
+    if item_layout == "module":
+        # MODULE layout (brutalist instrument panel): uniform-width cast cells
+        # with a per-module divider, the pitch sized from MEASURED content.
+        # Start at the clip's left edge so modules fill the readout window
+        # between the end-caps. Value font (Barlow Condensed) and label font
+        # (mono) are resolved genome-aware before measurement.
+        module_start_x = clip_inset_left
+        value_meas_font = _resolve_font_for_measurement(
+            module_value_font_family, genome_display_font=genome_display_font, genome_mono_font=genome_mono_font
         )
+        label_meas_font = _resolve_font_for_measurement(
+            module_label_font_family, genome_display_font=genome_display_font, genome_mono_font=genome_mono_font
+        )
+        value_ls_px = _parse_letter_spacing_px(letter_spacing_css, float(font_size))
+        label_ls_px = _parse_letter_spacing_px(module_label_letter_spacing, float(module_label_font_size or 8))
 
-    # Set-B color shift — when the per-item color cycle (cycle mode or
-    # bifamily) doesn't divide evenly into the total Set-A item count, the
-    # loop boundary shows two adjacent same-color items (Set-A's last item
-    # cycle-position == Set-B's first item cycle-position). Fix: pre-compute
-    # value_color_set_b / label_color_set_b on each text entry with offset
-    # equal to the total item count, so Set-B picks up the cycle one position
-    # ahead and the boundary alternates correctly.
-    text_entries = [e for e in laid_out if e.get("type") == "text"]
-    total_items = len(text_entries)
-    cycle_len = 0
-    palette_for_shift: list[str] = []
-    if text_fill_mode == "cycle" and text_fill_cycle:
-        cycle_len = len(text_fill_cycle)
-        palette_for_shift = list(text_fill_cycle)
-    elif bifamily_active:
-        cycle_len = 2
-        palette_for_shift = [primary_info, secondary_info]
-    shift_needed = cycle_len > 0 and total_items % cycle_len != 0
-    for i, entry in enumerate(text_entries):
-        item = entry["item"]
-        if shift_needed:
-            new_color = palette_for_shift[(i + total_items) % cycle_len]
-            item["value_color_set_b"] = new_color
-            item["label_color_set_b"] = new_color
-        else:
-            item["value_color_set_b"] = item.get("value_color", "")
-            item["label_color_set_b"] = item.get("label_color", "")
+        def _module_layout(items_in: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int, int]:
+            return _layout_marquee_modules(
+                items_in,
+                label_font=label_meas_font,
+                label_font_size=module_label_font_size,
+                label_letter_spacing_px=label_ls_px,
+                value_font=value_meas_font,
+                value_font_size=font_size,
+                hero_font_size=hero_font_size,
+                value_weight=measure_weight,
+                value_letter_spacing_px=value_ls_px,
+                inset=module_text_inset,
+                start_x=module_start_x,
+                min_width=module_min_width,
+                divider_w=module_divider_w,
+            )
 
-    # scroll_distance: one full Set-A worth = content_end_x - start_x =
-    # R x single_period. The layout helper added a trailing separator after
-    # every item, so the boundary gap (last sep end to Set-B first item start)
-    # equals item_gap — identical to every within-set sep-to-item gap. SMIL's
-    # frame-boundary jump from translate(-sd, 0) back to translate(0, 0) is
-    # visually invisible because the periodic strip pattern looks identical
-    # at both states.
-    base_speed = 90.2
+        laid_out, content_end_x, module_width = _module_layout(items_for_layout)
+        single_period = max(content_end_x - module_start_x, 1)
+        # +1 extra repetition so the window stays full as Set-A scrolls off.
+        repetitions = max(1, math.ceil(clip_width / single_period) + 1)
+        if repetitions > 1:
+            laid_out, content_end_x, module_width = _module_layout(items_for_layout * repetitions)
+        start_x = module_start_x
+        # Set-B mirrors Set-A per cell — color is content-derived, not cycled.
+        for entry in laid_out:
+            entry["value_color_set_b"] = entry.get("value_color", "")
+            entry["label_color_set_b"] = entry.get("label_color", "")
+    else:
+        # RIBBON layout (chrome / cellular / default): inline label+value at one
+        # absolute x with separators between, measured genome-aware.
+        module_width = 0
+        item_gap = 20  # historical inter-item breathing room
+        label_value_gap = _MARQUEE_LABEL_VALUE_GAP  # label -> value tspan gap (ribbon)
+        start_x = 16  # left padding inside the scroll viewport
+
+        def _ribbon_layout(items_in: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+            return _layout_marquee_items(
+                items_in,
+                font_family=font_family,
+                font_size=font_size,
+                font_weight=measure_weight,
+                letter_spacing_px=letter_spacing_px,
+                item_gap=item_gap,
+                label_value_gap=label_value_gap,
+                start_x=start_x,
+                separator_kind=separator_kind,
+                separator_size=separator_size,
+                separator_glyph=separator_glyph,
+                label_font_size=label_font_size,
+                genome_display_font=genome_display_font,
+                genome_mono_font=genome_mono_font,
+            )
+
+        laid_out, content_end_x = _ribbon_layout(items_for_layout)
+        single_period = max(content_end_x - start_x, 1)
+        repetitions = max(1, math.ceil(width / single_period))
+        if repetitions > 1:
+            laid_out, content_end_x = _ribbon_layout(items_for_layout * repetitions)
+        # Set-B mirrors Set-A per cell. State/role colors are content-derived
+        # (not position-cycled), so the loop boundary needs no color shift.
+        for entry in laid_out:
+            if entry.get("type") == "text":
+                inner = entry["item"]
+                inner["value_color_set_b"] = inner.get("value_color", "")
+                inner["label_color_set_b"] = inner.get("label_color", "")
+
     speed = spec.marquee_speeds[0] if spec.marquee_speeds else 1.0
     scroll_distance = content_end_x - start_x
-    scroll_dur = round(scroll_distance / (base_speed * speed), 2)
-    separator_fill = f"var(--dna-signal, {separator_color})"
-    chrome_well_w = max(0, width - 8)
-    chrome_well_h = max(0, height - 8)
-    chrome_inner_w = max(0, width - 2)
-    chrome_inner_h = max(0, height - 2)
-    chrome_top_accent_w = max(0, width - 48)
+    # Uniform reading rate across every genome (chrome's px/s) — NOT each
+    # prototype's hardcoded dur (brutalist 33s, automata 23.5s).
+    scroll_dur = round(scroll_distance / (CHROME_PX_PER_SEC * speed), 2)
+    # Paradigms whose separators must NOT follow the variant signal accent
+    # (cellular's neutral ▪) set separator_fill explicitly; everyone else gets
+    # the signal-following wrapper (brutalist's per-variant emerald divider).
+    separator_fill = separator_fill_override or f"var(--dna-signal, {separator_color})"
+    # v0.3.12-fix — frame geometry reconciled to marquee-dense-chrome.svg's
+    # actual construction (not just dims). Prototype well inset = 2px (was 4px),
+    # left edge sliver = 3.5px (was a 6px rail), inner hairline at 1.5px. The
+    # heavy feSpecularLighting bevel that brightened the border is replaced by a
+    # flat drop shadow in chrome-defs.j2, and the prototype's static milled
+    # detail (top specular line, white sheen, bottom shadow band, corner rivets)
+    # is added below.
+    chrome_well_w = max(0, width - 4)
+    chrome_well_h = max(0, height - 4)
+    chrome_inner_w = max(0, width - 3)
+    chrome_inner_h = max(0, height - 3)
+    chrome_specular_w = max(0, width - 8)
+    chrome_sheen_w = max(0, width - 4)
+    chrome_shadow_band_w = max(0, width - 4)
     marquee_geom = {
         "chrome_outer_rx": 4,
-        "chrome_well_x": 4,
-        "chrome_well_y": 4,
-        "chrome_well_rx": 2.6,
-        "chrome_rail_x": 4,
-        "chrome_rail_y": 4,
-        "chrome_rail_w": 6,
-        "chrome_inner_x": 1,
-        "chrome_inner_y": 1,
-        "chrome_inner_rx": 3.2,
-        "chrome_top_accent_x": 24,
-        "chrome_top_accent_y": 4,
-        "chrome_top_accent_h": 0.6,
+        "chrome_well_x": 2,
+        "chrome_well_y": 2,
+        "chrome_well_rx": 2.5,
+        "chrome_rail_x": 2,
+        "chrome_rail_y": 2,
+        "chrome_rail_w": 3.5,
+        "chrome_inner_x": 1.5,
+        "chrome_inner_y": 1.5,
+        "chrome_inner_rx": 3,
+        "chrome_specular_x": 4,
+        "chrome_specular_y": 2.5,
+        "chrome_specular_h": 1,
+        "chrome_sheen_x": 2,
+        "chrome_sheen_y": 2,
+        "chrome_sheen_h": 0.4,
+        "chrome_shadow_band_x": 2,
+        "chrome_shadow_band_y": height - 4,
+        "chrome_shadow_band_h": 2,
+        "chrome_rivet_size": 1,
+        "chrome_rivets": [
+            {"x": 6.5, "y": 5},
+            {"x": 6.5, "y": height - 6},
+            {"x": width - 8.5, "y": 5},
+            {"x": width - 8.5, "y": height - 6},
+        ],
         "brutalist_border_x": 0.5,
         "brutalist_border_y": 0.5,
         "brutalist_accent_x": 0,
@@ -2413,6 +2691,71 @@ def _resolve_horizontal(
         "cellular_hairline_h": 0.5,
     }
 
+    # v0.3.12 — DECORATIVE liveness geometry, computed here so the {paradigm}
+    # liveness partials carry zero coordinate arithmetic / literals (spatial
+    # stencil contract). Module → brutalist end-caps + engineering grid;
+    # ribbon → chrome LIVE+diamond + cellular wave-rail.
+    live_mid = height // 2
+    cap_r_x = clip_inset_left + clip_width
+    rail_y = height - 3
+    liveness: dict[str, Any] = {
+        "origin": 0,
+        "grid_line_w": 1,
+        "diamond_rx": 0.5,
+        "diamond_inner_rx": 0.3,
+        # Brutalist module end-caps (left strobe-node, right seal) + bottom rail.
+        "cap_l_w": clip_inset_left,
+        "cap_r_x": cap_r_x,
+        "cap_r_w": width - cap_r_x,
+        "cap_h": rail_y,
+        "cap_l_rail_x": clip_inset_left - 3,
+        "cap_rail_w": 3,
+        "cube_outer_x": 12,
+        "cube_outer_y": 14,
+        "cube_outer_w": 14,
+        "cube_inner_x": 16,
+        "cube_inner_y": 18,
+        "cube_inner_w": 6,
+        "seal_x": cap_r_x + 14,
+        "seal_y": 16,
+        "seal_w": 10,
+        "bottom_rail_y": rail_y,
+        "bottom_rail_h": 3,
+        "perimeter_x": 0.5,
+        "perimeter_y": 0.5,
+        "perimeter_w": width - 1,
+        "perimeter_h": height - 1,
+        "grid_y": 2,
+        "grid_h": height - 4,
+        # Chrome ribbon LIVE wordmark + pulsing diamond.
+        "live_text_x": 36,
+        "live_text_y": live_mid + 4,
+        "diamond_cx": 66,
+        "diamond_cy": live_mid,
+        "diamond_housing_x": -3.5,
+        "diamond_housing_y": -3.5,
+        "diamond_housing_w": 7,
+        "diamond_inner_x": -2,
+        "diamond_inner_y": -2,
+        "diamond_inner_w": 4,
+        "sep_x": 82,
+        "sep_y1": 6,
+        "sep_y2": height - 6,
+        # Cellular wave-rail baseline.
+        "rail_cell_y": height - 2,
+        "rail_cell_w": 5,
+        "rail_cell_h": 2,
+    }
+    # Vertical engineering-grid hairlines (module layout), 88px pitch.
+    liveness_grid = [{"x": i * 88} for i in range(1, width // 88 + 1)] if item_layout == "module" else []
+    # Travelling-wave rail cells (ribbon layout), 6px pitch, phase-delayed by x.
+    _wv_n = width // 6
+    liveness_rail = (
+        [{"x": i * 6 + 2, "delay": round(i * 3.2 / _wv_n, 3)} for i in range(_wv_n)]
+        if (item_layout != "module" and _wv_n)
+        else []
+    )
+
     ctx: dict[str, Any] = {
         "direction": spec.marquee_direction,
         "scroll_items": laid_out,
@@ -2422,6 +2765,11 @@ def _resolve_horizontal(
         "scroll_start_x": start_x,
         # Paradigm-driven typography (template renders these as <text> attrs).
         "font_size": font_size,
+        "label_font_size": label_font_size,
+        # Intra-cell tspan-flow gaps (single-sourced; templates render as dx so
+        # rendered width can't drift from the resolver's reserved width).
+        "label_value_gap": _MARQUEE_LABEL_VALUE_GAP,
+        "window_gap": _MARQUEE_WINDOW_GAP,
         "font_weight": font_weight_str,
         "letter_spacing": letter_spacing_css,
         "scroll_font_family": font_family,
@@ -2440,7 +2788,9 @@ def _resolve_horizontal(
         "chrome_inner_w": chrome_inner_w,
         "chrome_inner_h": chrome_inner_h,
         "chrome_rail_h": chrome_well_h,
-        "chrome_top_accent_w": chrome_top_accent_w,
+        "chrome_specular_w": chrome_specular_w,
+        "chrome_sheen_w": chrome_sheen_w,
+        "chrome_shadow_band_w": chrome_shadow_band_w,
         "cellular_bottom_hairline_y": height - 0.5,
         # Text-fill mode (template uses text_fill_gradient_id when item.value_color is "").
         "text_fill_mode": text_fill_mode,
@@ -2455,6 +2805,30 @@ def _resolve_horizontal(
         "clip_w": width - clip_inset_left - clip_inset_right,
         "clip_h": height - clip_inset_top - clip_inset_bottom,
         "clip_rx": clip_rx,
+        # v0.3.12 — scroll-item layout dispatch + module geometry. The template
+        # includes item-{item_layout}.j2 (ribbon | module); module fields are
+        # consumed only by item-module.j2.
+        "item_layout": item_layout,
+        "module_width": module_width,
+        "module_label_y": module_label_y,
+        "module_value_y": module_value_y,
+        "module_divider_y": module_divider_y,
+        "module_divider_h": module_divider_h,
+        "module_divider_w": module_divider_w,
+        "module_value_font_family": module_value_font_family,
+        "module_label_font_family": module_label_font_family,
+        "module_label_font_size": module_label_font_size,
+        "module_label_letter_spacing": module_label_letter_spacing,
+        "hero_font_size": hero_font_size,
+        # Decorative liveness geometry (paradigm partials consume named values).
+        "liveness": liveness,
+        "liveness_grid": liveness_grid,
+        "liveness_grid_y": liveness["grid_y"],
+        "liveness_grid_h": liveness["grid_h"],
+        "liveness_rail": liveness_rail,
+        "liveness_rail_y": liveness["rail_cell_y"],
+        "liveness_rail_w": liveness["rail_cell_w"],
+        "liveness_rail_h": liveness["rail_cell_h"],
     }
     ctx.update(chrome_ctx)
     return {"width": width, "height": height, "template": "frames/marquee-horizontal.svg.j2", "context": ctx}

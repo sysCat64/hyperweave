@@ -27,6 +27,15 @@ def _parse_entry(xml_text: str) -> dict[str, Any]:
         el = entry.find(f"{{{ns}}}{tag}")
         return (el.text or "").strip() if el is not None else ""
 
+    def _optional_arxiv(tag: str) -> str:
+        # journal_ref / doi are frequently ABSENT (verified absent on
+        # 2310.06825) — a missing element must surface as "n/a", never crash.
+        el = entry.find(f"{{{_ARXIV_NS}}}{tag}")
+        if el is None:
+            return "n/a"
+        text = (el.text or "").strip()
+        return text or "n/a"
+
     # Authors are repeated <author><name> elements
     authors: list[str] = []
     for author_el in entry.findall(f"{{{_ATOM_NS}}}author"):
@@ -47,6 +56,11 @@ def _parse_entry(xml_text: str) -> dict[str, Any]:
         "published": _text("published"),
         "categories": categories,
         "summary": _text("summary"),
+        # v0.3.12 audit-surfaced fields. ``updated`` is always present (Atom
+        # core); journal_ref / doi are arXiv-schema extensions, often absent.
+        "updated": _text("updated"),
+        "journal_ref": _optional_arxiv("journal_ref"),
+        "doi": _optional_arxiv("doi"),
     }
 
 

@@ -113,6 +113,29 @@ def load_badge_modes() -> frozenset[str]:
 
 
 @lru_cache(maxsize=1)
+def load_marquee_classes() -> tuple[dict[str, str], str]:
+    """Load the marquee metric→category map from data/marquee_classes.yaml.
+
+    Inverts the ``categories: {category: [metric, ...]}`` lists into a flat
+    ``{metric_lower: category}`` dict at load. Returns
+    ``(metric_to_category, default_category)``. Drives marquee auto-grouping
+    ORDER (volume→activity→identity) and hero-eligibility. Missing file → an
+    empty map + ``"volume"`` default (all-volume fail-safe). Cached because
+    every marquee resolution reads it.
+    """
+    path = _data_path("marquee_classes.yaml")
+    if not path.exists():
+        return {}, "volume"
+    raw = _read_yaml(path) or {}
+    default_category = str(raw.get("default_category", "volume"))
+    flat: dict[str, str] = {}
+    for category, metrics in (raw.get("categories") or {}).items():
+        for metric in metrics or []:
+            flat[str(metric).strip().lower()] = str(category)
+    return flat, default_category
+
+
+@lru_cache(maxsize=1)
 def load_font_embedding() -> dict[str, Any]:
     """Load font embedding gate from data/font-embedding.yaml.
 

@@ -2,7 +2,7 @@
      xmlns:hw="https://hyperweave.app/hw/v1.0"
      role="img"
      aria-labelledby="hw-UID-title hw-UID-desc"
-     viewBox="0 0 120 120"
+     viewBox="0 0 108 108"
      width="64" height="64"
      shape-rendering="geometricPrecision"
      data-hw-id="UUID"
@@ -237,7 +237,7 @@ svg, :root {
 
   </defs>
 
-<g transform="translate(60, 60)">
+<g transform="translate(54, 54)">
   <circle r="46" fill="none" stroke="url(#hw-UID-env)" stroke-width="5"/>
   <circle r="42" fill="url(#hw-UID-well)"/>
   <circle r="42" fill="none" stroke="#000510" stroke-width="0.6"/>

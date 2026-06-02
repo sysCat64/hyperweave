@@ -95,7 +95,8 @@ def compose(
             help=(
                 "Data tokens, comma-separated. Forms: text:STRING | kv:KEY=VALUE | "
                 "gh:owner/repo.metric | pypi:pkg.metric | npm:pkg.metric | "
-                "hf:org/model.metric | arxiv:id.metric | docker:owner/image.metric. "
+                "hf:org/model.metric | arxiv:id.metric | docker:owner/image.metric | "
+                "crates:pkg.metric | scorecard:owner/repo.metric | dora:owner/repo.metric. "
                 "Embedded commas in text/kv payloads escape as \\,."
             ),
         ),
@@ -442,7 +443,10 @@ def session(
 
 @app.command()
 def live(
-    provider: Annotated[str, typer.Argument(help="Provider: github, pypi, npm, arxiv, huggingface, docker")],
+    provider: Annotated[
+        str,
+        typer.Argument(help="Provider: github, pypi, npm, arxiv, huggingface, docker, crates, scorecard, dora"),
+    ],
     identifier: Annotated[str, typer.Argument(help="Resource ID: owner/repo, package-name, paper-id")],
     metric: Annotated[str, typer.Argument(help="Metric: stars, forks, version, downloads, likes")],
     genome: Annotated[str, typer.Option("--genome", "-g")] = "brutalist",
@@ -1116,7 +1120,17 @@ def mcp(
     """Start the HyperWeave MCP server."""
     from typing import Literal, cast
 
-    from hyperweave.mcp.server import mcp as mcp_server
+    try:
+        from hyperweave.mcp.server import mcp as mcp_server
+    except ModuleNotFoundError as exc:
+        # fastmcp ships in the optional [mcp] extra (see pyproject.toml). A
+        # core-only install reaches here — guide the user instead of dumping a
+        # raw ImportError.
+        typer.echo(
+            "The MCP server requires the 'mcp' extra. Install it with:\n  pip install 'hyperweave[mcp]'",
+            err=True,
+        )
+        raise typer.Exit(1) from exc
 
     # FastMCP's run() accepts a narrow Literal for transport. Cast after
     # validating the input instead of changing the user-facing CLI type.
@@ -1136,7 +1150,16 @@ def serve(
     reload: Annotated[bool, typer.Option("--reload")] = False,
 ) -> None:
     """Start the HyperWeave HTTP server."""
-    import uvicorn
+    try:
+        import uvicorn
+    except ModuleNotFoundError as exc:
+        # fastapi + uvicorn ship in the optional [serve] extra (see
+        # pyproject.toml). A core-only install reaches here — guide the user.
+        typer.echo(
+            "The HTTP server requires the 'serve' extra. Install it with:\n  pip install 'hyperweave[serve]'",
+            err=True,
+        )
+        raise typer.Exit(1) from exc
 
     uvicorn.run(
         "hyperweave.serve.app:app",

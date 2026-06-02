@@ -24,12 +24,12 @@ from hyperweave.core.models import ComposeSpec
 @pytest.mark.parametrize(
     ("genome_id", "expected_w", "expected_h"),
     [
-        ("chrome", 1040, 56),
-        ("brutalist", 720, 32),
-        # Cellular v0.3.0 visual refresh: marquee compacts to 800x32 (was 800x40).
-        # Matches the v3-sulfur prototype's tighter scroll strip — paired with
-        # mid_accent hairlines and info_accent scroll text.
-        ("automata", 800, 32),
+        # v0.3.12: all three marquees reconciled to their 800x44 prototypes
+        # (chrome was 1040x56, automata 800x32 — old dims that survived the WS4
+        # rebuild; both now match marquee-dense-chrome / automata-bone-v4).
+        ("chrome", 800, 44),
+        ("brutalist", 800, 44),
+        ("automata", 800, 44),
     ],
 )
 def test_marquee_dimensions_paradigm_driven(genome_id: str, expected_w: int, expected_h: int) -> None:
@@ -43,24 +43,36 @@ def test_marquee_dimensions_paradigm_driven(genome_id: str, expected_w: int, exp
 
 
 # ────────────────────────────────────────────────────────────────────
-#  Marquee — LIVE-block residue check
+#  Marquee — per-paradigm liveness vocabulary (v0.3.12)
 # ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("genome_id", ["chrome", "brutalist", "automata"])
-def test_marquee_no_live_block_residue(genome_id: str) -> None:
-    """v0.2.16 deleted the LIVE label panel + status diamond + divider entirely.
-    No paradigm should emit residue from the old LIVE-block infrastructure."""
-    spec = ComposeSpec(type="marquee-horizontal", genome_id=genome_id, title="HW|TEST")
-    svg = compose(spec).svg
-    # Hard residue checks — these were textual artifacts of the LIVE block.
-    assert "LIVE</text>" not in svg, f"{genome_id} still emits LIVE label text"
-    # The status diamond was a 7x7 rotate(45) rect group; reducing-motion-tests
-    # in CI catch the breathing animation, but the rect itself is the marker.
-    assert 'transform="rotate(45)"' not in svg, f"{genome_id} still emits status diamond"
-    # Edge fades were sized to the LIVE panel — fade-l / fade-r gradients gone.
-    assert "-fade-l" not in svg, f"{genome_id} still emits LIVE-block fade-left"
-    assert "-fade-r" not in svg, f"{genome_id} still emits LIVE-block fade-right"
+def test_marquee_liveness_vocabulary_per_paradigm() -> None:
+    """v0.3.12 reverses the v0.2.16 LIVE-block deletion: each paradigm now
+    carries its OWN static, purely DECORATIVE liveness markup with its own
+    @keyframes — chrome a LIVE wordmark + pulsing diamond, brutalist a
+    square-in-square strobe-cube in the left end-cap, automata a travelling
+    wave-rail. None of it binds data-hw-status (it reflects no single status —
+    a marquee has N cells), and all of it is prefers-reduced-motion-guarded."""
+    chrome = compose(ComposeSpec(type="marquee-horizontal", genome_id="chrome", title="HW|TEST")).svg
+    assert "LIVE</text>" in chrome, "chrome marquee missing LIVE wordmark"
+    assert 'class="hw-mq-diamond"' in chrome, "chrome marquee missing pulsing diamond"
+
+    brutalist = compose(ComposeSpec(type="marquee-horizontal", genome_id="brutalist", title="HW|TEST")).svg
+    assert 'class="hw-mq-cube"' in brutalist, "brutalist marquee missing strobe-cube live node"
+    assert 'data-hw-zone="cap-left"' in brutalist, "brutalist marquee missing left end-cap"
+
+    automata = compose(ComposeSpec(type="marquee-horizontal", genome_id="automata", title="HW|TEST")).svg
+    assert 'class="hw-mq-wv"' in automata, "automata marquee missing travelling wave-rail"
+
+    # Liveness is DECORATIVE — no liveness element carries data-hw-status, and
+    # every paradigm guards its motion with prefers-reduced-motion.
+    for genome_id, svg in (("chrome", chrome), ("brutalist", brutalist), ("automata", automata)):
+        assert "prefers-reduced-motion" in svg, f"{genome_id} liveness missing reduced-motion guard"
+        for marker in ("hw-mq-diamond", "hw-mq-cube", "hw-mq-wv"):
+            assert not re.search(rf'class="{marker}"[^>]*data-hw-status', svg), (
+                f"{genome_id} liveness element {marker} must not bind data-hw-status"
+            )
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -91,8 +103,9 @@ def test_marquee_short_content_floors_at_viewport_width() -> None:
     viewport_width so the cycle is still a full pass (matches chrome target)."""
     svg = compose(ComposeSpec(type="marquee-horizontal", genome_id="chrome", title="HW")).svg
     sd = _extract_scroll_distance(svg)
-    # Chrome viewport is 1040; a one-item "HW" marquee easily fits → floor applies.
-    assert sd >= 1040, f"Expected scroll_distance >= viewport_width 1040; got {sd}"
+    # Chrome viewport is 800 (v0.3.12 reconciled to the prototype); a one-item
+    # "HW" marquee easily fits → floor applies.
+    assert sd >= 800, f"Expected scroll_distance >= viewport_width 800; got {sd}"
 
 
 def test_marquee_loop_boundary_matches_inter_item_rhythm() -> None:
@@ -107,24 +120,32 @@ def test_marquee_loop_boundary_matches_inter_item_rhythm() -> None:
     The test extracts Set-A positions, computes the boundary gap (last sep end
     -> Set-B first item start), and asserts it's within 2px of the within-set
     rhythm (the 2px tolerance is float-to-int rounding in the layout helper).
+
+    v0.3.12: chrome moved to item_layout=module (stacked cells, no glyph
+    separators), so the separator-after-every-item rhythm this guards now lives
+    in the RIBBON layout — automata. Retargeted accordingly.
     """
     svg = compose(
         ComposeSpec(
             type="marquee-horizontal",
-            genome_id="chrome",
-            title="HYPERWEAVE|CHROME HORIZON|LIVING SVG ARTIFACTS|v0.2.16",
+            genome_id="automata",
+            variant="bone",
+            title="HYPERWEAVE|CELLULAR AUTOMATA|LIVING SVG ARTIFACTS|v0.3.12",
         )
     ).svg
     # scroll_distance from animateTransform.
     sd_m = re.search(r'to="-(\d+) 0"', svg)
     assert sd_m
     sd = int(sd_m.group(1))
-    # Extract all <text x=N> in Set-A (skip <rect> for separator-rect; chrome
-    # uses glyph separators which are <text>).
+    # Extract all <text x=N> in Set-A (skip <rect> for separator-rect; automata
+    # uses glyph separators (▪) which are <text>).
     set_a = svg.split('data-hw-zone="set-a"')[1].split('data-hw-zone="set-b"')[0]
     xs = [int(m) for m in re.findall(r'<text x="(\d+)"', set_a)]
-    # 4 items + 4 separators (one after each) = 8 entries.
-    assert len(xs) == 8, f"expected 4 items + 4 separators, got {len(xs)} text nodes"
+    # 4 items + 4 separators (one after each) = 8 entries per cycle. v0.3.12:
+    # chrome's smaller 11px font means short content may repeat to fill the
+    # 800px viewport, so the count is a multiple of 8 (the per-cycle entry
+    # count), not exactly 8. The boundary check below holds regardless.
+    assert len(xs) >= 8 and len(xs) % 8 == 0, f"expected a multiple of 8 text nodes, got {len(xs)}"
     # The last entry should be a separator (the new trailing one). Set-B first
     # item is at world x = 16 + scroll_distance.
     set_b_first_x = 16 + sd
@@ -166,71 +187,12 @@ def test_chrome_marquee_uses_chrome_text_gradient() -> None:
     assert re.search(r'fill="url\(#hw-[^"]+-ct\)"', svg), "items don't reference chrome-text gradient"
 
 
-def test_brutalist_marquee_uses_rect_separators() -> None:
-    """Brutalist paradigm declares separator_kind=rect with separator_size=6
-    and separator_color=#10B981. Each item-gap should be a 6x6 rect whose fill
-    routes through --dna-signal (so the variant's accent cascades through),
-    with #10B981 as the fallback for renderers that don't resolve the var."""
-    svg = compose(
-        ComposeSpec(
-            type="marquee-horizontal",
-            genome_id="brutalist",
-            title="LIVING ARTIFACTS|SELF-CONTAINED|AGENT INTERFACES",
-        )
-    ).svg
-    # Two items between three labels → at least 2 separator rects per Set; 4 total.
-    # separator_color wraps in var(--dna-signal, ...) so chrome variants
-    # cascade naturally; brutalist's accent (#10B981) matches its separator
-    # hex so the fallback case still equals the original color.
-    rect_seps = re.findall(
-        r'<rect [^>]*width="6" height="6"[^>]*fill="var\(--dna-signal, #10B981\)"[^>]*shape-rendering="crispEdges"',
-        svg,
-    )
-    assert len(rect_seps) >= 4, f"Expected ≥4 emerald rect separators (Set A + B); got {len(rect_seps)}"
-
-
-def test_brutalist_marquee_alternates_text_fill_cycle() -> None:
-    """Brutalist text_fill_cycle=[var(--dna-ink-primary), var(--dna-signal)] →
-    items rotate through the polarity-correct text color (ink_primary) and
-    the variant accent (signal). v0.3.2 follow-up replaced --dna-ink-bright
-    (which resolved to the DARK surface color for dark variants, making
-    marquee text invisible) with --dna-ink-primary which carries the bright
-    text color for dark variants and the dark ink for light variants —
-    visible across all 12 brutalist variants regardless of substrate polarity."""
-    svg = compose(
-        ComposeSpec(
-            type="marquee-horizontal",
-            genome_id="brutalist",
-            title="LIVING|SELF-CONTAINED|AGENT|INTERFACES",
-        )
-    ).svg
-    # Item 0 gets --dna-ink-primary, item 1 --dna-signal (accent), repeat.
-    assert 'fill="var(--dna-ink-primary)"' in svg
-    assert 'fill="var(--dna-signal)"' in svg
-
-
-def test_cellular_marquee_uses_monofamily_info_accent() -> None:
-    """Cellular v0.3.0 visual refresh: marquee adopts the variant's info_accent
-    for scroll text and mid_accent for the top/bottom hairlines + bullet
-    separators. Replaces the prior bifamily teal/amethyst alternation since
-    the marquee's narrow chromatic bandwidth (32px tall, 0.5px hairlines at
-    0.2 opacity) couldn't perceptually communicate a paired-variant signature.
-
-    Tested at the default variant (which the cellular paradigm declares as
-    violet-teal, primary=teal). Teal's info_accent is #5BE0F0 and mid_accent
-    is #1A6A7E."""
-    svg = compose(
-        ComposeSpec(
-            type="marquee-horizontal",
-            genome_id="automata",
-            title="HYPERWEAVE|CELLULAR|LIVING|ARTIFACTS",
-        )
-    ).svg
-    assert "#5BE0F0" in svg, "teal info_accent hex missing (scroll text)"
-    assert "#1A6A7E" in svg, "teal mid_accent hex missing (hairlines + separators)"
-    # Pre-v0.3.0 amethyst chromosome should NOT appear — paired variants no
-    # longer split the marquee into bifamily tones.
-    assert "#A88AD4" not in svg, "amethyst hex must not appear in v0.3.0 monofamily marquee"
+# NOTE (v0.3.12): the former brutalist-rect-separators, brutalist-text-fill-
+# cycle, and cellular-monofamily-info-accent tests asserted coloring/separator
+# behavior the marquee upgrade removed — brutalist now renders MODULES (dividers,
+# not inter-item rect bullets) and all paradigms color by role (category/state/
+# hero) via the cascade bridge, not a per-item cycle or info_accent fill. The
+# replacement behavior is pinned end-to-end in tests/test_marquee_v0_3_12.py.
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -253,7 +215,7 @@ def test_marquee_data_token_mode_uses_paradigm_dimensions() -> None:
         data_tokens=tokens,
     )
     svg = compose(spec).svg
-    assert 'viewBox="0 0 1040 56"' in svg
+    assert 'viewBox="0 0 800 44"' in svg
     # kv token should render as label+value tspan pair (paradigm independent).
     assert "VERSION" in svg
     assert "0.2.16" in svg
@@ -264,26 +226,32 @@ def test_marquee_data_token_mode_uses_paradigm_dimensions() -> None:
 # ────────────────────────────────────────────────────────────────────
 
 
-def test_chrome_icon_circle_uses_120_unit_viewbox_at_64px() -> None:
-    """Chrome paradigm's icon block declares viewbox_w=120, viewbox_h=120.
-    The rendered output is 64x64 but the internal coordinate system is 120-unit
-    so v2 specimen geometry (r=46/r=42 bezel, 0.6-unit hairlines) is preserved."""
+def test_chrome_icon_circle_uses_108_unit_viewbox_at_64px() -> None:
+    """Chrome paradigm's icon block declares viewbox_w=108, viewbox_h=108 (v0.3.12:
+    trimmed from 120 to remove excess padding so the Ø92 bezel fills the box at
+    ~85% — matching automata 100% / brutalist 94% — not 77%). Rendered output is
+    64x64; the v2 specimen geometry (r=46/r=42 bezel, 0.6-unit hairlines) is
+    preserved byte-for-byte — only the group origin recenters (54, not 60)."""
     svg = compose(ComposeSpec(type="icon", genome_id="chrome", glyph="github", shape="circle")).svg
-    assert 'viewBox="0 0 120 120"' in svg
+    assert 'viewBox="0 0 108 108"' in svg
     assert 'width="64"' in svg
     assert 'height="64"' in svg
-    # 5-layer chrome bezel uses the v2 specimen radii.
+    # 5-layer chrome bezel uses the v2 specimen radii (unchanged by the trim).
     assert 'r="46"' in svg, "circle bezel outer radius (envelope ring) missing"
     assert 'r="42"' in svg, "circle bezel inner radius (well/hairline/rim) missing"
+    # Recentered group origin: 108/2 = 54 (was 60 in the 120-unit field).
+    assert "translate(54, 54)" in svg, "circle group should recenter at 54 in the 108 viewBox"
 
 
-def test_chrome_icon_square_uses_120_unit_viewbox_at_64px() -> None:
-    """Same viewBox-override mechanism as the circle variant."""
+def test_chrome_icon_square_uses_108_unit_viewbox_at_64px() -> None:
+    """Same viewBox-trim mechanism as the circle variant (120 → 108). The 96x96
+    card body is unchanged; its group origin recenters to (6, 6)."""
     svg = compose(ComposeSpec(type="icon", genome_id="chrome", glyph="github", shape="square")).svg
-    assert 'viewBox="0 0 120 120"' in svg
+    assert 'viewBox="0 0 108 108"' in svg
     assert 'width="64"' in svg
-    # 96x96 card body (v2 specimen dimensions).
+    # 96x96 card body (v2 specimen dimensions, unchanged by the trim).
     assert 'width="96" height="96" rx="6"' in svg
+    assert "translate(6, 6)" in svg, "square card group should recenter at (6, 6) in the 108 viewBox"
 
 
 def test_brutalist_icon_keeps_64x64_viewbox_regression() -> None:

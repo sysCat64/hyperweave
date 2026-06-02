@@ -1,5 +1,19 @@
-{# Brutalist horizontal-marquee defs: intentionally empty.
-   Brutalist target has no gradients, no filters, no animations beyond the
-   shared scroll-track translate — just a flat slab with a perimeter stroke.
-   Specimen: brutalist-marquee-v1.svg.
+{# Brutalist horizontal-marquee defs — v0.3.12 module instrument panel.
+
+   Carries the DECORATIVE strobe-cube animation for the left end-cap live node.
+   This is a design flourish with its OWN @keyframes — NOT the state cascade's
+   .hw-bit, NOT bound to data-hw-status. prefers-reduced-motion freezes it on.
+   Specimen: brutalist-marquee-celadon.svg (binary strobe, 1.2s steps).
+
+   v0.3.12-fix: emit font_faces so the embedded Barlow Condensed (data-value
+   face) + JetBrains Mono (label face) ship in the SVG — without this the
+   marquee carried no @font-face and Barlow fell back to a system serif, which
+   read as the wrong font. Empty when font-embedding.yaml binds no marquee fonts.
 #}
+<style>{{ font_faces | safe }}
+  .hw-mq-cube { will-change: opacity; animation: hw-mq-bstrobe 1.2s steps(1) infinite; }
+  @keyframes hw-mq-bstrobe { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0.18 } }
+  @media (prefers-reduced-motion: reduce) {
+    .hw-mq-cube { animation: none !important; opacity: 1 !important; }
+  }
+</style>

@@ -7,9 +7,9 @@ parsing for all six providers, and the TTL cache.
 from __future__ import annotations
 
 import time
-from datetime import UTC, datetime
-from typing import Any
-from unittest.mock import AsyncMock, patch
+from datetime import UTC, datetime, timedelta
+from typing import Any, ClassVar
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -165,6 +165,9 @@ class TestConnectorCache:
         assert cache.ttl_for_provider("github") == 300
         assert cache.ttl_for_provider("pypi") == 600
         assert cache.ttl_for_provider("arxiv") == 1800
+        assert cache.ttl_for_provider("crates") == 600
+        assert cache.ttl_for_provider("scorecard") == 21600
+        assert cache.ttl_for_provider("dora") == 3600
         assert cache.ttl_for_provider("unknown") == 600  # default
 
 
@@ -304,6 +307,84 @@ class TestGitHubProvider:
         with pytest.raises(ValueError, match="owner/repo"):
             await fetch_metric("invalid-no-slash", "stars")
 
+    def test_format_relative_time_buckets(self) -> None:
+        from hyperweave.connectors.github import _format_relative_time
+
+        now = datetime.now(UTC)
+        # Deltas sit safely mid-bucket so sub-second drift can't cross a boundary.
+        assert _format_relative_time((now - timedelta(seconds=20)).isoformat()) == "JUST NOW"
+        assert _format_relative_time((now - timedelta(hours=3, minutes=20)).isoformat()) == "3H AGO"
+        assert _format_relative_time((now - timedelta(days=2, hours=5)).isoformat()) == "2D AGO"
+        assert _format_relative_time((now - timedelta(days=400)).isoformat()) == "1Y AGO"
+        assert _format_relative_time("not-a-timestamp") == "unknown"
+
+    @pytest.mark.asyncio
+    async def test_last_push_metric_formats_relative(self) -> None:
+        recent = (datetime.now(UTC) - timedelta(hours=5, minutes=20)).isoformat().replace("+00:00", "Z")
+        with patch(
+            "hyperweave.connectors.github.fetch_json",
+            new_callable=AsyncMock,
+            return_value={"pushed_at": recent},
+        ):
+            from hyperweave.connectors.github import fetch_metric
+
+            result = await fetch_metric("eli64s/readme-ai", "last_push")
+            assert result["metric"] == "last_push"
+            assert result["value"] == "5H AGO"
+
+    @pytest.mark.asyncio
+    async def test_contributors_count_from_link_header(self) -> None:
+        # The contributors API has no count field; the count is the rel="last"
+        # page index in the Link header (per_page=1 makes page == contributor count).
+        response = MagicMock()
+        response.headers = {
+            "Link": (
+                '<https://api.github.com/repositories/1/contributors?per_page=1&page=2>; rel="next", '
+                '<https://api.github.com/repositories/1/contributors?per_page=1&page=6>; rel="last"'
+            )
+        }
+        with patch(
+            "hyperweave.connectors.github.fetch",
+            new_callable=AsyncMock,
+            return_value=response,
+        ):
+            from hyperweave.connectors.github import fetch_metric
+
+            result = await fetch_metric("eli64s/readme-ai", "contributors")
+            assert result["metric"] == "contributors"
+            assert result["value"] == 6
+
+    @pytest.mark.asyncio
+    async def test_contributors_count_fallback_when_no_link(self) -> None:
+        # <=1 contributor → no Link header → fall back to body length.
+        response = MagicMock()
+        response.headers = {}
+        response.json.return_value = [{"login": "solo"}]
+        with patch(
+            "hyperweave.connectors.github.fetch",
+            new_callable=AsyncMock,
+            return_value=response,
+        ):
+            from hyperweave.connectors.github import fetch_metric
+
+            result = await fetch_metric("eli64s/readme-ai", "contributors")
+            assert result["value"] == 1
+
+    @pytest.mark.asyncio
+    async def test_pull_requests_count_from_search_api(self) -> None:
+        # open_issues_count conflates issues + PRs, so PRs come from the Search
+        # API's total_count via the dedicated github-search breaker.
+        with patch(
+            "hyperweave.connectors.github.fetch_json",
+            new_callable=AsyncMock,
+            return_value={"total_count": 25, "items": []},
+        ):
+            from hyperweave.connectors.github import fetch_metric
+
+            result = await fetch_metric("eli64s/readme-ai", "pull_requests")
+            assert result["metric"] == "pull_requests"
+            assert result["value"] == 25
+
 
 # =========================================================================
 # PyPI Provider
@@ -356,21 +437,15 @@ class TestPyPIProvider:
             assert result["value"] == ">=3.9"
 
     @pytest.mark.asyncio
-    async def test_downloads_metric_routes_through_pypistats(self) -> None:
-        # pypi.org/pypi/{pkg}/json hasn't carried download counts since 2016;
-        # the connector must hit pypistats.org/api/packages/{pkg}/recent and
-        # surface ``data.last_month`` as an integer.
-        pypistats_payload = {
-            "data": {"last_day": 12345, "last_week": 78901, "last_month": 234567},
-            "package": "readmeai",
-            "type": "recent_downloads",
-        }
-
+    async def test_downloads_metric_primary_pepy_total(self) -> None:
+        # v0.3.12: downloads is sourced from pepy.tech v2 (total_downloads),
+        # keyless and burst-tolerant. pypi.org's JSON never carried counts and
+        # pypistats.org rate-limits (429), so pepy is primary.
         captured_urls: list[str] = []
 
         async def fake_fetch_json(url: str, **_kwargs: Any) -> Any:
             captured_urls.append(url)
-            return pypistats_payload
+            return {"id": "readmeai", "total_downloads": 234567, "versions": []}
 
         with patch("hyperweave.connectors.rest.fetch_json", side_effect=fake_fetch_json):
             from hyperweave.connectors.rest import pypi_fetch_metric as fetch_metric
@@ -379,18 +454,42 @@ class TestPyPIProvider:
 
         assert result["value"] == 234567
         assert result["provider"] == "pypi"
-        assert captured_urls == ["https://pypistats.org/api/packages/readmeai/recent"]
+        assert captured_urls == ["https://pepy.tech/api/v2/projects/readmeai"]
 
     @pytest.mark.asyncio
-    async def test_downloads_metric_zero_when_pypistats_payload_empty(self) -> None:
-        # pypistats may return ``data: {}`` for packages with no recorded
-        # history. The connector must coerce missing values to 0 instead
-        # of leaking ``None``/``-1`` into downstream formatters.
-        with patch(
-            "hyperweave.connectors.rest.fetch_json",
-            new_callable=AsyncMock,
-            return_value={"data": {}, "package": "ghost", "type": "recent_downloads"},
-        ):
+    async def test_downloads_falls_back_to_pypistats_when_pepy_fails(self) -> None:
+        # When pepy is unavailable (429/network), fall back to pypistats
+        # last-month so downloads never silently returns --.
+        from hyperweave.connectors.base import ConnectorError
+
+        captured_urls: list[str] = []
+
+        async def fake_fetch_json(url: str, **_kwargs: Any) -> Any:
+            captured_urls.append(url)
+            if "pepy.tech" in url:
+                raise ConnectorError("pepy down (429)")
+            return {"data": {"last_day": 1, "last_week": 7, "last_month": 234567}, "type": "recent_downloads"}
+
+        with patch("hyperweave.connectors.rest.fetch_json", side_effect=fake_fetch_json):
+            from hyperweave.connectors.rest import pypi_fetch_metric as fetch_metric
+
+            result = await fetch_metric("readmeai", "downloads")
+
+        assert result["value"] == 234567
+        assert "pepy.tech" in captured_urls[0]
+        assert "pypistats.org" in captured_urls[1]
+
+    @pytest.mark.asyncio
+    async def test_downloads_zero_when_both_sources_empty(self) -> None:
+        # pepy returns no total + pypistats empty → coerce to 0, not None/-1.
+        from hyperweave.connectors.base import ConnectorError
+
+        async def fake_fetch_json(url: str, **_kwargs: Any) -> Any:
+            if "pepy.tech" in url:
+                raise ConnectorError("pepy down")
+            return {"data": {}, "package": "ghost", "type": "recent_downloads"}
+
+        with patch("hyperweave.connectors.rest.fetch_json", side_effect=fake_fetch_json):
             from hyperweave.connectors.rest import pypi_fetch_metric as fetch_metric
 
             result = await fetch_metric("ghost", "downloads")
@@ -1308,3 +1407,545 @@ class TestStargazerRESTSampling:
         # No now-point appended on the single-page path (REST single_page branch).
         assert len(result["points"]) == 7
         assert [p["count"] for p in result["points"]] == [1, 2, 3, 4, 5, 6, 7]
+
+
+# =========================================================================
+# crates.io Provider (v0.3.12)
+# =========================================================================
+
+
+class TestCratesProvider:
+    """crates.io connector — verified live against ``serde``."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> None:
+        reset_breakers()
+        get_cache().clear()
+
+    MOCK_DATA: ClassVar[dict[str, Any]] = {
+        "crate": {
+            "max_stable_version": "1.0.228",
+            "newest_version": "1.0.228",
+            "downloads": 1036804419,
+            "recent_downloads": 195396284,
+        },
+        "versions": [{"num": "1.0.228", "license": "MIT OR Apache-2.0"}],
+    }
+
+    @pytest.mark.asyncio
+    async def test_version_metric(self) -> None:
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            result = await crates_fetch_metric("serde", "version")
+            assert result["value"] == "1.0.228"
+            assert result["provider"] == "crates"
+
+    @pytest.mark.asyncio
+    async def test_downloads_and_recent(self) -> None:
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            assert (await crates_fetch_metric("serde", "downloads"))["value"] == 1036804419
+            get_cache().clear()
+            assert (await crates_fetch_metric("serde", "recent_downloads"))["value"] == 195396284
+
+    @pytest.mark.asyncio
+    async def test_license_from_versions(self) -> None:
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            assert (await crates_fetch_metric("serde", "license"))["value"] == "MIT OR Apache-2.0"
+
+    @pytest.mark.asyncio
+    async def test_version_falls_back_to_newest(self) -> None:
+        # Pre-1.0 / pre-release-only crates have no max_stable_version.
+        data = {"crate": {"newest_version": "0.1.0-alpha"}, "versions": []}
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=data):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            assert (await crates_fetch_metric("preview", "version"))["value"] == "0.1.0-alpha"
+
+    @pytest.mark.asyncio
+    async def test_empty_versions_license_unknown(self) -> None:
+        data = {"crate": {"max_stable_version": "1.0.0"}, "versions": []}
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=data):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            assert (await crates_fetch_metric("ghost", "license"))["value"] == "Unknown"
+
+    @pytest.mark.asyncio
+    async def test_unknown_metric_raises(self) -> None:
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            with pytest.raises(ValueError, match="Unknown crates metric"):
+                await crates_fetch_metric("serde", "nonexistent")
+
+    @pytest.mark.asyncio
+    async def test_user_agent_header_sent(self) -> None:
+        # crates.io 403s requests without a descriptive UA — assert we send one.
+        captured: dict[str, Any] = {}
+
+        async def fake_fetch_json(url: str, **kwargs: Any) -> Any:
+            captured["headers"] = kwargs.get("headers", {})
+            return self.MOCK_DATA
+
+        with patch("hyperweave.connectors.rest.fetch_json", side_effect=fake_fetch_json):
+            from hyperweave.connectors.rest import crates_fetch_metric
+
+            await crates_fetch_metric("serde", "version")
+
+        assert "HyperWeave/" in captured["headers"].get("User-Agent", "")
+
+
+# =========================================================================
+# OpenSSF Scorecard Provider (v0.3.12)
+# =========================================================================
+
+
+class TestScorecardProvider:
+    """OpenSSF Scorecard — verified live against ``tokio-rs/tokio``."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> None:
+        reset_breakers()
+        get_cache().clear()
+
+    MOCK_PAYLOAD: ClassVar[dict[str, Any]] = {
+        "date": "2026-05-25",
+        "repo": {"name": "github.com/tokio-rs/tokio"},
+        "score": 6.9,
+        "checks": [
+            {"name": "Maintained", "score": 10},
+            {"name": "Code-Review", "score": 10},
+            {"name": "Token-Permissions", "score": 0},
+            {"name": "Branch-Protection", "score": -1},
+        ],
+    }
+
+    @pytest.mark.asyncio
+    async def test_aggregate_score(self) -> None:
+        with patch(
+            "hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_PAYLOAD
+        ):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            result = await fetch_metric("tokio-rs/tokio", "score")
+            assert result["value"] == 6.9
+            assert result["provider"] == "scorecard"
+
+    @pytest.mark.asyncio
+    async def test_named_check_resolves(self) -> None:
+        with patch(
+            "hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_PAYLOAD
+        ):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            assert (await fetch_metric("tokio-rs/tokio", "code_review"))["value"] == 10
+
+    @pytest.mark.asyncio
+    async def test_negative_one_is_na(self) -> None:
+        # Branch-Protection=-1 means "did not run" → must surface as n/a,
+        # never a negative gauge value.
+        with patch(
+            "hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_PAYLOAD
+        ):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            assert (await fetch_metric("tokio-rs/tokio", "branch_protection"))["value"] == "n/a"
+
+    @pytest.mark.asyncio
+    async def test_real_zero_is_preserved(self) -> None:
+        # Token-Permissions=0 is a real (worst) score, NOT n/a.
+        with patch(
+            "hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_PAYLOAD
+        ):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            assert (await fetch_metric("tokio-rs/tokio", "token_permissions"))["value"] == 0
+
+    @pytest.mark.asyncio
+    async def test_absent_check_is_na(self) -> None:
+        # vulnerabilities is not in tokio's variable-length checks[] → n/a, not 0.
+        with patch(
+            "hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_PAYLOAD
+        ):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            assert (await fetch_metric("tokio-rs/tokio", "vulnerabilities"))["value"] == "n/a"
+
+    @pytest.mark.asyncio
+    async def test_fetch_once_single_api_call(self) -> None:
+        # Two metric tokens for one repo must share a single upstream call.
+        mock = AsyncMock(return_value=self.MOCK_PAYLOAD)
+        with patch("hyperweave.connectors.scorecard.fetch_json", mock):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            await fetch_metric("tokio-rs/tokio", "score")
+            await fetch_metric("tokio-rs/tokio", "maintained")
+            assert mock.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_identifier_raises(self) -> None:
+        from hyperweave.connectors.scorecard import fetch_metric
+
+        with pytest.raises(ValueError, match="owner/repo"):
+            await fetch_metric("no-slash", "score")
+
+    @pytest.mark.asyncio
+    async def test_unknown_metric_raises(self) -> None:
+        with patch(
+            "hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_PAYLOAD
+        ):
+            from hyperweave.connectors.scorecard import fetch_metric
+
+            with pytest.raises(ValueError, match="Unknown Scorecard metric"):
+                await fetch_metric("tokio-rs/tokio", "bogus")
+
+
+# =========================================================================
+# GitHub Actions DORA Provider (v0.3.12)
+# =========================================================================
+
+
+def _iso(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class TestDoraProvider:
+    """DORA computed metrics over a 30-day window."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> None:
+        reset_breakers()
+        get_cache().clear()
+
+    @pytest.mark.asyncio
+    async def test_deployments_path_computes_metrics(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        now = datetime.now(UTC)
+        deployments = [
+            {
+                "id": 3,
+                "sha": "sha3",
+                "created_at": _iso(now - timedelta(days=1)),
+                "updated_at": _iso(now - timedelta(days=1)),
+            },
+            {
+                "id": 2,
+                "sha": "sha2",
+                "created_at": _iso(now - timedelta(days=2)),
+                "updated_at": _iso(now - timedelta(days=2)),
+            },
+            {
+                "id": 1,
+                "sha": "sha1",
+                "created_at": _iso(now - timedelta(days=3)),
+                "updated_at": _iso(now - timedelta(days=3)),
+            },
+        ]
+        statuses = {
+            3: [{"state": "success", "created_at": _iso(now - timedelta(days=1))}],
+            2: [{"state": "failure", "created_at": _iso(now - timedelta(days=2))}],
+            1: [{"state": "success", "created_at": _iso(now - timedelta(days=3))}],
+        }
+        commits = {
+            "sha3": {"commit": {"author": {"date": _iso(now - timedelta(days=1, hours=2))}}},
+            "sha2": {"commit": {"author": {"date": _iso(now - timedelta(days=2, hours=4))}}},
+            "sha1": {"commit": {"author": {"date": _iso(now - timedelta(days=3, hours=6))}}},
+        }
+
+        async def fake(url: str, **_kw: Any) -> Any:
+            if "/deployments?" in url:
+                return deployments
+            if "/statuses" in url:
+                dep_id = int(url.split("/deployments/")[1].split("/statuses")[0])
+                return statuses[dep_id]
+            if "/commits/" in url:
+                return commits[url.rsplit("/", 1)[1]]
+            return {}
+
+        monkeypatch.setattr("hyperweave.connectors.dora.fetch_json", fake)
+        from hyperweave.connectors.dora import fetch_metric
+
+        # cfr = 1 failure / 3 total = 33.3%
+        assert (await fetch_metric("o/r", "change_failure_rate"))["value"] == pytest.approx(33.3)
+        # deploy_frequency = 2 successes / 30 days
+        assert (await fetch_metric("o/r", "deploy_frequency"))["value"] == pytest.approx(round(2 / 30, 3))
+        # lead_time = median([2h, 4h, 6h]) = 4.0
+        assert (await fetch_metric("o/r", "lead_time"))["value"] == pytest.approx(4.0)
+        # mttr: failure (day2) → next success (day1) = 24h
+        assert (await fetch_metric("o/r", "mttr"))["value"] == pytest.approx(24.0)
+
+    @pytest.mark.asyncio
+    async def test_fetch_once_shares_aggregate(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        now = datetime.now(UTC)
+        deployments = [
+            {
+                "id": 1,
+                "sha": "s1",
+                "created_at": _iso(now - timedelta(days=1)),
+                "updated_at": _iso(now - timedelta(days=1)),
+            }
+        ]
+        calls: list[str] = []
+
+        async def fake(url: str, **_kw: Any) -> Any:
+            calls.append(url)
+            if "/deployments?" in url:
+                return deployments
+            if "/statuses" in url:
+                return [{"state": "success", "created_at": _iso(now - timedelta(days=1))}]
+            if "/commits/" in url:
+                return {"commit": {"author": {"date": _iso(now - timedelta(days=1, hours=1))}}}
+            return {}
+
+        monkeypatch.setattr("hyperweave.connectors.dora.fetch_json", fake)
+        from hyperweave.connectors.dora import fetch_metric
+
+        await fetch_metric("o/r", "deploy_frequency")
+        first_round = len(calls)
+        await fetch_metric("o/r", "mttr")
+        # Second metric reads the cached aggregate — no new upstream calls.
+        assert len(calls) == first_round
+
+    @pytest.mark.asyncio
+    async def test_actions_fallback_when_no_deployments(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        now = datetime.now(UTC)
+        runs = {
+            "workflow_runs": [
+                {
+                    "status": "completed",
+                    "conclusion": "success",
+                    "updated_at": _iso(now - timedelta(days=1)),
+                    "head_sha": "a",
+                    "head_commit": {"timestamp": _iso(now - timedelta(days=1, hours=3))},
+                },
+                {
+                    "status": "completed",
+                    "conclusion": "failure",
+                    "updated_at": _iso(now - timedelta(days=2)),
+                    "head_sha": "b",
+                    "head_commit": {"timestamp": _iso(now - timedelta(days=2, hours=1))},
+                },
+            ]
+        }
+
+        async def fake(url: str, **_kw: Any) -> Any:
+            if "/deployments?" in url:
+                return []  # forces the Actions fallback
+            if url.endswith("/repos/o/r") or "/repos/o/r?" in url:
+                return {"default_branch": "main"}
+            if "/actions/runs" in url:
+                return runs
+            return {"default_branch": "main"}
+
+        monkeypatch.setattr("hyperweave.connectors.dora.fetch_json", fake)
+        from hyperweave.connectors.dora import fetch_metric
+
+        # cfr = 1 failure / 2 total = 50%
+        assert (await fetch_metric("o/r", "change_failure_rate"))["value"] == pytest.approx(50.0)
+        # lead_time = median([3h, 1h]) = 2.0 (head_commit.timestamp is inline)
+        assert (await fetch_metric("o/r", "lead_time"))["value"] == pytest.approx(2.0)
+
+    @pytest.mark.asyncio
+    async def test_zero_deploys_edge_case(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def fake(url: str, **_kw: Any) -> Any:
+            if "/deployments?" in url:
+                return []
+            if "/actions/runs" in url:
+                return {"workflow_runs": []}
+            return {"default_branch": "main"}
+
+        monkeypatch.setattr("hyperweave.connectors.dora.fetch_json", fake)
+        from hyperweave.connectors.dora import fetch_metric
+
+        assert (await fetch_metric("o/r", "deploy_frequency"))["value"] == 0.0
+        assert (await fetch_metric("o/r", "lead_time"))["value"] == "n/a"
+        assert (await fetch_metric("o/r", "mttr"))["value"] == "n/a"
+
+    @pytest.mark.asyncio
+    async def test_invalid_identifier_raises(self) -> None:
+        from hyperweave.connectors.dora import fetch_metric
+
+        with pytest.raises(ValueError, match="owner/repo"):
+            await fetch_metric("no-slash", "deploy_frequency")
+
+    @pytest.mark.asyncio
+    async def test_unknown_metric_raises(self) -> None:
+        from hyperweave.connectors.dora import fetch_metric
+
+        with pytest.raises(ValueError, match="Unknown DORA metric"):
+            await fetch_metric("o/r", "bogus")
+
+
+# =========================================================================
+# HuggingFace + arXiv extended fields (v0.3.12 — audit-surfaced)
+# =========================================================================
+
+
+class TestHuggingFaceExtendedFields:
+    """v0.3.12 HF fields — verified live against ``mistralai/Mistral-7B-v0.1``."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> None:
+        reset_breakers()
+        get_cache().clear()
+
+    MOCK_DATA: ClassVar[dict[str, Any]] = {
+        "lastModified": "2025-07-24T16:44:02.000Z",
+        "gated": False,
+        "cardData": {"license": "apache-2.0"},
+        "tags": ["license:apache-2.0", "pytorch"],
+    }
+
+    @pytest.mark.asyncio
+    async def test_last_modified_casing(self) -> None:
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import hf_fetch_metric
+
+            assert (await hf_fetch_metric("org/model", "last_modified"))["value"] == "2025-07-24T16:44:02.000Z"
+
+    @pytest.mark.asyncio
+    async def test_gated_bool_stringifies_lowercase(self) -> None:
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import hf_fetch_metric
+
+            assert (await hf_fetch_metric("org/model", "gated"))["value"] == "false"
+
+    @pytest.mark.asyncio
+    async def test_gated_access_mode_string(self) -> None:
+        data = {"gated": "manual"}
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=data):
+            from hyperweave.connectors.rest import hf_fetch_metric
+
+            assert (await hf_fetch_metric("org/model", "gated"))["value"] == "manual"
+
+    @pytest.mark.asyncio
+    async def test_license_from_card_data(self) -> None:
+        # License is NOT top-level — it lives in cardData.license.
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=self.MOCK_DATA):
+            from hyperweave.connectors.rest import hf_fetch_metric
+
+            assert (await hf_fetch_metric("org/model", "license"))["value"] == "apache-2.0"
+
+    @pytest.mark.asyncio
+    async def test_license_falls_back_to_tag(self) -> None:
+        data = {"tags": ["license:mit", "pytorch"]}
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=data):
+            from hyperweave.connectors.rest import hf_fetch_metric
+
+            assert (await hf_fetch_metric("org/model", "license"))["value"] == "mit"
+
+
+class TestArxivExtendedFields:
+    """v0.3.12 arXiv fields — verified live against ``2310.06825``."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> None:
+        reset_breakers()
+        get_cache().clear()
+
+    XML_WITHOUT_OPTIONAL = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <entry>
+    <title>Mistral 7B</title>
+    <published>2023-10-10T17:54:58Z</published>
+    <updated>2023-10-11T09:00:00Z</updated>
+    <summary>Abstract.</summary>
+  </entry>
+</feed>"""
+
+    XML_WITH_OPTIONAL = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <entry>
+    <title>Published Paper</title>
+    <published>2020-01-01T00:00:00Z</published>
+    <updated>2021-06-01T00:00:00Z</updated>
+    <arxiv:journal_ref>Nature 583, 2020</arxiv:journal_ref>
+    <arxiv:doi>10.1000/xyz123</arxiv:doi>
+    <summary>Abstract.</summary>
+  </entry>
+</feed>"""
+
+    @pytest.mark.asyncio
+    async def test_updated_metric(self) -> None:
+        with patch(
+            "hyperweave.connectors.arxiv.fetch_text", new_callable=AsyncMock, return_value=self.XML_WITHOUT_OPTIONAL
+        ):
+            from hyperweave.connectors.arxiv import fetch_metric
+
+            assert (await fetch_metric("2310.06825", "updated"))["value"] == "2023-10-11T09:00:00Z"
+
+    @pytest.mark.asyncio
+    async def test_absent_journal_ref_is_na(self) -> None:
+        # journal_ref / doi are frequently absent — must render n/a, never crash.
+        with patch(
+            "hyperweave.connectors.arxiv.fetch_text", new_callable=AsyncMock, return_value=self.XML_WITHOUT_OPTIONAL
+        ):
+            from hyperweave.connectors.arxiv import fetch_metric
+
+            assert (await fetch_metric("2310.06825", "journal_ref"))["value"] == "n/a"
+            get_cache().clear()
+            assert (await fetch_metric("2310.06825", "doi"))["value"] == "n/a"
+
+    @pytest.mark.asyncio
+    async def test_present_journal_ref_and_doi(self) -> None:
+        with patch(
+            "hyperweave.connectors.arxiv.fetch_text", new_callable=AsyncMock, return_value=self.XML_WITH_OPTIONAL
+        ):
+            from hyperweave.connectors.arxiv import fetch_metric
+
+            assert (await fetch_metric("2020.00001", "journal_ref"))["value"] == "Nature 583, 2020"
+            get_cache().clear()
+            assert (await fetch_metric("2020.00001", "doi"))["value"] == "10.1000/xyz123"
+
+
+# =========================================================================
+# Unified dispatcher — v0.3.12 providers
+# =========================================================================
+
+
+class TestDispatcherV0312:
+    """Route the three new providers + the cargo alias through the dispatcher."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> None:
+        reset_breakers()
+        get_cache().clear()
+
+    @pytest.mark.asyncio
+    async def test_routes_to_crates(self) -> None:
+        data = {"crate": {"max_stable_version": "1.0.0", "downloads": 5}, "versions": [{"license": "MIT"}]}
+        with patch("hyperweave.connectors.rest.fetch_json", new_callable=AsyncMock, return_value=data):
+            from hyperweave.connectors import fetch_metric
+
+            result = await fetch_metric("crates", "serde", "version")
+            assert result["provider"] == "crates"
+            assert result["value"] == "1.0.0"
+
+    @pytest.mark.asyncio
+    async def test_routes_to_scorecard(self) -> None:
+        payload = {"score": 7.5, "checks": []}
+        with patch("hyperweave.connectors.scorecard.fetch_json", new_callable=AsyncMock, return_value=payload):
+            from hyperweave.connectors import fetch_metric
+
+            result = await fetch_metric("scorecard", "tokio-rs/tokio", "score")
+            assert result["provider"] == "scorecard"
+            assert result["value"] == 7.5
+
+    @pytest.mark.asyncio
+    async def test_routes_to_dora(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        async def fake(url: str, **_kw: Any) -> Any:
+            if "/deployments?" in url:
+                return []
+            if "/actions/runs" in url:
+                return {"workflow_runs": []}
+            return {"default_branch": "main"}
+
+        monkeypatch.setattr("hyperweave.connectors.dora.fetch_json", fake)
+        from hyperweave.connectors import fetch_metric
+
+        result = await fetch_metric("dora", "o/r", "deploy_frequency")
+        assert result["provider"] == "dora"
+        assert result["value"] == 0.0

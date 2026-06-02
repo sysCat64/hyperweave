@@ -31,6 +31,10 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
         # license stay on pypi.org and a pypistats outage doesn't trip
         # the breaker that fronts pypi.org.
         "pypistats.org",
+        # pepy.tech is the PRIMARY source for the pypi downloads metric (its v2
+        # API is keyless and purpose-built for download badges). pypistats.org
+        # rate-limits (429) under the proofset's burst, so it's the fallback.
+        "pepy.tech",
         "registry.npmjs.org",
         # api.npmjs.org hosts the download stats endpoint (v0.3.9: was
         # routed through registry.npmjs.org/-/downloads/* which returns
@@ -41,6 +45,11 @@ ALLOWED_HOSTS: frozenset[str] = frozenset(
         "export.arxiv.org",
         "huggingface.co",
         "hub.docker.com",
+        # crates.io requires a descriptive User-Agent (set per-call in
+        # rest.py); the host itself is the only SSRF allowlist addition.
+        "crates.io",
+        # OpenSSF Scorecard — keyless supply-chain trust scores, repo-scoped.
+        "api.securityscorecards.dev",
     }
 )
 
@@ -125,7 +134,7 @@ class CircuitBreaker:
 # Three breaker-isolated provider names. The literal ``"github"`` is no longer
 # accepted (kept off the list intentionally) — bare references are caught by
 # the grep gate in CLAUDE.md. See connectors/github.py for the full rationale.
-_GITHUB_PROVIDERS: frozenset[str] = frozenset({"github-core", "github-search", "github-graphql"})
+_GITHUB_PROVIDERS: frozenset[str] = frozenset({"github-core", "github-search", "github-graphql", "github-actions"})
 
 _token_index: int = 0
 

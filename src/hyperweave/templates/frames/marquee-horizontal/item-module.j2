@@ -1,0 +1,28 @@
+{# Module scroll-item layout (brutalist instrument panel).
+
+   Selected by ParadigmMarqueeConfig.item_layout == "module". Each metric is a
+   uniform-width cast cell: a small mono label STACKED OVER a bold condensed
+   value (both left-aligned at the module's text inset), bounded by a heavy
+   full-height divider at the module's right boundary — the dashboard-strip /
+   stats-card stacked-cell grammar set in motion. Every x / divider-x /
+   value-font-size is PRE-COMPUTED by the resolver from measured content (zero
+   arithmetic here). Stateful (activity) cells carry data-hw-status so the
+   state-signal-cascade binds the value to var(--hw-state-value). Renders
+   Set-A and Set-B (Set-B offset by scroll_distance for the seamless loop).
+   Consumes parent-scoped vars (sd, ls, sc, tfid, uid) plus the module geometry
+   context (module_label_y/value_y/divider_y/divider_h/divider_w, the value /
+   label fonts). #}
+    <g data-hw-zone="set-a">
+{% for m in scroll_items %}
+      <rect x="{{ m.divider_x }}" y="{{ module_divider_y }}" width="{{ module_divider_w }}" height="{{ module_divider_h }}" fill="{{ sc }}" shape-rendering="crispEdges"/>
+      <text x="{{ m.x }}" y="{{ module_label_y }}" font-family="{{ module_label_font_family }}" font-size="{{ module_label_font_size }}" letter-spacing="{{ module_label_letter_spacing }}" fill="{{ m.label_color }}">{{ m.label }}</text>
+      <text x="{{ m.x }}" y="{{ module_value_y }}" font-family="{{ module_value_font_family }}" font-size="{{ m.value_font_size }}"{% if m.font_weight %} font-weight="{{ m.font_weight }}"{% endif %} letter-spacing="{{ ls }}"{% if m.data_hw_status %} data-hw-status="{{ m.data_hw_status }}"{% endif %} fill="{% if m.value_color %}{{ m.value_color }}{% else %}url(#{{ uid }}-{{ tfid }}){% endif %}">{{ m.value }}{% if m.window %}<tspan dx="{{ window_gap }}" font-family="{{ module_label_font_family }}" font-size="{{ module_label_font_size }}" letter-spacing="{{ module_label_letter_spacing }}" fill="var(--dna-ink-muted)">{{ m.window }}</tspan>{% endif %}</text>
+{% endfor %}
+    </g>
+    <g data-hw-zone="set-b" transform="translate({{ sd }}, 0)" aria-hidden="true">
+{% for m in scroll_items %}
+      <rect x="{{ m.divider_x }}" y="{{ module_divider_y }}" width="{{ module_divider_w }}" height="{{ module_divider_h }}" fill="{{ sc }}" shape-rendering="crispEdges"/>
+      <text x="{{ m.x }}" y="{{ module_label_y }}" font-family="{{ module_label_font_family }}" font-size="{{ module_label_font_size }}" letter-spacing="{{ module_label_letter_spacing }}" fill="{{ m.label_color_set_b | default(m.label_color) }}">{{ m.label }}</text>
+      <text x="{{ m.x }}" y="{{ module_value_y }}" font-family="{{ module_value_font_family }}" font-size="{{ m.value_font_size }}"{% if m.font_weight %} font-weight="{{ m.font_weight }}"{% endif %} letter-spacing="{{ ls }}"{% if m.data_hw_status %} data-hw-status="{{ m.data_hw_status }}"{% endif %} fill="{% if m.value_color_set_b | default(m.value_color) %}{{ m.value_color_set_b | default(m.value_color) }}{% else %}url(#{{ uid }}-{{ tfid }}){% endif %}">{{ m.value }}{% if m.window %}<tspan dx="{{ window_gap }}" font-family="{{ module_label_font_family }}" font-size="{{ module_label_font_size }}" letter-spacing="{{ module_label_letter_spacing }}" fill="var(--dna-ink-muted)">{{ m.window }}</tspan>{% endif %}</text>
+{% endfor %}
+    </g>
