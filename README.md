@@ -77,7 +77,7 @@ When an agent needs to produce something visual &mdash; a status card, a dashboa
 HyperWeave is that primitive. One API call returns a self-contained SVG with data binding, branding, and machine-readable metadata baked in. No JavaScript, no dependencies, no runtime. It renders in GitHub READMEs, Slack, Notion, docs, your site, email, VS Code, or terminal. Every surface that renders an `<img>` tag is a HyperWeave surface.
 
 <p align="center">
-  <img src="assets/tables/hw-format-comparison-matrix.svg" alt="HyperWeave" width="100%"/>
+  <img src="https://raw.githubusercontent.com/InnerAura/hyperweave/main/assets/tables/hw-format-comparison-matrix-v2.svg" alt="HyperWeave" width="100%"/>
 </p>
 
 ---
@@ -195,9 +195,9 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Profile<br/><sub>stats card</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/stats/eli64s/brutalist.static?variant=pulse" alt="stats — pulse (light)" width="70%"/>
+  <img src="https://hyperweave.app/v1/stats/eli64s/brutalist.static?variant=pulse" alt="stats — pulse (light)"/>
   <br/>
-  <img src="https://hyperweave.app/v1/stats/eli64s/brutalist.static?variant=celadon" alt="stats — celadon (dark)" width="70%"/>
+  <img src="https://hyperweave.app/v1/stats/eli64s/brutalist.static?variant=celadon" alt="stats — celadon (dark)"/>
   <br/>
   <ul>
 <li><sub><code>/v1/stats/{username}/{genome}.static?variant={variant}</code></sub></li>
@@ -208,7 +208,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Star Chart<br/><sub>star history</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/brutalist.static?variant=celadon" alt="star chart" width="70%"/>
+  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/brutalist.static?variant=celadon" alt="star chart"/>
   <br/>
   <ul>
 <li><sub><code>/v1/chart/stars/{owner}/{repo}/{genome}.static?variant={variant}</code></sub></li>
@@ -313,7 +313,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Profile<br/><sub>stats card</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/stats/eli64s/automata.static?variant=bone&v=2" alt="stats" width="100%"/>
+  <img src="https://hyperweave.app/v1/stats/eli64s/automata.static?variant=bone&v=2" alt="stats"/>
   <br/>
   <ul>
 <li><sub><code>/v1/stats/{username}/{genome}.static?variant={tone}</code></sub></li>
@@ -324,7 +324,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Star Chart<br/><sub>star history</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/automata.static?variant=bone&v=2" alt="star chart" width="100%"/>
+  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/automata.static?variant=bone&v=2" alt="star chart"/>
   <br/>
   <ul>
 <li><sub><code>/v1/chart/stars/{owner}/{repo}/{genome}.static?variant={tone}</code></sub></li>
@@ -414,7 +414,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Profile<br/><sub>stats card</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/stats/eli64s/chrome.static?variant=horizon" alt="stats" width="100%"/>
+  <img src="https://hyperweave.app/v1/stats/eli64s/chrome.static?variant=horizon" alt="stats" />
   <br/>
   <ul>
 <li><sub><code>/v1/stats/{username}/{genome}.static?variant={variant}</code></sub></li>
@@ -425,7 +425,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Star Chart<br/><sub>star history</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/chrome.static?variant=horizon" alt="star chart" width="100%"/>
+  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/chrome.static?variant=horizon" alt="star chart" />
   <br/>
   <ul>
 <li><sub><code>/v1/chart/stars/{owner}/{repo}/{genome}.static?variant={variant}</code></sub></li>
@@ -519,7 +519,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Profile<br/><sub>stats card</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/stats/eli64s/primer.static?variant=porcelain" alt="stats" width="100%"/>
+  <img src="https://hyperweave.app/v1/stats/eli64s/primer.static?variant=porcelain" alt="stats"/>
   <br/>
   <ul>
 <li><sub><code>/v1/stats/{username}/primer.static?variant={variant}</code></sub></li>
@@ -530,7 +530,7 @@ Why genome and not theme? Because brand isn't a design problem, it's an infrastr
 <tr>
 <th align="left">Star Chart<br/><sub>star history</sub></th>
 <td>
-  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/primer.static?variant=porcelain" alt="star chart" width="100%"/>
+  <img src="https://hyperweave.app/v1/chart/stars/eli64s/readme-ai/primer.static?variant=porcelain" alt="star chart"/>
   <br/>
   <ul>
 <li><sub><code>/v1/chart/stars/{owner}/{repo}/primer.static?variant={variant}</code></sub></li>
