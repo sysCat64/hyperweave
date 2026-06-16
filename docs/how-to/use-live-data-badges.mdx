@@ -1,113 +1,160 @@
 ---
 title: "Use Live Data"
-description: "Fetch real-time metrics from GitHub, PyPI, npm, arXiv, HuggingFace, and Docker Hub and render them as badges or strips."
+description: "Fetch provider metrics with the shared data-token grammar and render them as badges, strips, or marquees."
 ---
 
 ## The Problem
 
-You want artifacts that show real-time data -- GitHub stars, PyPI versions, npm downloads -- rendered in your HyperWeave genome instead of a third-party badge service.
+You want artifacts that show real-time data -- GitHub stars, PyPI versions, npm
+downloads, supply-chain scores -- rendered in your HyperWeave genome instead of
+a third-party badge service.
 
-## Live Data Badges
+## Data Token Grammar
+
+HyperWeave uses one comma-separated data-token grammar across the CLI, HTTP API,
+and MCP:
+
+| Form | Meaning |
+|---|---|
+| `text:STRING` | Raw display text |
+| `kv:KEY=VALUE` | Static labeled value |
+| `<provider>:<identifier>.<metric>` | Live provider metric |
+
+Provider aliases include `gh` / `github`, `pypi`, `npm`, `hf` /
+`huggingface`, `arxiv`, `docker`, `crates` / `cargo`, `scorecard`, and `dora`.
+Embedded commas in `text:` and `kv:` payloads escape as `\,`.
+
+## Data-Driven Badges
 
 ### CLI
 
 ```bash
-# GitHub stars
-hyperweave live github anthropics/claude-code stars -g brutalist-emerald -o stars.svg
+# Static labeled value
+hyperweave compose badge "VERSION" --data kv:VERSION=0.6.3 -g brutalist -o version.svg
 
-# PyPI version
-hyperweave live pypi fastmcp version -g chrome-horizon -o version.svg
+# GitHub stars
+hyperweave compose badge "STARS" --data gh:openai/codex.stars -g brutalist --glyph github -o stars.svg
 
 # npm downloads
-hyperweave live npm express version
+hyperweave compose badge "NPM" --data npm:express.downloads -g chrome -o npm-downloads.svg
 
-# arXiv paper title
-hyperweave live arxiv 2301.00774 title
+# crates.io version
+hyperweave compose badge "CRATE" --data crates:serde.version -g primer -o crate-version.svg
+```
 
-# HuggingFace model downloads
-hyperweave live huggingface meta-llama/Llama-2-7b downloads
+`hyperweave live` remains as a single-provider badge shortcut:
 
-# Docker Hub pull count
-hyperweave live docker library/nginx pull_count
+```bash
+hyperweave live github openai/codex stars -g brutalist -o stars.svg
 ```
 
 ### HTTP API
 
-The live endpoint fetches data and renders in one request:
+Use the two-segment badge route with `?data=`:
 
 ```
-GET /v1/live/{provider}/{identifier}/{metric}/{genome}.{motion}
+GET /v1/badge/{title}/{genome}.{motion}?data=<provider>:<identifier>.<metric>
 ```
 
 Examples:
 
 ```bash
-curl http://localhost:8000/v1/live/github/anthropics/claude-code/stars/brutalist-emerald.chromatic-pulse
-curl http://localhost:8000/v1/live/pypi/fastmcp/version/chrome-horizon
+curl "http://localhost:8000/v1/badge/STARS/brutalist.static?data=gh:openai/codex.stars&glyph=github"
+curl "http://localhost:8000/v1/badge/VERSION/chrome.static?data=pypi:fastmcp.version"
+curl "http://localhost:8000/v1/badge/TRUST/primer.static?data=scorecard:openai/codex.score"
 ```
-
-The response includes caching headers:
-
-| Header | Value |
-|---|---|
-| `Cache-Control` | `public, max-age={ttl}, stale-while-revalidate=3600` |
-| `X-HW-Provider` | The data provider name |
-| `X-HW-Cache-Tier` | `connector` (success) or `error` (failure) |
 
 ### MCP
 
 ```
-hw_live(provider="github", identifier="anthropics/claude-code", metric="stars", genome="brutalist-emerald")
+hw_compose(type="badge", title="STARS", data="gh:openai/codex.stars", genome="brutalist", glyph="github")
+```
+
+For MCP clients that only need a single provider-backed badge, `hw_live` is also
+available:
+
+```
+hw_live(provider="github", identifier="openai/codex", metric="stars", genome="brutalist")
 ```
 
 ## Supported Providers
 
-| Provider | Identifier Format | Available Metrics |
-|---|---|---|
-| `github` | `owner/repo` | `stars`, `forks`, `watchers`, `issues`, `license`, `language` |
-| `pypi` | `package-name` | `version`, `license`, `python_requires` |
-| `npm` | `package-name` | `version`, `license` |
-| `arxiv` | `paper-id` | `title`, `authors`, `categories`, `summary`, `published` |
-| `huggingface` | `org/model` | `downloads`, `likes`, `tags`, `library_name`, `pipeline_tag` |
-| `docker` | `namespace/repo` | `pull_count`, `star_count`, `last_updated` |
+| Provider | Token prefix | Identifier format | Example metrics |
+|---|---|---|---|
+| GitHub | `gh:` or `github:` | `owner/repo` | `stars`, `forks`, `watchers`, `issues`, `license`, `language`, `last_push`, `build`, `contributors`, `pull_requests` |
+| PyPI | `pypi:` | `package-name` | `version`, `downloads`, `license`, `python_requires` |
+| npm | `npm:` | `package-name` | `version`, `downloads`, `license` |
+| arXiv | `arxiv:` | `paper-id` | `title`, `authors`, `categories`, `summary`, `published`, `updated`, `journal_ref`, `doi` |
+| HuggingFace | `hf:` or `huggingface:` | `org/model` | `downloads`, `likes`, `tags`, `library_name`, `pipeline_tag`, `last_modified`, `gated`, `license` |
+| Docker Hub | `docker:` | `namespace/repo` | `pull_count`, `star_count`, `last_updated` |
+| crates.io | `crates:` or `cargo:` | `crate-name` | `version`, `downloads`, `recent_downloads`, `license` |
+| OpenSSF Scorecard | `scorecard:` | `owner/repo` | `score`, `maintained`, `code_review`, `branch_protection`, `vulnerabilities`, `ci_tests` |
+| DORA | `dora:` | `owner/repo` | `deploy_frequency`, `lead_time`, `change_failure_rate`, `mttr` |
 
-## Live Data Strips
+## Data-Driven Strips
 
-Strips support multi-provider live data via the `?live=` query parameter. Multiple providers are fetched concurrently.
+Strips support static metrics, live tokens, or a mix of both. Multiple live
+provider tokens are fetched concurrently.
 
 ```
-GET /v1/strip/{title}/{genome}.{motion}?live=provider:id:metric,provider:id:metric
+GET /v1/strip/{title}/{genome}.{motion}?data=provider:id.metric,provider:id.metric
 ```
 
 ```bash
-# Single provider
-curl "localhost:8000/v1/strip/claude-code/brutalist-emerald.static?live=github:anthropics/claude-code:stars"
+# Static values
+curl "http://localhost:8000/v1/strip/project/brutalist.static?data=kv:STARS=42K,kv:VERSION=0.6.3"
 
-# Multiple providers (fetched concurrently)
-curl "localhost:8000/v1/strip/fastmcp/brutalist-emerald.rimrun?live=github:jlowin/fastmcp:stars,pypi:fastmcp:version"
+# Multiple providers
+curl "http://localhost:8000/v1/strip/codex/brutalist.static?data=gh:openai/codex.stars,pypi:fastmcp.version"
 ```
 
-The resolved values are formatted as pipe-separated metrics (e.g., `stars: 2.9k | version: 0.6.3`) and passed to the strip's metric resolver. The `Cache-Control` TTL is the minimum across all provider responses.
+In CLI form:
 
-If a single provider fails, that metric shows `"error"` while successful providers render normally.
+```bash
+hyperweave compose strip "codex" --data gh:openai/codex.stars,pypi:fastmcp.version -g brutalist -o strip.svg
+```
 
-<Warning>
-  The `?live=` parameter overrides `?value=` when both are provided.
-</Warning>
+The resolved values are formatted as metric pairs and passed to the strip
+resolver. If both `value` and `data` are provided, `data` wins when it resolves
+to displayable values.
+
+## Data-Driven Marquees
+
+Marquees can mix text tokens and live values:
+
+```
+GET /v1/marquee/{title}/{genome}.{motion}?data=text:NEW,gh:owner/repo.stars
+```
+
+```bash
+curl "http://localhost:8000/v1/marquee/live/primer.static?data=text:NEW,gh:openai/codex.stars,text:DOWNLOADS"
+
+hyperweave compose marquee-horizontal --data text:NEW,gh:openai/codex.stars,text:DOWNLOADS -g primer -o marquee.svg
+```
 
 ## Error Handling
 
-If the provider is unreachable, the badge renders with value `"error"` and a 60-second cache TTL. The circuit breaker opens after 5 consecutive failures per provider, preventing cascading timeouts.
+Malformed data-token strings render the SMPTE error SVG with HTTP 200 and
+`X-HW-Error-Code: 400` so README image proxies still display a useful artifact.
+
+If a single live provider fetch fails, that token degrades to `"--"` while
+successful tokens render normally. The failure cache TTL is short so recovered
+providers can refresh quickly.
 
 ## Caching
 
-Provider TTLs (in-memory cache):
+Provider TTLs vary by connector and are carried through the response cache. For
+multi-provider artifacts, the HTTP `Cache-Control` TTL is the minimum across all
+resolved live tokens and includes `stale-while-revalidate=3600`.
 
-| Provider | TTL |
+Common TTLs:
+
+| Provider family | Typical TTL |
 |---|---|
-| GitHub | 300s (5 min) |
-| PyPI | 600s (10 min) |
-| npm | 600s (10 min) |
-| arXiv | 1800s (30 min) |
-| HuggingFace | 600s (10 min) |
-| Docker | 600s (10 min) |
+| GitHub scalar metrics | 300s |
+| GitHub build status | 120s |
+| PyPI, npm, HuggingFace, Docker Hub, crates.io | 600s |
+| arXiv | 1800s |
+| OpenSSF Scorecard | 21600s |
+| DORA | 600s |
+| Failed live token | 60s |
