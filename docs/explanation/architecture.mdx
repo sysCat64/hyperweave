@@ -38,7 +38,7 @@ compose/engine.py
 render/templates.py (Jinja2)
     |-- document.svg.j2 wraps frames/badge.svg.j2
     |-- + components/glyph.svg.j2
-    |-- + motions/border/pulse.svg.j2
+    |-- + motions/border/chromatic-pulse.svg.j2
     |
     v
 ComposeResult { svg, width, height, metadata }
@@ -126,12 +126,12 @@ Genome = aesthetic DNA (colors, shadows, rhythm). Profile = structural skeleton 
 User's README -> GitHub Camo -> Cloudflare CDN -> Fly.io (uvicorn) -> Connectors
 ```
 
-When a user embeds `<img src="https://hyperweave.app/v1/badge/build/passing/brutalist-emerald">` in a README:
+When a user embeds `<img src="https://hyperweave.app/v1/badge/build/passing/brutalist.static">` in a README:
 
 1. **GitHub Camo** proxies the image (strips JS, re-serves with its own headers)
 2. **Cloudflare** (CDN layer) caches based on `Cache-Control` and `ETag`
 3. **Fly.io** runs uvicorn on port 8080 in the `iad` (Ashburn) region -- same campus as Camo's US-East origin, minimizing latency
-4. **Connectors** fetch live data from GitHub API, PyPI, etc. (only for `/v1/live/` and `?live=` routes)
+4. **Connectors** fetch live data from GitHub API, PyPI, etc. only when a URL grammar route includes `?data=` tokens
 
 ### Container Configuration
 

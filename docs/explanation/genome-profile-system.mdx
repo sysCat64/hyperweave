@@ -22,16 +22,16 @@ Genome properties map to CSS custom properties (`--dna-*`) that templates consum
 
 ## Profile = Structural Skeleton
 
-A profile defines the structural decisions that shape how frames look, independent of color:
+A profile defines the structural decisions that shape how frames look, independent of color. Current profiles are named by their material model: `flat` for plate-like layouts and `dimensional` for chrome/depth-aware layouts.
 
-| Property | brutalist | chrome |
+| Property | flat | dimensional |
 |---|---|---|
-| `badge_corner` | 0 (sharp) | 4 (rounded) |
+| `badge_inset` | 0px | 2px |
 | `badge_frame_height` | 20px | 22px |
 | `strip_accent_width` | 6px | 4px |
-| `glyph_backing` | square | circle |
-| `status_shape` | square | diamond |
-| `fonts.title` | SF Mono, monospace | Inter, sans-serif |
+| `strip_metric_pitch` | 106px | 107px |
+| `badge_use_mono` | true | false |
+| `fonts.title` | Inter/system sans | Impact/Arial Black |
 
 Multiple genomes can share a profile. The separation means creating a new genome only requires defining colors, not rewriting structural templates.
 
@@ -39,17 +39,19 @@ Multiple genomes can share a profile. The separation means creating a new genome
 
 ```
 GENOME (JSON)                    PROFILE (YAML)
-brutalist-emerald  ──references──> brutalist
-chrome-horizon     ──references──> chrome
+brutalist  ──references──> flat
+chrome     ──references──> dimensional
+automata   ──references──> flat
+primer     ──references──> flat
 ```
 
 The mapping is declared in the genome config:
 
 ```json
 {
-  "id": "brutalist-emerald",
-  "profile": "brutalist",
-  "surface_0": "#14532D",
+  "id": "brutalist",
+  "profile": "flat",
+  "surface_0": "#0A2218",
   "accent": "#10B981",
   ...
 }
@@ -59,8 +61,10 @@ And enforced in code:
 
 ```python
 _GENOME_PROFILE_MAP = {
-    "brutalist-emerald": "brutalist",
-    "chrome-horizon": "chrome",
+    "brutalist": "flat",
+    "chrome": "dimensional",
+    "automata": "flat",
+    "primer": "flat",
 }
 ```
 
@@ -70,13 +74,13 @@ ComposeSpec auto-resolves `profile_id` from `genome_id` via a model validator.
 
 When a badge is composed:
 
-1. ComposeSpec specifies `genome_id="brutalist-emerald"`
+1. ComposeSpec specifies `genome_id="brutalist"`
 2. Engine resolves genome JSON and profile YAML
 3. Genome colors become CSS variables (`--dna-surface`, `--dna-signal`)
 4. Profile values become template context (`badge_corner=0`, `badge_frame_height=20`)
 5. Jinja2 template uses both: `border-radius: {{ badge_corner }}px; fill: var(--dna-surface);`
 
-The same template produces visually distinct output for each genome because the CSS variables and structural values are different.
+The same composition pipeline produces visually distinct output for each genome because CSS variables, structural values, and paradigm-specific partials can differ.
 
 ## Specimen-First Rule
 
@@ -88,17 +92,17 @@ Genomes are not invented -- they are extracted from finished specimen SVGs. The 
 4. Extract colors, shadows, glow into a genome JSON
 5. Write Jinja2 templates that reproduce the specimens faithfully
 
-**If there are no specimens, the genome does not ship.** This is why v0.1 has exactly two genomes -- they are the only ones with complete specimen sets.
+**If there are no specimens, the genome does not ship.** This is why the built-in registry stays deliberately small: shipped genomes are the ones with specimen-backed frame behavior and explicit profile mappings.
 
-## Chrome-Horizon Specifics
+## Chrome Specifics
 
-chrome-horizon uses a fundamentally different rendering approach for some frames:
+`chrome` uses the `dimensional` profile and a fundamentally different rendering approach for some frames:
 
-- **Banner**: Environment-mapped chrome gradient (not text-split overlays like brutalist)
+- **Badge**: Envelope, well, and specular passes instead of a flat two-panel plate
 - **Strip**: Chrome gradient text fill
 - **Icon**: Circle and square variants with metallic treatment
 
-This means chrome-horizon has completely separate template paths for these frames. You cannot use a brutalist template and "swap colors" -- the structural DNA is different.
+This means chrome has separate paradigm-specific template partials for these frames. You cannot use a flat template and "swap colors" -- the structural DNA is different.
 
 ## Adding a New Genome (v0.2+)
 

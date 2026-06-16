@@ -53,7 +53,7 @@ Different endpoint types use different cache strategies:
 | Endpoint | Cache-Control | Rationale |
 |---|---|---|
 | `/v1/badge/...`, `/v1/strip/...`, etc. | `max-age=300` | Data-bound compositions, may change |
-| `/v1/live/...`, `/v1/strip/...?live=` | `max-age={ttl}, stale-while-revalidate=3600` | Live data, TTL varies by provider |
+| URL grammar routes with `?data=` | `max-age={ttl}, stale-while-revalidate=3600` | Live data, TTL varies by provider |
 | `/v1/genomes`, `/v1/motions`, `/v1/glyphs`, `/v1/frames` | `max-age=3600` | Discovery data, changes infrequently |
 | `/g/{genome}` | `max-age=86400, stale-while-revalidate=604800` | Genome DNA rarely changes |
 | `/a/inneraura/{slug}` | `max-age=31536000, immutable` | Editorial specimens never change |
@@ -87,7 +87,7 @@ Most email clients strip SVG animation:
 To verify an artifact survives Camo:
 
 1. Serve locally: `hyperweave serve --port 8000`
-2. Embed in a test README: `![badge](http://localhost:8000/v1/badge/build/passing/brutalist-emerald)`
+2. Embed in a test README: `![badge](http://localhost:8000/v1/badge/build/passing/brutalist.static)`
 3. Push to GitHub and verify the badge renders correctly
 4. Check that animations play (SMIL and CSS both work)
 
