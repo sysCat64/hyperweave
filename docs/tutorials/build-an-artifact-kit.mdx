@@ -1,9 +1,9 @@
 ---
 title: "Build an Artifact Kit"
-description: "Compose a branded artifact set -- banner, badges, strip, divider, and social icons -- in one command for any surface."
+description: "Compose a branded artifact set -- badges, strip, divider, and social icons -- in one command for any surface."
 ---
 
-This tutorial walks you through composing a full artifact kit. By the end, you will have a banner, status badges, a metric strip, a section divider, and social icons -- all in a consistent genome. The `readme` kit type targets README surfaces, but the same concept scales to docs pages, Notion workspaces, Slack bots, or any `<img>`-capable surface.
+This tutorial walks you through composing a full artifact kit. By the end, you will have status badges, a metric strip, a section divider, and social icons -- all in a consistent genome. The `readme` kit type targets README surfaces, but the same concept scales to docs pages, Notion workspaces, Slack bots, or any `<img>`-capable surface.
 
 ## Prerequisites
 
@@ -16,9 +16,9 @@ The `kit` command composes a full artifact set. The `readme` type produces artif
 
 ```bash
 hyperweave kit readme \
-  --genome brutalist-emerald \
+  --genome brutalist \
   --project "my-project" \
-  --badges "build:passing,version:v0.2.0,coverage:95%,license:MIT" \
+  --badges "build:passing,version:v0.6.3,coverage:95%,license:MIT" \
   --social "github,discord,x" \
   --output ./assets/
 ```
@@ -27,9 +27,8 @@ This writes the following files to `./assets/`:
 
 | File | Frame Type | Content |
 |---|---|---|
-| `banner.svg` | banner | "MY-PROJECT" hero banner |
 | `badge-build.svg` | badge | "build: passing" (state: passing) |
-| `badge-version.svg` | badge | "version: v0.2.0" (state: active) |
+| `badge-version.svg` | badge | "version: v0.6.3" (state: active) |
 | `badge-coverage.svg` | badge | "coverage: 95%" (state: passing) |
 | `badge-license.svg` | badge | "license: MIT" (state: active) |
 | `strip.svg` | strip | 4-metric strip |
@@ -42,12 +41,8 @@ This writes the following files to `./assets/`:
 
 ```markdown
 <p align="center">
-  <img src="./assets/banner.svg" alt="my-project" width="800"/>
-</p>
-
-<p align="center">
   <img src="./assets/badge-build.svg" alt="build: passing"/>
-  <img src="./assets/badge-version.svg" alt="version: v0.2.0"/>
+  <img src="./assets/badge-version.svg" alt="version: v0.6.3"/>
   <img src="./assets/badge-coverage.svg" alt="coverage: 95%"/>
   <img src="./assets/badge-license.svg" alt="license: MIT"/>
 </p>
@@ -79,9 +74,9 @@ Regenerate the same kit with a different genome:
 
 ```bash
 hyperweave kit readme \
-  -g chrome-horizon \
+  -g chrome \
   --project "my-project" \
-  --badges "build:passing,version:v0.2.0" \
+  --badges "build:passing,version:v0.6.3" \
   --output ./assets-chrome/
 ```
 
@@ -97,9 +92,9 @@ hyperweave serve --port 8000
 curl -X POST http://localhost:8000/v1/kit/readme \
   -H "Content-Type: application/json" \
   -d '{
-    "genome": "brutalist-emerald",
+    "genome": "brutalist",
     "project": "my-project",
-    "badges": "build:passing,version:v0.2.0",
+    "badges": "build:passing,version:v0.6.3",
     "social": "github"
   }'
 ```
@@ -111,9 +106,9 @@ Returns a JSON object with SVG strings keyed by artifact name.
 ```
 hw_kit(
   type="readme",
-  genome="brutalist-emerald",
+  genome="brutalist",
   project="my-project",
-  badges="build:passing,version:v0.2.0,coverage:95%",
+  badges="build:passing,version:v0.6.3,coverage:95%",
   social="github,discord"
 )
 ```

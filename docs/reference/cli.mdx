@@ -62,7 +62,7 @@ hyperweave compose stats eli64s -g chrome -o stats.svg
 hyperweave compose chart stars eli64s/readme-ai -g brutalist -o chart.svg
 hyperweave compose matrix --preset connectors -g primer --markdown-out table.md
 
-# v0.2.0: custom genome from local JSON
+# Custom genome from local JSON
 hyperweave compose badge "DEPLOY" "live" --genome-file ./my-genome.json
 ```
 
@@ -77,9 +77,9 @@ hyperweave kit [kit_type] [options]
 | Option | Short | Default | Description |
 |---|---|---|---|
 | `kit_type` | | `readme` | Kit type |
-| `--genome` | `-g` | `brutalist-emerald` | Genome slug |
-| `--project` | | `""` | Project name (used in banner) |
-| `--badges` | | `""` | Badge pairs: `"build:passing,version:v0.2.0"` |
+| `--genome` | `-g` | `brutalist` | Genome slug |
+| `--project` | | `""` | Project name, used as the strip identity |
+| `--badges` | | `""` | Badge pairs: `"build:passing,version:v0.6.3"` |
 | `--social` | | `""` | Social icons: `"github,discord,x"` |
 | `--output` | `-o` | `.` | Output directory |
 
