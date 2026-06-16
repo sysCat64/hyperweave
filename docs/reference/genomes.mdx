@@ -3,107 +3,120 @@ title: "Genomes Reference"
 description: "Complete reference for HyperWeave genomes -- aesthetic DNA specifications that control visual identity."
 ---
 
-A genome is a portable, machine-readable aesthetic specification. It defines colors, shadows, glow, rhythm, and compatible motions. Every artifact inherits its visual identity from a genome.
+A genome is a portable, machine-readable aesthetic specification. It defines
+color, material, typography, rhythm, compatible motions, and optional variants.
+Every artifact inherits its visual identity from a genome.
 
-## Available Genomes
+Built-in genome JSON files live under `src/hyperweave/data/genomes/`.
 
-### brutalist-emerald
+## Artifact Genomes
 
-Dark field, emerald signal, sharp zero-radius corners, tectonic typography.
+These genomes are intended for general badge, strip, icon, divider, marquee,
+stats, chart, and matrix composition.
 
-| Property | Value | CSS Variable |
-|---|---|---|
-| Surface 0 | `#14532D` | `--dna-surface` |
-| Surface 1 | `#0D0D0D` | `--dna-surface-raised` |
-| Surface 2 | `#1A1A1A` | `--dna-surface-overlay` |
-| Ink | `#A7F3D0` | `--dna-ink-primary` |
-| Ink secondary | `#6EE7B7` | `--dna-ink-secondary` |
-| Accent | `#10B981` | `--dna-signal` |
-| Accent complement | `#059669` | `--dna-signal-complement` |
-| Stroke | `#333333` | `--dna-stroke` |
-| Corner | `0` | `--dna-corner` |
-| Rhythm base | `2.618s` | `--dna-rhythm-base` |
-| Profile | `brutalist` | -- |
-| Category | `dark` | -- |
+| ID | Name | Category | Profile | Surface | Ink | Accent | Corner | Rhythm | Compatible Motions |
+|---|---|---|---|---|---|---|---|---|---|
+| `brutalist` | Brutalist | dark | `flat` | `#0A2218` | `#D1FAE5` | `#10B981` | `0` | `2.618s` | `static`, all five border motions |
+| `chrome` | Chrome | dark | `dimensional` | `#000A14` | `#E0ECF6` | `#5BA3D4` | `4px` | `6s` | `static`, all five border motions |
+| `automata` | Automata | dark | `flat` | `#04060A` | `#ededed` | `#1E849A` | `0` | `2.618s` | `static`, `chromatic-pulse`, `corner-trace`, `rimrun` |
+| `primer` | Primer | light | `flat` | `#F5F8FF` | `#1E3A5F` | `#1D4ED8` | `6` | `2.618s` | `static`, `chromatic-pulse`, `corner-trace` |
 
-**Compatible motions**: `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun`, `bars`, `broadcast`, `cascade`, `collapse`, `converge`, `crash`, `drop`, `breach`, `pulse`
+## Telemetry Genomes
 
-### chrome-horizon
+Telemetry genomes are session-receipt skins. They are compatible with `static`
+motion only.
 
-Deep void, metallic blue, environmental chrome mapping, smooth curves.
+| ID | Name | Category | Surface | Ink | Accent |
+|---|---|---|---|---|---|
+| `telemetry-antigravity` | Telemetry Antigravity | light | `#fafafb` | `#1f2024` | `#1a73e8` |
+| `telemetry-claude-code` | Telemetry Claude Code | light | `#faf7f2` | `#1a1410` | `#D97757` |
+| `telemetry-codex` | Telemetry Codex | light | `rgba(255,255,255,0.74)` | `#080913` | `#4357F6` |
+| `telemetry-cream` | Telemetry Cream | light | `#ECE4D0` | `#1A1510` | `#FF5A28` |
+| `telemetry-voltage` | Telemetry Voltage | dark | `#08101A` | `#F5F6F8` | `#FFEAB0` |
 
-| Property | Value | CSS Variable |
-|---|---|---|
-| Surface 0 | `#000a14` | `--dna-surface` |
-| Surface 1 | `#0a1628` | `--dna-surface-raised` |
-| Surface 2 | `#12243c` | `--dna-surface-overlay` |
-| Ink | `#e0eaf4` | `--dna-ink-primary` |
-| Ink secondary | `#8cb4d4` | `--dna-ink-secondary` |
-| Accent | `#5ba3d4` | `--dna-signal` |
-| Corner | `4` | `--dna-corner` |
-| Rhythm base | `2.618s` | `--dna-rhythm-base` |
-| Profile | `chrome` | -- |
-| Category | `dark` | -- |
+## Motion Compatibility
 
-**Compatible motions**: `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun`
+Genome compatibility is checked before frame compatibility. A motion must pass
+both checks before it can render visibly; CIM regime behavior can still correct
+non-CIM motions to `static`.
 
-<Info>
-  chrome-horizon supports border motions only. Kinetic typography motions are not available because the banner specimen uses environment-mapped chrome, not text-split overlays.
-</Info>
+| Genome | Compatible Motions |
+|---|---|
+| `brutalist` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun` |
+| `chrome` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun` |
+| `automata` | `static`, `chromatic-pulse`, `corner-trace`, `rimrun` |
+| `primer` | `static`, `chromatic-pulse`, `corner-trace` |
+| `telemetry-*` | `static` |
+
+`rimrun` is still badge-scoped by frame compatibility, even when a genome lists
+it as compatible.
 
 ## Genome Specification Fields
 
-Every genome config contains these fields:
+Every genome config contains a common core of fields. Individual genomes can add
+variant, material, glyph, telemetry, or frame-specific fields.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | `str` | Unique identifier |
+| `id` | `str` | Unique genome slug |
 | `name` | `str` | Display name |
-| `category` | `"dark" \| "light"` | Base theme |
+| `category` | `"dark" \| "light"` | Base theme category |
 | `profile` | `str` | Structural profile reference |
-| `surface_0` | hex | Primary background |
-| `surface_1` | hex | Raised surface |
-| `surface_2` | hex | Overlay surface |
-| `ink` | hex | Primary text color |
-| `ink_secondary` | hex | Secondary text color |
-| `ink_on_accent` | hex | Text on accent backgrounds |
-| `accent` | hex | Signal/brand color |
-| `accent_complement` | hex | Secondary accent |
-| `accent_signal` | hex | Highlight signal |
-| `accent_warning` | hex | Warning state color |
-| `accent_error` | hex | Error state color |
-| `stroke` | hex | Border/line color |
-| `shadow_color` | hex | Shadow color |
-| `shadow_opacity` | `str` | Shadow alpha |
-| `corner` | `str` | Corner radius |
+| `surface_0` | color | Primary surface |
+| `surface_1` | color | Alternate surface |
+| `surface_2` | color | Deep surface |
+| `ink` | color | Primary text color |
+| `ink_secondary` | color | Muted text color |
+| `ink_on_accent` | color | Text color on accent backgrounds |
+| `accent` | color | Primary signal color |
+| `accent_complement` | color | Secondary signal color |
+| `stroke` | color | Border or separator color |
+| `corner` | `str` | Corner radius token |
 | `rhythm_base` | `str` | Base animation timing |
 | `density` | `str` | Visual density factor |
-| `compatible_motions` | `list[str]` | Allowed motion primitives (must include `static`) |
+| `compatible_motions` | `list[str]` | Motion allowlist; must include `static` |
 
 ## CSS Variable Mapping
 
-Genome properties map to CSS custom properties via `genome_to_css()`:
+The compose assembler maps genome fields into CSS custom properties before SVG
+templates render.
 
-```
-surface_0    -> --dna-surface
-surface_1    -> --dna-surface-raised
-surface_2    -> --dna-surface-overlay
-ink          -> --dna-ink-primary
-ink_secondary -> --dna-ink-secondary
-accent       -> --dna-signal
-stroke       -> --dna-stroke
-corner       -> --dna-corner
-rhythm_base  -> --dna-rhythm-base
-```
+| Genome Field | CSS Variable |
+|---|---|
+| `surface_0` | `--dna-surface` |
+| `surface_1` | `--dna-surface-alt` |
+| `surface_2` | `--dna-surface-deep` |
+| `ink` | `--dna-ink-primary` |
+| `ink_secondary` | `--dna-ink-muted` |
+| `ink_on_accent` | `--dna-ink-on-accent` |
+| `accent` | `--dna-signal` |
+| `accent_complement` | `--dna-signal-dim` |
+| `stroke` | `--dna-border` |
+| `corner` | `--dna-corner` |
+| `rhythm_base` | `--dna-rhythm-base` |
 
-Templates use `var(--dna-*)` exclusively -- never hardcoded colors.
+Templates consume `var(--dna-*)` values instead of hardcoding colors.
+
+## Variants
+
+Several artifact genomes ship variants. The `variants` list is the allowed slug
+set. Depending on the genome, a variant can resolve through sparse
+`variant_overrides` entries or through tone primitives, while retaining the same
+profile and base motion allowlist.
+
+Use `--variant <slug>` on the CLI or `variant=<slug>` in URL grammar routes.
+
+```bash
+hyperweave compose badge "build" "passing" -g primer --variant porcelain
+curl "localhost:8000/v1/badge/build/passing/chrome.static?variant=horizon"
+```
 
 ## Rhythm System
 
-Timing uses the golden ratio (phi = 1.618):
+Genomes expose rhythm tokens to animation templates.
 
-| Rhythm | Formula | brutalist-emerald |
+| Rhythm Field | CSS Variable | Notes |
 |---|---|---|
-| `rhythm_base` | Configured | `2.618s` |
-| `rhythm_slow` | `base * phi` | `~4.236s` |
-| `rhythm_fast` | `base / phi` | `~1.618s` |
+| `rhythm_base` | `--dna-rhythm-base` | Primary timing token |
+| `rhythm_slow` | `--dna-rhythm-slow` | Optional slower timing token |
+| `rhythm_fast` | `--dna-rhythm-fast` | Optional faster timing token |
