@@ -1,21 +1,27 @@
 ---
 title: "Set Up Claude Code Hooks"
-description: "Configure Claude Code hooks to automate HyperWeave artifact generation after sessions."
+description: "Configure Claude Code hooks to generate HyperWeave session receipts after sessions."
 ---
 
 ## The Problem
 
-You want HyperWeave to automatically generate session receipts or other artifacts when a Claude Code session ends, without manual intervention.
+You want HyperWeave to automatically generate a session receipt when a Claude Code session ends, without manual intervention.
 
 ## Automatic Installation
 
-The simplest method:
+Install only the Claude Code hook:
+
+```bash
+hyperweave install-hook --runtime claude-code
+```
+
+This modifies `~/.claude/settings.json` to add a `SessionEnd` hook. The command is idempotent: running it again removes stale `hw session` entries and replaces any prior HyperWeave hook with the current `hyperweave session receipt` command.
+
+Omit `--runtime` when you want HyperWeave to auto-detect and install hooks for every supported runtime on the machine:
 
 ```bash
 hyperweave install-hook
 ```
-
-This modifies `~/.claude/settings.json` to add a `SessionEnd` hook. The command is idempotent -- running it again detects the existing hook and skips.
 
 ## Manual Installation
 
@@ -29,7 +35,7 @@ Edit `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "hw session receipt",
+            "command": "hyperweave session receipt",
             "timeout": 10
           }
         ]
@@ -44,22 +50,25 @@ Edit `~/.claude/settings.json`:
 1. Claude Code ends a session
 2. The `SessionEnd` event fires
 3. Claude Code pipes a JSON payload to stdin containing `transcript_path`
-4. `hw session receipt` reads the path from stdin
+4. `hyperweave session receipt` reads the path from stdin
 5. The telemetry pipeline parses the transcript
-6. A receipt SVG is written to `.hyperweave/receipts/<session-id>.svg`
+6. A receipt SVG is written to `.hyperweave/receipts/`
 7. A one-line cost summary is printed to stderr
 
 ## Custom Hook Scripts
 
-You can create more complex hooks using shell scripts. HyperWeave's design (JSON output from `session parse`, SVG from `session receipt`) supports piping:
+You can create more complex hooks using shell scripts. Read the hook payload once, then pass it to each command that needs it:
 
 ```bash
 #!/usr/bin/env bash
 # custom-hook.sh -- Generate receipt + rhythm strip
+set -euo pipefail
 
-# Parse the transcript (reads stdin for hook JSON)
-hyperweave session receipt
-hyperweave session strip "$(cat | jq -r .transcript_path)" -o .hyperweave/strip.svg
+payload="$(cat)"
+transcript_path="$(printf '%s' "$payload" | jq -r '.transcript_path // .transcriptPath')"
+
+printf '%s' "$payload" | hyperweave session receipt
+hyperweave session strip "$transcript_path" -o .hyperweave/strip.svg
 ```
 
 Then in settings:
@@ -84,7 +93,13 @@ Then in settings:
 
 ## Verifying the Hook
 
-After installation, run a Claude Code session. Check for output:
+Run the read-only doctor command:
+
+```bash
+hyperweave doctor
+```
+
+You should see Claude Code reported with a registered `hyperweave session receipt` hook. Then run a Claude Code session and check for output in the workspace:
 
 ```bash
 ls -la .hyperweave/receipts/
@@ -94,8 +109,11 @@ If no receipt appears, check:
 
 1. Is HyperWeave installed in your PATH? (`which hyperweave`)
 2. Is the hook in settings? (`cat ~/.claude/settings.json | jq .hooks`)
-3. Does the transcript exist? (Look in `.claude/projects/`)
+3. Does `hyperweave doctor` report the Claude Code hook as registered?
+4. Does the transcript exist? (Look in `~/.claude/projects/`)
 
 ## Removing the Hook
 
 Edit `~/.claude/settings.json` and remove the HyperWeave entry from the `SessionEnd` array.
+
+For multi-runtime setup, see the [Install Session Telemetry](/tutorials/install-session-telemetry) tutorial.
