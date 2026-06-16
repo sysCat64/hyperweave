@@ -21,16 +21,19 @@ uv add hyperweave
 
 Requires Python 3.12+.
 
+Install `hyperweave` for local CLI composition. Use `hyperweave[all]` when you
+also want the HTTP server and MCP server available from the same environment.
+
 ## Compose a Badge
 
 <Tabs>
   <Tab title="CLI">
     ```bash
-    hyperweave compose badge "build" "passing" --genome brutalist
-    ```
-    Outputs SVG to stdout. Pipe to a file:
-    ```bash
     hyperweave compose badge "build" "passing" -g brutalist -o badge.svg
+    ```
+    Open `badge.svg` in a browser, or omit `-o` to print the SVG to stdout:
+    ```bash
+    hyperweave compose badge "build" "passing" -g brutalist
     ```
   </Tab>
   <Tab title="Python">
@@ -120,11 +123,24 @@ hyperweave kit readme \
   -g brutalist \
   --project "my-project" \
   --badges "build:passing,version:v0.6.3,coverage:95%" \
-  --social "github,discord"
+  --social "github,discord,x" \
+  --output ./assets/
 ```
 
-This produces: badge-build, badge-version, badge-coverage, strip, divider,
-icon-github, and icon-discord.
+This writes badge-build, badge-version, badge-coverage, strip, divider,
+icon-github, icon-discord, and icon-x SVG files to `./assets/`.
+
+MCP clients can request the same kit as in-memory SVG strings:
+
+```
+hw_kit(
+  type="readme",
+  genome="brutalist",
+  project="my-project",
+  badges="build:passing,version:v0.6.3,coverage:95%",
+  social="github,discord,x"
+)
+```
 
 ## Data-Driven Artifacts
 
@@ -146,6 +162,12 @@ OpenSSF Scorecard, and DORA metrics.
 <CardGroup cols={2}>
   <Card title="Tutorial: Compose Your First Badge" icon="graduation-cap" href="/tutorials/compose-your-first-badge">
     Step-by-step walkthrough of badge composition with every option explained.
+  </Card>
+  <Card title="Tutorial: Build an Artifact Kit" icon="box" href="/tutorials/build-an-artifact-kit">
+    Generate README-ready badges, strips, dividers, and social icons in one command.
+  </Card>
+  <Card title="Tutorial: Install Session Telemetry" icon="receipt" href="/tutorials/install-session-telemetry">
+    Wire Claude Code, Codex, or Antigravity sessions into automatic receipt generation.
   </Card>
   <Card title="Reference: ComposeSpec" icon="book" href="/reference/compose-spec">
     Full parameter reference for the composition API.
