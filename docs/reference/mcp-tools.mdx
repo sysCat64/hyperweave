@@ -71,6 +71,24 @@ Compose any HyperWeave artifact. Returns self-contained SVG string.
 `hw_compose` can resolve live values inline when `data` tokens are provided. For `stats`/`chart` frames, pass `connector_data` when the caller already has a pre-fetched payload. Matrix callers can pass a `matrix` table directly, or use `connector_data={"matrix_adapter": "connector-registry"}` for the generated connector matrix.
 </Note>
 
+Examples:
+
+```
+hw_compose(type="badge", title="build", value="passing", genome="brutalist")
+```
+
+```python
+await hw_compose(
+    type="matrix",
+    genome="primer",
+    connector_data={"matrix_adapter": "connector-registry"},
+    render_target="markdown",
+)
+```
+
+The first call returns a self-contained SVG badge. The matrix call returns the
+GFM markdown projection instead of SVG.
+
 ### `hw_live`
 
 Compose a badge with live data fetched from a provider.
@@ -98,6 +116,21 @@ Compose a full artifact kit. Returns dict of SVG strings keyed by artifact name.
 | `badges` | `str` | `""` | Badge pairs: `"build:passing,version:v0.6.3"` |
 | `social` | `str` | `""` | Social glyph IDs: `"github,discord,x"` |
 
+Example:
+
+```
+hw_kit(
+  type="readme",
+  genome="brutalist",
+  project="my-project",
+  badges="build:passing,version:v0.6.3,coverage:95%",
+  social="github,discord,x"
+)
+```
+
+This returns keys such as `badge-build`, `badge-version`, `badge-coverage`,
+`strip`, `divider`, `icon-github`, `icon-discord`, and `icon-x`.
+
 ### `hw_discover`
 
 Discover available HyperWeave components. Returns structured data about genomes, motions, glyphs, and frame types.
@@ -105,6 +138,19 @@ Discover available HyperWeave components. Returns structured data about genomes,
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `what` | `str` | `"all"` | `all`, `genomes`, `motions`, `glyphs`, `frames`, `matrix`, `url_grammar` |
+
+Use `hw_discover` when an agent needs current registry data before composing:
+
+```
+hw_discover(what="genomes")
+hw_discover(what="matrix")
+hw_discover(what="url_grammar")
+```
+
+`what="genomes"` returns every loaded genome, including telemetry skins such as
+`telemetry-codex`, `telemetry-claude-code`, and `telemetry-antigravity`.
+`what="matrix"` returns matrix cell kinds, inferred-kind notes, available
+presets, and projection support.
 
 ## Resources
 
@@ -120,9 +166,13 @@ ComposeSpec parameter reference. Returns JSON with all valid parameter values:
   "state": ["active", "passing", ...],
   "glyph_mode": ["auto", "fill", "wire", "none"],
   "regime": ["normal", "permissive", "ungoverned"],
-  "divider_variant": ["block", "current", "takeoff", "void", "zeropoint"]
+  "divider_variant": ["block", "current", "takeoff", "void", "zeropoint", "dissolve", "band", "seam", "sigil", "aura"]
 }
 ```
+
+The schema resource is the compact boundary reference for typed enum fields. Use
+`hyperweave://genomes` or `hw_discover(what="genomes")` when you need the full
+loaded genome registry, including telemetry-only skins.
 
 ### `hyperweave://genomes`
 
