@@ -18,7 +18,7 @@ The simplest badge needs a frame type, a label, and a value:
 hyperweave compose badge "build" "passing" -o badge.svg
 ```
 
-This produces a two-panel badge with "build" on the left and "passing" on the right, using the default genome (`brutalist-emerald`) and no motion.
+This produces a two-panel badge with "build" on the left and "passing" on the right, using the default genome (`brutalist`) and static output.
 
 Open `badge.svg` in a browser or embed it in markdown:
 
@@ -48,7 +48,7 @@ hyperweave compose badge "deploy" "building" --state building -o badge-building.
 
 ## Step 3: Add a Glyph
 
-Glyphs are 97 SVG icons (91 from Simple Icons + 6 geometric shapes). Add one with `--glyph`:
+Glyphs are 189 bundled SVG marks (183 brand marks + 6 geometric shapes). Add one with `--glyph`:
 
 ```bash
 hyperweave compose badge "build" "passing" --glyph github -o badge-glyph.svg
@@ -73,13 +73,13 @@ Border motions add SMIL animation overlays to badges. There are 5 border motions
 
 ```bash
 # Chromatic pulse: cycling color shift on the border
-hyperweave compose badge "build" "passing" -m chromatic-pulse -o badge-pulse.svg
+hyperweave compose badge "build" "passing" -m chromatic-pulse --regime permissive -o badge-pulse.svg
 
 # Corner trace: animated path tracing the corners
-hyperweave compose badge "build" "passing" -m corner-trace -o badge-trace.svg
+hyperweave compose badge "build" "passing" -m corner-trace --regime permissive -o badge-trace.svg
 
 # Dual orbit: two particles orbiting the border
-hyperweave compose badge "build" "passing" -m dual-orbit -o badge-orbit.svg
+hyperweave compose badge "build" "passing" -m dual-orbit --regime permissive -o badge-orbit.svg
 ```
 
 All 5 border motions: `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun`.
@@ -94,10 +94,10 @@ The same badge renders differently in each genome:
 
 ```bash
 # Sharp corners, emerald accent, monospace typography
-hyperweave compose badge "build" "passing" -g brutalist-emerald -o badge-be.svg
+hyperweave compose badge "build" "passing" -g brutalist -o badge-brutalist.svg
 
 # Smooth curves, metallic blue, chrome mapping
-hyperweave compose badge "build" "passing" -g chrome-horizon -o badge-ch.svg
+hyperweave compose badge "build" "passing" -g chrome -o badge-chrome.svg
 ```
 
 Compare the two files -- same content, completely different visual identity. That is the power of the genome system.
@@ -106,7 +106,7 @@ Compare the two files -- same content, completely different visual identity. Tha
 
 ```bash
 hyperweave compose badge "stars" "2.9k" \
-  --genome chrome-horizon \
+  --genome chrome \
   --state passing \
   --glyph github \
   --motion chromatic-pulse \
@@ -118,7 +118,7 @@ hyperweave compose badge "stars" "2.9k" \
 
 - Badges are composed with `hyperweave compose badge <label> <value>`
 - States control the visual status indicator
-- Glyphs add icons from a 97-glyph library
+- Glyphs add icons from the bundled registry
 - Border motions add SMIL animation overlays
 - Genomes completely change the visual identity without changing content
 - The `--regime` flag controls which motions are allowed
