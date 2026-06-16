@@ -29,48 +29,6 @@
 </p>
 -->
 
-<!--
-AI agents need to explain what they did, what they found, and what changed — HyperWeave gives them a visual language that works anywhere.
-
----
-HyperWeave lets agents compose portable visual artifacts that can live inside reports, detach into Slack/email/docs, and carry their source, state, and drilldown with them.
-
----
-
-A brand agent for repos.
-Generate a cohesive visual identity layer for README, profile, status, and releases — automatically.
-
-A brand agent for repos. Generate a cohesive visual identity — README, profile, metrics, releases — from a single genome.
----
-
-HyperWeave is the generative visual identity system for the agentic era. A user defines a genome — their aesthetic DNA — and HyperWeave renders coherent visual artifacts across any surface, for any context, from any data. Badges for repos. Cards for stats. Charts for data. Artifact sets for research papers. Release kits for product launches. Marketing assets for startups. Static when static. Live when live. Generated when generative. Their brand, as infrastructure, for everything their agents will ever need to render.
-
-The list in the middle ("Badges for repos. Cards for stats. Charts for data...") reads long. It proves the surface area is broad but it also reads like a features list. Investors skim past enumeration. You could collapse it: "Every surface agents render on, from repos to research papers to product launches." The breadth lands harder when it's a claim than when it's a list.
-
-HyperWeave is the brand agent for engineering teams. Define your identity once; every artifact your team ships carries it wherever their work appears.
-
-Safe, Auditable, Drop-Anywhere Visuals for your Agents.
-
----
-
-"Hyperweave is the visual protocol for autonomous agents. We give AI agents the ability to generate high-fidelity, brand-aligned UI artifacts—roadmaps, telemetry, and status cards—so humans can monitor and trust agentic workflows."
-
----
-
-HyperWeave is the visual artifact layer for modern software.
-Generate branded, self-contained SVG outputs for profiles, repositories, docs, dashboards, and agent workflows.
-
-“runtime-free visual compiler for structured machine outputs”
-
-take structured state, compress it into an emotionally legible surface, and make it portable
-
-"In a post-Mythos world, letting autonomous agents generate executable UI code (React/JS) is a catastrophic security risk. HyperWeave is the secure, stateless, verifiable visual protocol for the Agentic Web."
-
-The Voiceover: "Agents don't need to generate heavy React apps that require hosting and runtimes. HyperWeave generates secure, zero-dependency SVG artifacts that travel to wherever your users actually work."
-
-Prompting Guide for AI Agents
--->
-
 ---
 
 ## The Problem
