@@ -4,12 +4,13 @@
 
 * ``--runtime ""`` (default) — calls ``_detect_installed_runtimes`` and
   registers for every detected runtime; empty detection → exit 1.
-* ``--runtime all`` — both runtimes regardless of detection state.
+* ``--runtime all`` — every supported runtime regardless of detection state.
 * ``--runtime <name>`` — single runtime (legacy explicit form).
 
 Detection uses a dual signal: config dir under ``$HOME`` OR CLI binary
 on PATH. ``Path.home`` and ``shutil.which`` are both monkeypatched so
-the tests never touch the real ``~/.claude`` / ``~/.codex`` directories.
+the tests never touch the real ``~/.claude`` / ``~/.codex`` /
+``~/.gemini`` directories.
 """
 
 from __future__ import annotations
@@ -123,6 +124,19 @@ def test_install_hook_no_runtime_no_detection_exits_one(monkeypatch: MonkeyPatch
     result = runner.invoke(app, ["install-hook"])
     assert result.exit_code == 1
     assert "no agent runtime detected" in result.stderr
+    assert "~/.gemini/antigravity" in result.stderr
+    assert "antigravity" in result.stderr
+
+
+def test_install_hook_help_names_every_runtime_without_rich_markup_gaps() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["install-hook", "--help"])
+    assert result.exit_code == 0
+    assert "claude-code" in result.stdout
+    assert "codex" in result.stdout
+    assert "antigravity" in result.stdout
+    assert "hooks feature flag" in result.stdout
+    assert "plus  hooks" not in result.stdout
 
 
 def test_install_hook_auto_detect_only_claude(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -176,8 +190,8 @@ def test_install_hook_auto_detect_codex_binary_only_creates_dir(monkeypatch: Mon
     assert (tmp_path / ".codex" / "config.toml").exists()
 
 
-def test_install_hook_runtime_all_forces_both(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
-    """``--runtime all`` registers for both runtimes even when neither is detected."""
+def test_install_hook_runtime_all_forces_all_supported_runtimes(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """``--runtime all`` registers every runtime even when none are detected."""
     _patch_home(monkeypatch, tmp_path)
     _patch_which(monkeypatch, {"claude": None, "codex": None, "antigravity": None})
 
@@ -186,6 +200,7 @@ def test_install_hook_runtime_all_forces_both(monkeypatch: MonkeyPatch, tmp_path
     assert result.exit_code == 0
     assert (tmp_path / ".claude" / "settings.json").exists()
     assert (tmp_path / ".codex" / "hooks.json").exists()
+    assert (tmp_path / ".gemini" / "config" / "hooks.json").exists()
 
 
 def test_install_hook_runtime_codex_with_genome_pins_command(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

@@ -19,7 +19,7 @@ def _normalize_genome_slug(slug: str) -> str:
     """Expand short-form telemetry skin slugs (e.g. ``cream`` → ``telemetry-cream``).
 
     Lets users type ``--genome cream`` instead of ``--genome telemetry-cream`` for
-    the three v0.2.21 telemetry skins. Pass-through for slugs that already carry
+    receipt-capable telemetry skins. Pass-through for slugs that already carry
     the ``telemetry-`` prefix or any non-telemetry genome (brutalist, chrome, etc.).
     """
     if not slug or slug.startswith("telemetry-"):
@@ -485,9 +485,9 @@ def session(
         typer.Option(
             "--genome",
             help=(
-                "Pin telemetry skin (cream, voltage, claude-code, or full slug like "
-                "telemetry-cream). Empty = auto-detect from JSONL runtime field, "
-                "fall back to telemetry-voltage."
+                "Pin telemetry skin (cream, voltage, claude-code, codex, antigravity, "
+                "or full slug like telemetry-cream). Empty = auto-detect from JSONL "
+                "runtime field, fall back to telemetry-voltage."
             ),
         ),
     ] = "",
@@ -1021,8 +1021,8 @@ def install_hook(
             "--genome",
             help=(
                 "Pin telemetry skin for every session receipt (cream, voltage, "
-                "claude-code, codex, or full slug like telemetry-cream). Empty = "
-                "auto-detect from JSONL runtime field at session-end time."
+                "claude-code, codex, antigravity, or full slug like telemetry-cream). "
+                "Empty = auto-detect from JSONL runtime field at session-end time."
             ),
         ),
     ] = "",
@@ -1032,10 +1032,11 @@ def install_hook(
             "--runtime",
             help=(
                 "Agent runtime to install the receipt hook for. Empty (default) "
-                "auto-detects installed runtimes (~/.claude, ~/.codex, or 'claude'/"
-                "'codex' on PATH) and registers for each present. 'claude-code' "
-                "writes a SessionEnd hook to ~/.claude/settings.json. 'codex' writes "
-                "a Stop hook to ~/.codex/hooks.json plus [features] hooks in "
+                "auto-detects installed runtimes (~/.claude, ~/.codex, "
+                "~/.gemini/antigravity, or the claude/codex/antigravity binaries on "
+                "PATH) and registers for each present. 'claude-code' writes a "
+                "SessionEnd hook to ~/.claude/settings.json. 'codex' writes a Stop "
+                "hook to ~/.codex/hooks.json plus the hooks feature flag in "
                 "~/.codex/config.toml. 'antigravity' writes a Stop hook to "
                 "~/.gemini/config/hooks.json. 'all' forces every supported runtime "
                 "regardless of detection."
@@ -1054,15 +1055,16 @@ def install_hook(
 
     # Resolve targets:
     #   ""     (default) → auto-detect installed runtimes (config dir OR binary)
-    #   "all"            → both runtimes regardless of detection
+    #   "all"            → every supported runtime regardless of detection
     #   "<name>"         → just that runtime (legacy explicit form)
     if runtime == "":
         detected = _detect_installed_runtimes()
         if not detected:
             typer.echo(
-                "Error: no agent runtime detected (~/.claude, ~/.codex, or "
-                "'claude'/'codex' on PATH). Install Claude Code or Codex CLI, "
-                "or pass --runtime <name> to force.",
+                "Error: no agent runtime detected (~/.claude, ~/.codex, "
+                "~/.gemini/antigravity, or the claude/codex/antigravity binaries "
+                "on PATH). Install Claude Code, Codex CLI, or Antigravity, or pass "
+                "--runtime <name> to force.",
                 err=True,
             )
             raise typer.Exit(1)
@@ -1089,7 +1091,7 @@ def install_hook(
             typer.echo(
                 f"Error: genome '{genome}' (resolved to '{full_slug}') does not support receipts. "
                 "Telemetry skins must declare paradigms.receipt — try 'cream', 'voltage', "
-                "'claude-code', or 'codex'.",
+                "'claude-code', 'codex', or 'antigravity'.",
                 err=True,
             )
             raise typer.Exit(1)

@@ -1,29 +1,51 @@
 ---
-title: "Set Up Claude Code Hooks"
-description: "Configure Claude Code hooks to generate HyperWeave session receipts after sessions."
+title: "Set Up Agent Runtime Hooks"
+description: "Configure Claude Code, Codex, and Antigravity hooks to generate HyperWeave session receipts."
 ---
 
 ## The Problem
 
-You want HyperWeave to automatically generate a session receipt when a Claude Code session ends, without manual intervention.
+You want HyperWeave to automatically generate session receipts from supported agent runtime transcripts without running `hyperweave session receipt` by hand.
 
 ## Automatic Installation
 
-Install only the Claude Code hook:
-
-```bash
-hyperweave install-hook --runtime claude-code
-```
-
-This modifies `~/.claude/settings.json` to add a `SessionEnd` hook. The command is idempotent: running it again removes stale `hw session` entries and replaces any prior HyperWeave hook with the current `hyperweave session receipt` command.
-
-Omit `--runtime` when you want HyperWeave to auto-detect and install hooks for every supported runtime on the machine:
+Install hooks for every detected runtime:
 
 ```bash
 hyperweave install-hook
 ```
 
-## Manual Installation
+HyperWeave detects initialized config directories or installed CLI binaries for Claude Code, Codex, and Antigravity. To install hooks even when a runtime has not been detected yet, use `all`:
+
+```bash
+hyperweave install-hook --runtime all
+```
+
+Or scope installation to one runtime:
+
+```bash
+hyperweave install-hook --runtime claude-code
+hyperweave install-hook --runtime codex
+hyperweave install-hook --runtime antigravity
+```
+
+The installer is idempotent. Running it again removes stale `hw session` entries and replaces any prior HyperWeave hook with the current `hyperweave session receipt` command.
+
+| Runtime | Hook file | Event | Notes |
+|---|---|---|---|
+| Claude Code | `~/.claude/settings.json` | `SessionEnd` | Adds one HyperWeave command group |
+| Codex | `~/.codex/hooks.json` and `~/.codex/config.toml` | `Stop` | Enables `[features] hooks = true`; receipt refreshes after each Stop event |
+| Antigravity | `~/.gemini/config/hooks.json` | `Stop` | Uses `workspacePaths[0]` so receipts land in the project workspace |
+
+Use `--genome` when every generated receipt should use the same telemetry skin:
+
+```bash
+hyperweave install-hook --runtime all --genome voltage
+```
+
+Short telemetry skin names such as `voltage`, `claude-code`, `codex`, and `antigravity` resolve to their `telemetry-*` genome IDs.
+
+## Manual Claude Code Installation
 
 Edit `~/.claude/settings.json`:
 
@@ -45,15 +67,77 @@ Edit `~/.claude/settings.json`:
 }
 ```
 
+## Manual Codex Installation
+
+Codex uses `~/.codex/hooks.json` plus a feature flag in `~/.codex/config.toml`.
+
+`~/.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "hyperweave session receipt",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`~/.codex/config.toml`:
+
+```toml
+[features]
+hooks = true
+```
+
+Codex Stop hooks can run throughout a session, so the same receipt file may refresh as the conversation progresses.
+
+## Manual Antigravity Installation
+
+Edit `~/.gemini/config/hooks.json`:
+
+```json
+{
+  "hyperweave-receipt": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "hyperweave session receipt",
+        "timeout": 10
+      }
+    ]
+  }
+}
+```
+
+Antigravity Stop hooks expect a JSON allow response on stdout. `hyperweave session receipt` detects Antigravity hook payloads and emits the required response after writing the receipt.
+
 ## How the Hook Works
 
-1. Claude Code ends a session
-2. The `SessionEnd` event fires
-3. Claude Code pipes a JSON payload to stdin containing `transcript_path`
-4. `hyperweave session receipt` reads the path from stdin
+1. The agent runtime fires its configured hook event
+2. The runtime pipes a JSON payload to stdin
+3. `hyperweave session receipt` reads the transcript path from the payload
+4. HyperWeave auto-detects the transcript runtime from the JSONL shape
 5. The telemetry pipeline parses the transcript
 6. A receipt SVG is written to `.hyperweave/receipts/`
 7. A one-line cost summary is printed to stderr
+
+Runtime payload fields differ slightly:
+
+| Runtime | Transcript field |
+|---|---|
+| Claude Code | `transcript_path` or `transcriptPath` |
+| Codex | `transcript_path`, `transcriptPath`, or an explicit transcript path argument |
+| Antigravity | `transcriptPath` plus optional `workspacePaths` |
 
 ## Custom Hook Scripts
 
@@ -91,6 +175,8 @@ Then in settings:
 }
 ```
 
+For Codex, place the same command inside a `Stop` matcher group in `~/.codex/hooks.json`. For Antigravity, place it under a named `Stop` hook in `~/.gemini/config/hooks.json`.
+
 ## Verifying the Hook
 
 Run the read-only doctor command:
@@ -99,7 +185,7 @@ Run the read-only doctor command:
 hyperweave doctor
 ```
 
-You should see Claude Code reported with a registered `hyperweave session receipt` hook. Then run a Claude Code session and check for output in the workspace:
+You should see each detected runtime reported with a registered `hyperweave session receipt` hook. Then run a supported agent session and check for output in the workspace:
 
 ```bash
 ls -la .hyperweave/receipts/
@@ -108,12 +194,18 @@ ls -la .hyperweave/receipts/
 If no receipt appears, check:
 
 1. Is HyperWeave installed in your PATH? (`which hyperweave`)
-2. Is the hook in settings? (`cat ~/.claude/settings.json | jq .hooks`)
-3. Does `hyperweave doctor` report the Claude Code hook as registered?
-4. Does the transcript exist? (Look in `~/.claude/projects/`)
+2. Is the runtime hook config present?
+   - Claude Code: `cat ~/.claude/settings.json | jq .hooks`
+   - Codex: `cat ~/.codex/hooks.json | jq .hooks`
+   - Antigravity: `cat ~/.gemini/config/hooks.json | jq .`
+3. Does `hyperweave doctor` report the runtime hook as registered?
+4. Does the transcript exist?
+   - Claude Code: `~/.claude/projects/`
+   - Codex: `~/.codex/sessions/`
+   - Antigravity: `~/.gemini/antigravity/brain/`
 
 ## Removing the Hook
 
-Edit `~/.claude/settings.json` and remove the HyperWeave entry from the `SessionEnd` array.
+Re-run `hyperweave install-hook --runtime <name>` to replace stale HyperWeave entries with the current command. To remove the hook entirely, edit the runtime config file and delete the HyperWeave entry from the hook event.
 
-For multi-runtime setup, see the [Install Session Telemetry](/tutorials/install-session-telemetry) tutorial.
+For the broader telemetry workflow, see the [Install Session Telemetry](/tutorials/install-session-telemetry) tutorial.
