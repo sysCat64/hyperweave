@@ -171,10 +171,12 @@ def test_rhythm_strip_honors_explicit_genome_pin() -> None:
 
 
 def test_short_form_genome_slug_expands_to_telemetry_prefix() -> None:
-    """``cream`` → ``telemetry-cream``; same for the other 2 v0.2.21 skins."""
+    """Receipt-capable telemetry skins accept short slugs."""
     assert _normalize_genome_slug("cream") == "telemetry-cream"
     assert _normalize_genome_slug("voltage") == "telemetry-voltage"
     assert _normalize_genome_slug("claude-code") == "telemetry-claude-code"
+    assert _normalize_genome_slug("codex") == "telemetry-codex"
+    assert _normalize_genome_slug("antigravity") == "telemetry-antigravity"
 
 
 def test_full_slug_passes_through_unchanged() -> None:
