@@ -23,9 +23,9 @@ The sole input to the composition pipeline. A frozen Pydantic model with:
 - **Content**: `title`, `value`, `slots` (structured zone content)
 - **Appearance**: `state`, `motion`, `glyph`, `glyph_mode`, `variant`, `shape`
 - **Governance**: `regime`, `metadata_tier`, `generation`
-- **Frame-specific**: `divider_variant`, `direction`, `rows`
+- **Frame-specific**: `divider_variant`, `state_glyph_shape`, `marquee_direction`, `marquee_speeds`, `glyph_tint`
 - **Telemetry**: `telemetry_data` (contract dict for `receipt` and `rhythm-strip`)
-- **Connector and data frames**: `stats_username`, `chart_owner`, `chart_repo`, `connector_data` (pre-fetched dict), `matrix` (table IR)
+- **Connector and data frames**: `stats_username`, `chart_owner`, `chart_repo`, `connector_data` (pre-fetched dict), `data_tokens`, `matrix` (table IR)
 - **Custom genome**: `genome_override` (inline genome dict — bypasses the built-in registry, equivalent to the CLI `--genome-file` flag)
 
 ## Frame Types
@@ -37,7 +37,7 @@ The sole input to the composition pipeline. A frozen Pydantic model with:
 | `badge` | Dynamic width x 20-22px | Two-panel: label + value |
 | `strip` | 530px+ x 36px | Identity + up to 4 metric cells |
 | `icon` | 64x64px | Single glyph frame |
-| `divider` | 800px x variable | 5 specimen-faithful variants |
+| `divider` | 800px x variable | Editorial and genome-themed divider variants |
 | `marquee-horizontal` | 800px x variable | SMIL scroll animation |
 | `receipt` | Variable | Session telemetry card |
 | `rhythm-strip` | Variable | Tool call density timeline |
@@ -50,17 +50,17 @@ The sole input to the composition pipeline. A frozen Pydantic model with:
 A genome declares:
 
 ```yaml
-id: brutalist-emerald
-name: Brutalist Emerald
+id: brutalist
+name: Brutalist
 category: dark
-profile: brutalist
+profile: flat
 surface_0: "#14532D"     # --dna-surface
 surface_1: "#0D0D0D"     # --dna-surface-raised
 accent: "#10B981"        # --dna-signal
 ink: "#A7F3D0"           # --dna-ink-primary
 corner: "0"              # --dna-corner
 rhythm_base: "2.618s"    # --dna-rhythm-base (phi-derived)
-compatible_motions: [static, chromatic-pulse, bars, cascade, ...]
+compatible_motions: [static, chromatic-pulse, corner-trace, dual-orbit, entanglement, rimrun]
 ```
 
 All genome properties map to CSS custom properties (`--dna-*`) consumed by templates via `var()`.
@@ -82,13 +82,12 @@ fonts:
 
 ## Motion System
 
-Three motion categories:
+Two motion categories:
 
 1. **Static**: No animation (always CIM-compliant)
-2. **Border** (5 motions): SMIL overlays on badge/strip borders
-3. **Kinetic typography** (9 motions): CSS/SMIL text animations on banners
+2. **Border** (5 motions): SMIL overlays on eligible badge, strip, and icon frames
 
-Motion templates live in `templates/motions/` and produce pure SVG animation elements.
+Motion templates live in `src/hyperweave/templates/motions/` and produce pure SVG animation fragments. The current public vocabulary is `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, and `rimrun`.
 
 ## Metadata Tiers
 
@@ -118,7 +117,7 @@ Four serving namespaces plus infrastructure:
 
 | Namespace | Purpose | Cache |
 |---|---|---|
-| `/v1/` | Composition API (badge, strip, banner, live, compose, discovery) | 300s data-bound, 3600s discovery |
+| `/v1/` | Composition API (badge, strip, icon, divider, marquee, stats, chart, matrix, compose, discovery) | 300s data-bound, 3600s discovery |
 | `/g/` | Genome registry (DNA as JSON) | 24h + stale-while-revalidate |
 | `/a/` | Artifact store (editorial specimens) | Immutable (1 year) |
 | `/d/` | Drop events (genome launch metadata) | Variable |
@@ -140,11 +139,11 @@ These invariants are enforced by CI and code review:
 
 ```bash
 # Zero f-string SVG in Python
-grep -rn 'f"<' hyperweave/ --include="*.py"  # must return nothing
+grep -rn 'f"<' src/hyperweave/ --include="*.py"  # must return nothing
 
 # No phantom genomes
-grep -rl "clinical-ivory\|glass-aurora\|stencil-midnight" hyperweave/  # must return nothing
+grep -rl "clinical-ivory\|glass-aurora\|stencil-midnight" src/hyperweave/  # must return nothing
 
 # No substrate references
-grep -rn "substrate" hyperweave/ --include="*.py" --include="*.j2" | grep -v "# deferred"  # must return nothing
+grep -rn "substrate" src/hyperweave/ --include="*.py" --include="*.j2" | grep -v "# deferred"  # must return nothing
 ```
