@@ -308,14 +308,20 @@ All discovery endpoints return JSON with `Cache-Control: public, max-age=3600`.
 
 ```json
 [
+  {"id": "automata", "name": "Automata", "category": "dark"},
   {"id": "brutalist", "name": "Brutalist", "category": "dark"},
   {"id": "chrome", "name": "Chrome", "category": "dark"},
-  {"id": "automata", "name": "Automata", "category": "light"},
-  {"id": "primer", "name": "Primer", "category": "light"}
+  {"id": "primer", "name": "Primer", "category": "light"},
+  {"id": "telemetry-antigravity", "name": "Telemetry Antigravity", "category": "light"},
+  {"id": "telemetry-claude-code", "name": "Telemetry Claude Code", "category": "light"},
+  {"id": "telemetry-codex", "name": "Telemetry Codex", "category": "light"},
+  {"id": "telemetry-cream", "name": "Telemetry Cream", "category": "light"},
+  {"id": "telemetry-voltage", "name": "Telemetry Voltage", "category": "dark"}
 ]
 ```
 
-The endpoint returns all loaded genomes, including telemetry genomes.
+The endpoint returns all loaded artifact genomes and telemetry skins. Categories
+come directly from each genome JSON.
 
 ## Namespace Routes
 
