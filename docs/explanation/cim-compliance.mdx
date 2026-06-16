@@ -19,20 +19,15 @@ Three regimes control CIM enforcement:
 
 ## CIM-Compliant Motions
 
-Only these motions pass CIM validation under the `normal` regime:
+Only `static` passes CIM validation under the `normal` regime in the current public vocabulary:
 
 | Motion | Type | Why Compliant |
 |---|---|---|
 | `static` | -- | No animation, always safe |
-| `bars` | kinetic | Predictable horizontal sweep, low distraction |
-| `broadcast` | kinetic | Subtle radial pulse, accessibility-safe |
-| `cascade` | kinetic | Sequential letter reveal, readable |
-| `drop` | kinetic | Gravity effect, natural motion |
-| `crash` | kinetic | Impact effect, brief and contained |
 
 ## Non-CIM Motions
 
-These motions require `permissive` or `ungoverned` regime:
+The current non-static motions are border overlays. They require `permissive` or `ungoverned` if you want them to render instead of being corrected to `static`:
 
 | Motion | Type | Why Non-Compliant |
 |---|---|---|
@@ -41,10 +36,6 @@ These motions require `permissive` or `ungoverned` regime:
 | `dual-orbit` | border | Two moving elements, higher visual complexity |
 | `entanglement` | border | Oscillating patterns |
 | `rimrun` | border | Continuous glow trace |
-| `converge` | kinetic | Letters moving from edges, high motion area |
-| `breach` | kinetic | Barrier-breaking effect, sudden motion |
-| `pulse` | kinetic | Rhythmic scale change, repetitive |
-| `collapse` | kinetic | Implosion effect, large motion area |
 
 ## Downgrade Behavior
 
@@ -75,8 +66,8 @@ The policy lane validator checks:
 ## Practical Usage
 
 ```bash
-# Normal regime: cascade is CIM-compliant, works fine
-hyperweave compose banner "HYPERWEAVE" -m cascade
+# Normal regime: static is CIM-compliant, works fine
+hyperweave compose badge "build" "passing" -m static
 
 # Normal regime: dual-orbit is NOT CIM-compliant, silently becomes static
 hyperweave compose badge "build" "passing" -m dual-orbit
