@@ -1,116 +1,127 @@
 ---
 title: "Motions Reference"
-description: "Complete reference for HyperWeave motion primitives -- SMIL border overlays and CSS kinetic typography."
+description: "Complete reference for HyperWeave motion primitives -- static output and SMIL border overlays."
 ---
 
-Motion primitives add animation to artifacts. There are three categories: static (no motion), border (SMIL overlays for badge/strip), and kinetic typography (CSS for banner).
+Motion primitives add governed animation metadata and SVG overlays to artifacts. The current public vocabulary is the `MotionId` enum: `static` plus five SMIL border motions.
 
 ## Motion Categories
 
 ### Static
 
-| ID | CIM | Applies To |
-|---|---|---|
-| `static` | Yes | All frames |
+`static` is the default path. It emits no motion CSS, no motion class, and short-circuits motion validation.
+
+| ID | CIM | Applies To | Behavior |
+|---|---|---|---|
+| `static` | Yes | All frames | No animation; no border overlay |
 
 ### Border Motions (SMIL)
 
-Border motions are SVG-native SMIL animations that overlay the border of badges and strips.
+Border motions are SVG-native SMIL fragments rendered from `src/hyperweave/templates/motions/border/`. They can attach to badge, strip, and icon frames when both genome compatibility and frame compatibility allow them.
 
-| ID | CIM | Description |
-|---|---|---|
-| `chromatic-pulse` | No | Cycling color shift on the border |
-| `corner-trace` | No | Animated path tracing the corners |
-| `dual-orbit` | No | Two particles orbiting the perimeter |
-| `entanglement` | No | Paired quantum-like border oscillation |
-| `rimrun` | No | Continuous border trace with glow |
+| ID | CIM | Applies To | Description |
+|---|---|---|---|
+| `chromatic-pulse` | No | `badge`, `strip`, `icon` | Chromatic gradient cycling with stroke-width and opacity modulation |
+| `corner-trace` | No | `badge`, `strip`, `icon` | Single runner tracing the rounded frame perimeter |
+| `dual-orbit` | No | `badge`, `strip`, `icon` | Two perimeter runners offset by half a circuit |
+| `entanglement` | No | `badge`, `strip`, `icon` | Coupled chromatic gradient and paired dash traversal |
+| `rimrun` | No | `badge` | Badge-sized frosted-prism rim runners with refraction and glare layers |
 
-**Applies to**: `badge`, `strip`
+`rimrun` is registry-scoped to `badge` under normal compatibility checks. The template can receive seam geometry, but the motion registry is the source of truth for default frame eligibility.
 
-### Kinetic Typography (CSS/SMIL)
+## Frame Compatibility
 
-Kinetic motions are text animation overlays applied to banner frames.
+Motion compatibility is checked after genome compatibility. `static` is always valid.
 
-| ID | CIM | Description |
-|---|---|---|
-| `bars` | Yes | Horizontal bar sweep reveal |
-| `broadcast` | Yes | Radiating signal pulse |
-| `cascade` | Yes | Cascading letter stagger |
-| `collapse` | No | Implosion toward center |
-| `converge` | No | Letters converging from edges |
-| `crash` | Yes | Impact collision effect |
-| `drop` | Yes | Gravity drop with bounce |
-| `breach` | No | Breaking through barrier |
-| `pulse` | No | Rhythmic scale pulse |
-
-**Applies to**: `banner` (brutalist-emerald only)
+| Frame | Allowed Motions Under `normal` |
+|---|---|
+| `badge` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun` |
+| `strip` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement` |
+| `icon` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement` |
+| `divider` | `static` |
+| `marquee-horizontal` | `static` |
+| `receipt` | `static` |
+| `rhythm-strip` | `static` |
+| `stats` | `static` |
+| `chart` | `static` |
+| `matrix` | `static` |
 
 ## CIM Compliance
 
 The Compositional Integrity Model (CIM) defines which motions are safe for use in governed contexts.
 
-**CIM-compliant motions** (allowed under `normal` regime):
-`static`, `bars`, `broadcast`, `cascade`, `drop`, `crash`
+**CIM-compliant motions**:
+`static`
 
-**Non-CIM motions** (require `permissive` or `ungoverned` regime):
-`chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun`, `converge`, `breach`, `pulse`, `collapse`
+**Non-CIM motions**:
+`chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun`
 
 ### Regime Behavior
 
-| Regime | CIM Enforced | Non-CIM Motion Behavior |
+| Regime | Policy-Lane Behavior | Frame Compatibility Behavior |
 |---|---|---|
-| `normal` | Yes | Silently downgraded to `static` |
-| `permissive` | No | All motions allowed (with waiver) |
-| `ungoverned` | No | All motions allowed, no validation |
+| `normal` | Non-CIM motions are corrected to `static` | Incompatible frame requests resolve to `static` |
+| `permissive` | Non-CIM motions are allowed with logged violations | Incompatible frame requests are allowed with a reason string |
+| `ungoverned` | Policy-lane checks are skipped | Unknown or incompatible motions can pass validation, but visible output still requires a registered config/template |
 
 ## Genome Compatibility
 
-| Genome | Border (5) | Kinetic (9) |
-|---|---|---|
-| brutalist-emerald | All 5 | All 9 |
-| chrome-horizon | All 5 | None |
+Genomes declare their own `compatible_motions` list. A motion must pass both the genome list and the frame compatibility table above.
+
+| Genome | Compatible Motions |
+|---|---|
+| `brutalist` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun` |
+| `chrome` | `static`, `chromatic-pulse`, `corner-trace`, `dual-orbit`, `entanglement`, `rimrun` |
+| `automata` | `static`, `chromatic-pulse`, `corner-trace`, `rimrun` |
+| `primer` | `static`, `chromatic-pulse`, `corner-trace` |
+| `telemetry-antigravity` | `static` |
+| `telemetry-claude-code` | `static` |
+| `telemetry-codex` | `static` |
+| `telemetry-cream` | `static` |
+| `telemetry-voltage` | `static` |
 
 ## Template Structure
 
-Motion templates live in `templates/motions/`:
+Motion templates live under `src/hyperweave/templates/motions/`:
 
 ```
-templates/motions/
+src/hyperweave/templates/motions/
   border/
     chromatic-pulse.svg.j2
     corner-trace.svg.j2
     dual-orbit.svg.j2
     entanglement.svg.j2
     rimrun.svg.j2
-  kinetic/
-    bars.svg.j2
-    broadcast.svg.j2
-    cascade.svg.j2
-    ...
 ```
 
-Border motions produce SMIL `<animate>` elements. Kinetic motions produce `<style>` blocks with CSS keyframes.
+The runtime scans the root motion registry and the `border/` registry subdirectory. Border templates produce SMIL `<animate>` elements and expose `defs` plus `overlay` fragments to the frame template.
 
 ## Motion YAML Config
 
-Each motion has a YAML config in `data/motions/`:
+Each motion has a YAML config under `src/hyperweave/data/motions/`:
 
 ```yaml
-# data/motions/border/chromatic-pulse.yaml
+# src/hyperweave/data/motions/border/chromatic-pulse.yaml
 id: chromatic-pulse
 name: Chromatic Pulse
-type: border
+category: smil
 cim_compliant: false
-applies_to: [badge, strip]
+animated_properties:
+  - stop-color
+  - stroke-width
+  - opacity
+applies_to: [badge, strip, icon]
 ```
 
-The `static.yaml` config is at the root of `data/motions/`.
+The `static.yaml` config lives at the root of `src/hyperweave/data/motions/`; border motion configs live in `src/hyperweave/data/motions/border/`.
 
 ## Seam Handling
 
-Border motions need to know the frame geometry for accurate overlays:
+Border overlays receive computed frame geometry from Python before the Jinja template renders.
 
-| Frame | Seam Variable |
-|---|---|
-| Badge | `left_panel_width`, `right_panel_x` |
-| Strip | `first_divider_x` |
+| Context Value | Used By | Purpose |
+|---|---|---|
+| `w`, `h`, `rx` | All border motions | Size and corner radius of the traced frame |
+| `perim` | `corner-trace`, `dual-orbit`, `entanglement` | Rounded-rectangle perimeter used for dash travel |
+| `lp_w`, `right_x` | `rimrun` | Badge panel boundaries for left/right rim paths |
+| `seam_positions` | `rimrun` | Optional strip divider coordinates for seam-aware path generation |
