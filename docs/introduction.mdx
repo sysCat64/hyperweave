@@ -26,7 +26,7 @@ ARTIFACT = FRAME x PROFILE x GENOME x SLOTS x MOTION x ENVIRONMENT
 - **Profile**: Structural skeleton (corner radii, accent widths, typography scale, glyph backing)
 - **Genome**: Aesthetic DNA (colors, shadows, glow, rhythm, compatible motions)
 - **Slots**: Content filling frame zones (labels, values, metrics, glyphs)
-- **Motion**: Animation primitive (SMIL border overlays or CSS kinetic typography)
+- **Motion**: Animation primitive (static output or SVG-native SMIL border overlays)
 - **Environment**: Target platform constraints (GitHub README, Notion, email)
 
 ## Why HyperWeave?
@@ -39,18 +39,18 @@ Agent-generated visuals are disposable -- no state, no brand, no memory. Every g
 - **Three interfaces** -- CLI, HTTP API, and MCP tools for any integration pattern
 - **Telemetry** -- parse supported agent sessions into structured visual receipts
 
-## What Ships in v0.2
+## What Ships Today
 
 | Dimension | Count |
 |---|---|
 | Frame types | 10 (badge, strip, icon, divider, marquee-horizontal, stats, chart, matrix, receipt, rhythm-strip) |
-| Genomes | 2 (brutalist-emerald, chrome-horizon) |
-| Motion configs | 16 (1 static + 5 border SMIL + 10 kinetic CSS) |
-| Glyphs | 97 (91 Simple Icons + 6 geometric) |
-| Divider variants | 5 (block, current, takeoff, void, zeropoint) |
+| Genomes | 9 (4 artifact genomes + 5 telemetry skins) |
+| Motion configs | 6 (static + 5 SVG-native border overlays) |
+| Glyphs | 97 bundled glyphs |
+| Divider variants | Genome-themed and editorial variants |
 | Metadata tiers | 5 (Tier 0 silent through Tier 4 reasoning) |
-| Paradigms | 3 per frame (default, brutalist, chrome) -- per-frame dispatch from genome |
-| Bundled fonts | 2 (JetBrains Mono, Orbitron, base64-embedded) |
+| Paradigms | 5 paradigm configs (default, brutalist, chrome, cellular, primer) |
+| Bundled fonts | Self-contained font embedding by frame/genome need |
 
 ## Three Interfaces
 
@@ -64,7 +64,7 @@ Agent-generated visuals are disposable -- no state, no brand, no memory. Every g
   <Card title="HTTP API" icon="server">
     FastAPI with URL grammar, POST composition, live data, and discovery.
     ```bash
-    curl localhost:8000/v1/badge/build/passing/brutalist-emerald
+    curl localhost:8000/v1/badge/build/passing/brutalist.static
     ```
   </Card>
   <Card title="MCP" icon="robot">
