@@ -932,13 +932,19 @@ async def compose_kit_post(req: KitRequest) -> dict[str, str]:
 
 
 _FRAME_URL_GRAMMAR: dict[str, dict[str, Any]] = {
-    "badge (static)": {
+    "badge": {
         "pattern": "/v1/badge/{title}/{value}/{genome}.{motion}",
-        "query_params": ["glyph", "glyph_mode", "state", "regime", "size", "variant", "pair"],
-    },
-    "badge (data-driven)": {
-        "pattern": "/v1/badge/{title}/{genome}.{motion}?data=...",
-        "query_params": ["data", "glyph", "glyph_mode", "state", "regime", "size", "variant", "pair"],
+        "query_params": [
+            "data",
+            "glyph",
+            "glyph_mode",
+            "state",
+            "regime",
+            "size",
+            "variant",
+            "pair",
+            "state_glyph_shape",
+        ],
     },
     "strip": {
         "pattern": "/v1/strip/{title}/{genome}.{motion}",
@@ -960,14 +966,14 @@ _FRAME_URL_GRAMMAR: dict[str, dict[str, Any]] = {
         "query_params": ["glyph_mode", "shape", "state", "regime", "variant", "pair", "size"],
     },
     "divider": {
-        "pattern": "/v1/divider/{variant}/{genome}.{motion}",
+        "pattern": "/v1/divider/{divider_variant}/{genome}.{motion}",
         "query_params": ["variant", "pair"],
     },
     "marquee-horizontal": {
         "pattern": "/v1/marquee/{title}/{genome}.{motion}",
         "query_params": ["data", "direction", "speeds", "state", "regime", "variant", "pair"],
     },
-    "chart-stars": {
+    "chart": {
         "pattern": "/v1/chart/stars/{owner}/{repo}/{genome}.{motion}",
         "query_params": ["variant", "pair"],
     },
@@ -977,7 +983,7 @@ _FRAME_URL_GRAMMAR: dict[str, dict[str, Any]] = {
     },
     "matrix": {
         "pattern": "/v1/matrix/{preset}/{genome}.{motion}",
-        "query_params": ["variant", "spec"],
+        "query_params": ["variant", "spec", "glyph_tint"],
     },
     "receipt": {"pattern": "POST /v1/compose", "query_params": []},
     "rhythm-strip": {"pattern": "POST /v1/compose", "query_params": []},
@@ -985,8 +991,9 @@ _FRAME_URL_GRAMMAR: dict[str, dict[str, Any]] = {
 
 
 @app.get("/v1/frames")
-async def list_frames() -> list[dict[str, Any]]:
+async def list_frames(response: Response) -> list[dict[str, Any]]:
     """List all frame types with URL grammar and query params."""
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return [
         {
             "type": ft.value,

@@ -284,12 +284,22 @@ All discovery endpoints return JSON with `Cache-Control: public, max-age=3600`.
   {
     "type": "badge",
     "pattern": "/v1/badge/{title}/{value}/{genome}.{motion}",
-    "query_params": ["glyph", "glyph_mode", "state", "regime", "size", "variant", "pair"]
+    "query_params": ["data", "glyph", "glyph_mode", "state", "regime", "size", "variant", "pair", "state_glyph_shape"]
   },
   {
     "type": "strip",
     "pattern": "/v1/strip/{title}/{genome}.{motion}",
     "query_params": ["value", "data", "glyph", "glyph_mode", "state", "size", "regime", "variant", "pair", "subtitle"]
+  },
+  {
+    "type": "matrix",
+    "pattern": "/v1/matrix/{preset}/{genome}.{motion}",
+    "query_params": ["variant", "spec", "glyph_tint"]
+  },
+  {
+    "type": "chart",
+    "pattern": "/v1/chart/stars/{owner}/{repo}/{genome}.{motion}",
+    "query_params": ["variant", "pair"]
   }
 ]
 ```
@@ -362,10 +372,10 @@ ComposeSpec JSON hash. Send `If-None-Match` to skip recomposition:
 
 ```bash
 # First request
-curl -v localhost:8000/v1/badge/build/passing/brutalist
+curl -v localhost:8000/v1/badge/build/passing/brutalist.static
 # Note the ETag header
 
 # Conditional request
-curl -H 'If-None-Match: "abc123"' localhost:8000/v1/badge/build/passing/brutalist
+curl -H 'If-None-Match: "abc123"' localhost:8000/v1/badge/build/passing/brutalist.static
 # Returns 304 if unchanged
 ```

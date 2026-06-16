@@ -591,12 +591,19 @@ async def test_health(client: AsyncClient) -> None:
 async def test_list_frames(client: AsyncClient) -> None:
     resp = await client.get("/v1/frames")
     assert resp.status_code == 200
+    assert resp.headers["Cache-Control"] == "public, max-age=3600"
     data = resp.json()
-    types = [f["type"] for f in data]
+    frames = {f["type"]: f for f in data}
+    types = list(frames)
     assert "badge" in types
     assert "strip" in types
     assert "icon" in types
     assert all("pattern" in f for f in data)
+    assert frames["badge"]["pattern"] == "/v1/badge/{title}/{value}/{genome}.{motion}"
+    assert "state_glyph_shape" in frames["badge"]["query_params"]
+    assert frames["chart"]["pattern"] == "/v1/chart/stars/{owner}/{repo}/{genome}.{motion}"
+    assert frames["divider"]["pattern"] == "/v1/divider/{divider_variant}/{genome}.{motion}"
+    assert "glyph_tint" in frames["matrix"]["query_params"]
 
 
 # ===========================================================================
