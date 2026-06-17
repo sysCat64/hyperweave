@@ -79,8 +79,9 @@ class DividerVariant(StrEnum):
     Post-v0.2.19 split:
       - Editorial generics (block, current, takeoff, void, zeropoint) are served
         from /a/inneraura/dividers/<slug>; genome-agnostic, hardcoded specimen colors.
-      - Genome-themed (dissolve, band, seam) live at /v1/divider/{slug}/{genome}.{motion}
-        and are validated against genome.dividers at resolve-time.
+      - Genome-themed (dissolve, band, seam, sigil, aura) live at
+        /v1/divider/{slug}/{genome}.{motion} and are validated against
+        genome.dividers at resolve-time.
     Slug consistency rule: slug carries the design name only, never genome qualifier.
     """
 
