@@ -171,7 +171,7 @@ hyperweave compose matrix --spec-file table.json -g primer --variant porcelain -
 
 A genome is a portable, machine-readable aesthetic specification. It encodes the complete visual identity (chromatic system, surface material, motion vocabulary, geometric form language) as a set of CSS custom properties that any agent can consume and apply consistently across every artifact type.
 
-Four built-in genomes ship today. Custom genome generation via AI skill files coming soon.
+Four artifact genomes and five telemetry receipt skins ship today. Custom genome files are supported via `--genome-file`; AI-generated genome skill files remain a future extension.
 
 <!--
 Why genome and not theme? Because brand isn't a design problem, it's an infrastructure problem. When an agent says "build me a status page," it has zero memory of visual identity. A genome solves that: define once, express everywhere, from a 90px badge to a 900px star history chart. The same genome produces different artifacts that feel like they came from the same hand.
