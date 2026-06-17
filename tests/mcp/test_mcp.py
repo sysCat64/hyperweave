@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock, patch
 
+from hyperweave.core.enums import DividerVariant
 from hyperweave.mcp.server import (
     genomes_resource,
     hw_compose,
@@ -40,6 +41,13 @@ def test_hw_compose_docstring_advertises_primer_variants() -> None:
     assert "primer (light editorial, 8 variants" in doc
     for variant in ("porcelain", "cream", "dusk", "petrol"):
         assert variant in doc
+
+
+def test_hw_compose_docstring_advertises_all_divider_variants() -> None:
+    """MCP docs must match the divider variant enum."""
+    doc = hw_compose.__doc__ or ""
+    for variant in DividerVariant:
+        assert variant.value in doc
 
 
 async def test_hw_compose_badge() -> None:
@@ -168,6 +176,9 @@ async def test_hw_discover_url_grammar_advertises_data_token_routes() -> None:
         assert "brutalist: 22 variants" in variant_help
         assert "automata: 16 solo tones" in variant_help
         assert "primer: noir | carbon | space | anvil | porcelain | cream | dusk | petrol" in variant_help
+    divider_slug_help = grammar["divider"]["query_params"]["divider_slug (path)"]
+    for variant in DividerVariant:
+        assert variant.value in divider_slug_help
     # Banner / timeline routes were deleted in v0.2.14.
     assert "banner" not in grammar
     assert "timeline" not in grammar

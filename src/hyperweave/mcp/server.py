@@ -35,6 +35,8 @@ _VARIANT_REFERENCE = (
     "primer: noir | carbon | space | anvil | porcelain | cream | dusk | petrol."
 )
 
+_DIVIDER_VARIANT_REFERENCE = "block | current | takeoff | void | zeropoint | dissolve | band | seam | sigil | aura"
+
 
 # ── Tools ────────────────────────────────────────────────────────────
 
@@ -91,7 +93,7 @@ async def hw_compose(
       strip:    title="readme-ai" value="STARS:2.9k,FORKS:278" (metric strip)
                 — or strip with data="gh:owner/repo.stars,gh:owner/repo.forks"
       icon:     glyph="github" (64x64 icon frame)
-      divider:  divider_variant=block|current|takeoff|void|zeropoint|dissolve
+      divider:  divider_variant=block|current|takeoff|void|zeropoint|dissolve|band|seam|sigil|aura
       marquee:  title="ITEM1 | ITEM2" (pipe-separated for raw text)
                 — or data="text:NEW,gh:owner/repo.stars,text:DOWNLOAD"
       receipt:  telemetry_data={session data contract dict}
@@ -412,7 +414,7 @@ async def hw_discover(
             "divider": {
                 "pattern": "/v1/divider/{divider_slug}/{genome}.{motion}",
                 "query_params": {
-                    "divider_slug (path)": "block | current | takeoff | void | zeropoint | dissolve | seam | band",
+                    "divider_slug (path)": _DIVIDER_VARIANT_REFERENCE,
                     "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily dissolve divider. "
