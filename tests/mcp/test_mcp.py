@@ -34,6 +34,14 @@ def test_hw_compose_docstring_advertises_16_automata_tones() -> None:
         assert tone in doc
 
 
+def test_hw_compose_docstring_advertises_primer_variants() -> None:
+    """MCP docs must include primer after it joined the artifact genome set."""
+    doc = hw_compose.__doc__ or ""
+    assert "primer (light editorial, 8 variants" in doc
+    for variant in ("porcelain", "cream", "dusk", "petrol"):
+        assert variant in doc
+
+
 async def test_hw_compose_badge() -> None:
     result = await hw_compose(type="badge", title="build", value="passing")
     assert isinstance(result, str)
@@ -145,6 +153,21 @@ async def test_hw_discover_url_grammar_advertises_data_token_routes() -> None:
     # Route-shape assertions lock the patterns against the HTTP route source of truth.
     assert grammar["stats"]["pattern"] == "/v1/stats/{username}/{genome}.{motion}"
     assert grammar["chart-stars"]["pattern"] == "/v1/chart/stars/{owner}/{repo}/{genome}.{motion}"
+    variant_entries = (
+        "badge (static)",
+        "badge (data-driven)",
+        "strip",
+        "icon",
+        "divider",
+        "marquee-horizontal",
+        "stats",
+        "chart-stars",
+    )
+    for key in variant_entries:
+        variant_help = grammar[key]["query_params"]["variant"]
+        assert "brutalist: 22 variants" in variant_help
+        assert "automata: 16 solo tones" in variant_help
+        assert "primer: noir | carbon | space | anvil | porcelain | cream | dusk | petrol" in variant_help
     # Banner / timeline routes were deleted in v0.2.14.
     assert "banner" not in grammar
     assert "timeline" not in grammar

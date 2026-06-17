@@ -23,6 +23,19 @@ mcp = FastMCP(
 )
 
 
+_VARIANT_REFERENCE = (
+    "Variant slug from the genome whitelist. "
+    "brutalist: 22 variants "
+    "(celadon/carbon/alloy/temper/pigment/ember/umber/onyx/archive/signal/"
+    "pulse/depth/afterimage/primer/ferro/ozalid/sulfur/tyrian/indigo/patina/"
+    "graphite/cyan). "
+    "chrome: horizon | abyssal | lightning | graphite | moth. "
+    "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
+    "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper). "
+    "primer: noir | carbon | space | anvil | porcelain | cream | dusk | petrol."
+)
+
+
 # ── Tools ────────────────────────────────────────────────────────────
 
 
@@ -65,7 +78,10 @@ async def hw_compose(
             chrome (dark, metallic, 5 named variants: horizon/abyssal/lightning/graphite/moth) |
             automata (cellular, 16 solo tones: violet/teal/bone/steel/amber/jade/magenta/
               cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper
-              — pair any two via ?pair=...)
+              — pair any two via ?pair=...) |
+            primer (light editorial, 8 variants: noir/carbon/space/anvil/
+              porcelain/cream/dusk/petrol) |
+            telemetry-* receipt skins (antigravity/claude-code/codex/cream/voltage)
             — or pass ``genome_override`` as an inline genome dict to bypass
               the built-in registry (equivalent to CLI ``--genome-file``).
 
@@ -114,10 +130,13 @@ async def hw_compose(
     glyph_mode: auto | fill | wire | none
     size: default | compact
     shape: square | circle (icon frame shape, genome-dependent)
-    variant: chrome → horizon | abyssal | lightning | graphite | moth
+    variant: brutalist → 22 named variants (flagship: celadon)
+             chrome → horizon | abyssal | lightning | graphite | moth
              automata → violet | teal | bone | steel | amber | jade | magenta |
                         cobalt | toxic | solar | abyssal | crimson | sulfur |
                         indigo | burgundy | copper (16 solo tones)
+             primer → noir | carbon | space | anvil | porcelain | cream |
+                       dusk | petrol
              empty = frame default flagship variant (cellular default = teal)
     pair: cellular paradigm pairing modifier (automata only). Composes any two
           solo tones — e.g. variant="teal" pair="violet". Bifamily frames
@@ -327,11 +346,7 @@ async def hw_discover(
                     "state": "active | passing | building | warning | critical | failing | offline",
                     "regime": "normal | permissive | ungoverned",
                     "size": "default | compact",
-                    "variant": (
-                        "chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
-                        "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper)."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily strip + divider. "
                         "Composes any two tones at request time (e.g. ?variant=teal&pair=violet). "
@@ -350,11 +365,7 @@ async def hw_discover(
                     "state": "Semantic state",
                     "regime": "normal | permissive | ungoverned",
                     "size": "default | compact",
-                    "variant": (
-                        "chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
-                        "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper)."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily strip + divider. "
                         "Composes any two tones at request time (e.g. ?variant=teal&pair=violet). "
@@ -371,11 +382,7 @@ async def hw_discover(
                     "subtitle": "Subtitle under identity (cellular paradigm)",
                     "glyph": "Glyph identifier",
                     "state": "Semantic state",
-                    "variant": (
-                        "chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
-                        "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper)."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily strip + divider. "
                         "Composes any two tones at request time (e.g. ?variant=teal&pair=violet). "
@@ -393,11 +400,7 @@ async def hw_discover(
                     "shape": "square | circle",
                     "glyph_mode": "auto | fill | wire | none",
                     "state": "Semantic state",
-                    "variant": (
-                        "chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
-                        "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper)."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily strip + divider. "
                         "Composes any two tones at request time (e.g. ?variant=teal&pair=violet). "
@@ -410,11 +413,7 @@ async def hw_discover(
                 "pattern": "/v1/divider/{divider_slug}/{genome}.{motion}",
                 "query_params": {
                     "divider_slug (path)": "block | current | takeoff | void | zeropoint | dissolve | seam | band",
-                    "variant": (
-                        "Chromatic variant. chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
-                        "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper)."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily dissolve divider. "
                         "Composes any two tones at request time (e.g. ?variant=teal&pair=violet)."
@@ -428,11 +427,7 @@ async def hw_discover(
                     "data": data_grammar + " When set, drives the scroll directly and ignores title.",
                     "direction": "ltr | rtl",
                     "speeds": "Single float scroll speed multiplier",
-                    "variant": (
-                        "chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones (violet/teal/bone/steel/amber/jade/magenta/"
-                        "cobalt/toxic/solar/abyssal/crimson/sulfur/indigo/burgundy/copper)."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": (
                         "automata only — second solo tone for bifamily strip + divider. "
                         "Composes any two tones at request time (e.g. ?variant=teal&pair=violet). "
@@ -448,10 +443,7 @@ async def hw_discover(
                 "pattern": "/v1/stats/{username}/{genome}.{motion}",
                 "query_params": {
                     "data": "Optional live data tokens appended as stats metric slots.",
-                    "variant": (
-                        "Chromatic variant. chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": "automata only — silently ignored on stats (kept for URL grammar uniformity).",
                 },
                 "example": "/v1/stats/GLM-5/chrome.static?data=github:zai-org/GLM-5.stars,hf:zai-org/GLM-5.1.downloads",
@@ -472,10 +464,7 @@ async def hw_discover(
             "chart-stars": {
                 "pattern": "/v1/chart/stars/{owner}/{repo}/{genome}.{motion}",
                 "query_params": {
-                    "variant": (
-                        "Chromatic variant. chrome: horizon | abyssal | lightning | graphite | moth. "
-                        "automata: 16 solo tones."
-                    ),
+                    "variant": _VARIANT_REFERENCE,
                     "pair": "automata only — silently ignored on chart (kept for URL grammar uniformity).",
                 },
                 "example": "/v1/chart/stars/eli64s/readme-ai/automata.static?variant=bone",
