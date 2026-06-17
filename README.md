@@ -870,7 +870,7 @@ Every artifact ships with:
 | Dimension | Count |
 |---|---|
 | Frame types | 10 (badge, strip, icon, divider, marquee-horizontal, stats, chart, matrix, receipt, rhythm-strip) |
-| Genomes | 4 (automata, brutalist, chrome, primer) |
+| Genomes | 9 (4 artifact genomes + 5 telemetry skins) |
 | Motion configs | 6 (1 static + 5 border SMIL) |
 | Glyphs | 189 (183 brand marks + 6 geometric shapes) |
 | Divider variants | 10: 5 genome-themed (`band` chrome, `seam` + `sigil` brutalist, `dissolve` automata, `aura` primer) + 5 genome-agnostic (`block`, `current`, `takeoff`, `void`, `zeropoint`) at <code>/a/inneraura/dividers/</code> |
