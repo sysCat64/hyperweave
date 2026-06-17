@@ -142,9 +142,9 @@ hyperweave live <provider> <identifier> <metric> [options]
 
 | Argument | Description |
 |---|---|
-| `provider` | `github`, `pypi`, `npm`, `arxiv`, `huggingface`, `docker` |
-| `identifier` | Resource ID (`owner/repo`, `package-name`, `paper-id`) |
-| `metric` | Metric name (`stars`, `forks`, `version`, `downloads`) |
+| `provider` | `github`, `pypi`, `npm`, `arxiv`, `huggingface`, `docker`, `crates`, `scorecard`, `dora` |
+| `identifier` | Resource ID (`owner/repo`, `package-name`, `paper-id`, container image, or crate name) |
+| `metric` | Provider metric such as `stars`, `forks`, `version`, `downloads`, `pull_count`, `score`, or `deploy_frequency` |
 
 ### `genomes`
 
